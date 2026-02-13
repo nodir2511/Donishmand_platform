@@ -1,0 +1,6 @@
+@echo off
+echo Proveryayu zavisimosti...
+call npm install
+echo Zapuskayu server razrabotki...
+npm run dev
+pause

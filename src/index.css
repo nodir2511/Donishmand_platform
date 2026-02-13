@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gaming-bg text-gaming-text font-sans overflow-x-hidden;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-gaming-primary to-gaming-pink;
+  }
+  .glass-panel {
+    @apply bg-gaming-card/60 backdrop-blur-xl border border-white/5;
+  }
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+}
+
+/* Custom Scrollbar for sleek look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0B15; 
+}
+::-webkit-scrollbar-thumb {
+  background: #1E1E30; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6C5DD3; 
+}

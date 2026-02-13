@@ -1,0 +1,134 @@
+import React, { useState } from 'react';
+import { X, Save, Video, FileText, ClipboardList, Presentation } from 'lucide-react';
+import VideoEditor from './VideoEditor';
+import TextEditor from './TextEditor';
+import TestEditor from './TestEditor';
+import SlidesEditor from './SlidesEditor';
+
+const TABS = [
+    { id: 'video', icon: Video, label: { ru: 'Видео', tj: 'Видео' } },
+    { id: 'text', icon: FileText, label: { ru: 'Текст', tj: 'Матн' } },
+    { id: 'test', icon: ClipboardList, label: { ru: 'Тест', tj: 'Тест' } },
+    { id: 'slides', icon: Presentation, label: { ru: 'Слайды', tj: 'Слайдҳо' } },
+];
+
+const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
+    const [activeTab, setActiveTab] = useState('video');
+    const [content, setContent] = useState(lesson.content || {
+        video: { url: '', descriptionRu: '', descriptionTj: '' },
+        text: { bodyRu: '', bodyTj: '' },
+        test: { questions: [] },
+        slidesRu: [],
+        slidesTj: []
+    });
+
+    const handleTabChange = (tabId) => {
+        setActiveTab(tabId);
+    };
+
+    const handleContentChange = (tabId, data) => {
+        setContent(prev => ({ ...prev, [tabId]: data }));
+    };
+
+    const handleSave = () => {
+        onSave({ ...lesson, content });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="w-full max-w-4xl max-h-[90vh] bg-gaming-card/95 backdrop-blur-xl rounded-3xl border border-white/10 overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b border-white/10">
+                    <div>
+                        <h2 className="text-2xl font-bold">
+                            {lang === 'ru' ? 'Редактирование содержимого' : 'Таҳрири мундариҷа'}
+                        </h2>
+                        <p className="text-gaming-textMuted mt-1">
+                            {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-gaming-textMuted hover:text-white transition-colors"
+                    >
+                        <X size={24} />
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-2 px-6 py-4 border-b border-white/5 overflow-x-auto">
+                    {TABS.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => handleTabChange(tab.id)}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${isActive
+                                    ? 'bg-gaming-primary text-white'
+                                    : 'bg-gaming-bg/50 text-gaming-textMuted hover:text-white'
+                                    }`}
+                            >
+                                <Icon size={18} />
+                                {tab.label[lang]}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Content Area */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {activeTab === 'video' && (
+                        <VideoEditor
+                            data={content.video || {}}
+                            onChange={(data) => handleContentChange('video', data)}
+                            lang={lang}
+                        />
+                    )}
+                    {activeTab === 'text' && (
+                        <TextEditor
+                            data={content.text || {}}
+                            onChange={(data) => handleContentChange('text', data)}
+                            lang={lang}
+                        />
+                    )}
+                    {activeTab === 'test' && (
+                        <TestEditor
+                            data={content.test || { questions: [] }}
+                            onChange={(data) => handleContentChange('test', data)}
+                            lang={lang}
+                        />
+                    )}
+                    {activeTab === 'slides' && (
+                        <SlidesEditor
+                            slidesRu={content.slidesRu || []}
+                            slidesTj={content.slidesTj || []}
+                            onChange={(field, data) => setContent(prev => ({ ...prev, [field]: data }))}
+                            lang={lang}
+                        />
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+                    <button
+                        onClick={onClose}
+                        className="px-6 py-3 text-gaming-textMuted hover:text-white transition-colors"
+                    >
+                        {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                    </button>
+                    <button
+                        onClick={handleSave}
+                        className="flex items-center gap-2 px-6 py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95"
+                    >
+                        <Save size={18} />
+                        {lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default LessonContentEditor;

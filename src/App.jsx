@@ -8,6 +8,7 @@ import SectionPage from './components/pages/SectionPage';
 import TopicPage from './components/pages/TopicPage';
 import LessonPage from './components/pages/LessonPage';
 import CreatorPage from './components/pages/CreatorPage';
+import NotFoundPage from './components/pages/NotFoundPage';
 import { TRANSLATIONS } from './constants/data';
 
 function AppContent() {
@@ -32,6 +33,7 @@ function AppContent() {
                     <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage lang={lang} t={t} />} />
                     <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} />} />
                     <Route path="/creator" element={<CreatorPage lang={lang} t={t} />} />
+                    <Route path="*" element={<NotFoundPage lang={lang} t={t} />} />
                 </Routes>
             </main>
 

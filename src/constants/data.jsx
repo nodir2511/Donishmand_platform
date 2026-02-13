@@ -18,7 +18,11 @@ export const TRANSLATIONS = {
         navCourses: "Курсы",
         navLibrary: "Библиотека",
         navAbout: "О нас",
-        navLogin: "Войти"
+        navLogin: "Войти",
+        errorTitle: "Страница не найдена",
+        errorSubtitle: "Похоже, вы забрели в неизведанную зону. Страница, которую вы ищете, была удалена или перемещена.",
+        errorHome: "На главную",
+        errorBack: "Вернуться назад"
     },
     tj: {
         heroTitle: <>Донише, ки ояндаро <span className="text-gradient">тағйир медиҳад</span></>,
@@ -35,7 +39,11 @@ export const TRANSLATIONS = {
         navCourses: "Курсҳо",
         navLibrary: "Китобхона",
         navAbout: "Дар бораи мо",
-        navLogin: "Ворид шудан"
+        navLogin: "Ворид шудан",
+        errorTitle: "Саҳифа ёфт нашуд",
+        errorSubtitle: "Ба назар мерасад, ки шумо ба минтақаи номаълум ворид шудед. Саҳифае, ки шумо меҷӯед, ҳазф шудааст ё кӯчонида шудааст.",
+        errorHome: "Ба саҳифаи асосӣ",
+        errorBack: "Ба қафо"
     }
 };
 

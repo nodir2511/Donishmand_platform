@@ -1,0 +1,53 @@
+import React from 'react';
+import { Home, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+
+const NotFoundPage = ({ lang, t }) => {
+    return (
+        <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 relative overflow-hidden">
+
+            {/* Background Elements */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gaming-pink/5 rounded-full blur-[100px] pointer-events-none"></div>
+            <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-gaming-primary/10 rounded-full blur-[80px] pointer-events-none animate-pulse-slow"></div>
+
+            <div className="relative z-10 text-center max-w-2xl mx-auto">
+                <div className="inline-flex items-center justify-center p-4 bg-gaming-card/50 backdrop-blur-md rounded-3xl border border-gaming-pink/20 shadow-lg shadow-gaming-pink/10 mb-8 animate-float">
+                    <AlertTriangle size={64} className="text-gaming-pink" />
+                </div>
+
+                <h1 className="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-gaming-primary via-gaming-pink to-gaming-accent mb-4 drop-shadow-2xl">
+                    404
+                </h1>
+
+                <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
+                    {t.errorTitle}
+                </h2>
+
+                <p className="text-lg text-gaming-textMuted mb-10 leading-relaxed">
+                    {t.errorSubtitle}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Link
+                        to="/"
+                        className="group relative bg-gaming-primary hover:bg-gaming-primary/90 text-white px-8 py-3 rounded-xl font-bold transition-all active:scale-95 shadow-lg shadow-gaming-primary/25 flex items-center justify-center gap-2 overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                        <Home size={20} />
+                        <span>{t.errorHome}</span>
+                    </Link>
+
+                    <button
+                        onClick={() => window.history.back()}
+                        className="group bg-transparent hover:bg-white/5 text-white border border-white/10 px-8 py-3 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 backdrop-blur-sm"
+                    >
+                        <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+                        <span>{t.errorBack}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default NotFoundPage;

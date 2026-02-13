@@ -36,15 +36,15 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-4xl max-h-[90vh] bg-gaming-card/95 backdrop-blur-xl rounded-3xl border border-white/10 overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:p-4">
+            <div className="w-full max-w-4xl h-[90vh] sm:h-auto sm:max-h-[90vh] bg-gaming-card/95 backdrop-blur-xl rounded-t-3xl sm:rounded-3xl border border-white/10 overflow-hidden flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-white/10">
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 shrink-0">
                     <div>
-                        <h2 className="text-2xl font-bold">
-                            {lang === 'ru' ? 'Редактирование содержимого' : 'Таҳрири мундариҷа'}
+                        <h2 className="text-xl sm:text-2xl font-bold">
+                            {lang === 'ru' ? 'Редактирование' : 'Таҳрир'}
                         </h2>
-                        <p className="text-gaming-textMuted mt-1">
+                        <p className="text-gaming-textMuted mt-1 text-sm sm:text-base truncate max-w-[200px] sm:max-w-md">
                             {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
                         </p>
                     </div>
@@ -57,7 +57,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 px-6 py-4 border-b border-white/5 overflow-x-auto">
+                <div className="flex gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-white/5 overflow-x-auto shrink-0 no-scrollbar">
                     {TABS.map(tab => {
                         const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
@@ -65,12 +65,12 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
                             <button
                                 key={tab.id}
                                 onClick={() => handleTabChange(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-xl whitespace-nowrap transition-all ${isActive
+                                className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl whitespace-nowrap transition-all text-sm sm:text-base ${isActive
                                     ? 'bg-gaming-primary text-white'
                                     : 'bg-gaming-bg/50 text-gaming-textMuted hover:text-white'
                                     }`}
                             >
-                                <Icon size={18} />
+                                <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
                                 {tab.label[lang]}
                             </button>
                         );
@@ -78,7 +78,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                     {activeTab === 'video' && (
                         <VideoEditor
                             data={content.video || {}}
@@ -111,16 +111,16 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang }) => {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
+                <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-white/10 shrink-0 bg-gaming-card/95">
                     <button
                         onClick={onClose}
-                        className="px-6 py-3 text-gaming-textMuted hover:text-white transition-colors"
+                        className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-gaming-textMuted hover:text-white transition-colors"
                     >
-                        {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                        {lang === 'ru' ? 'Отмена' : 'Бекор'}
                     </button>
                     <button
                         onClick={handleSave}
-                        className="flex items-center gap-2 px-6 py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95"
+                        className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95 text-sm sm:text-base"
                     >
                         <Save size={18} />
                         {lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}

@@ -4,6 +4,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { compressImage } from '../../utils/imageHelpers';
+import { translateText } from '../../services/translationService';
 
 const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: slide.id });
@@ -37,12 +38,14 @@ const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => 
                         <span className="text-sm text-gaming-textMuted">
                             {lang === 'ru' ? 'Слайд' : 'Слайд'} #{index + 1}
                         </span>
-                        <button
-                            onClick={() => onDelete(slide.id)}
-                            className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
-                        >
-                            <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => onDelete(slide.id)}
+                                className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Image URL */}
@@ -138,16 +141,14 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
         onChange(currentListField, updated);
     };
 
-    const deleteSlide = (slideId) => {
-        const updated = slides.filter(s => s.id !== slideId);
-        onChange(currentListField, updated);
+    const deleteSlide = (id) => {
+        onChange(currentListField, slides.filter(s => s.id !== id));
     };
 
     const handleDragEnd = (event) => {
-        const { active, over } = event;
-        if (active.id !== over?.id) {
-            const oldIndex = slides.findIndex(s => s.id === active.id);
-            const newIndex = slides.findIndex(s => s.id === over.id);
+        if (active.id !== over.id) {
+            const oldIndex = slides.findIndex((s) => s.id === active.id);
+            const newIndex = slides.findIndex((s) => s.id === over.id);
             onChange(currentListField, arrayMove(slides, oldIndex, newIndex));
         }
     };
@@ -167,8 +168,8 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
                         <button
                             onClick={() => setEditLang('ru')}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${editLang === 'ru'
-                                    ? 'bg-gaming-primary text-white shadow-lg'
-                                    : 'text-gaming-textMuted hover:text-white'
+                                ? 'bg-gaming-primary text-white shadow-lg'
+                                : 'text-gaming-textMuted hover:text-white'
                                 }`}
                         >
                             <Globe size={14} />
@@ -177,8 +178,8 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
                         <button
                             onClick={() => setEditLang('tj')}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${editLang === 'tj'
-                                    ? 'bg-gaming-accent text-white shadow-lg'
-                                    : 'text-gaming-textMuted hover:text-white'
+                                ? 'bg-gaming-accent text-white shadow-lg'
+                                : 'text-gaming-textMuted hover:text-white'
                                 }`}
                         >
                             <Globe size={14} />

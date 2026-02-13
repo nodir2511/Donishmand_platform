@@ -123,6 +123,17 @@ const TestEditor = ({ data, onChange, lang }) => {
         }
     };
 
+    const autoTranslateQuestionTjToRu = async (qIndex) => {
+        const key = `q_${qIndex}`;
+        setTranslating(prev => ({ ...prev, [key]: true }));
+        try {
+            const translated = await translateText(questions[qIndex].textTj, 'tj', 'ru');
+            updateQuestion(qIndex, 'textRu', translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
     const autoTranslateOption = async (qIndex, optIndex) => {
         const key = `opt_${qIndex}_${optIndex}`;
         setTranslating(prev => ({ ...prev, [key]: true }));
@@ -130,6 +141,18 @@ const TestEditor = ({ data, onChange, lang }) => {
             const opt = questions[qIndex].options[optIndex];
             const translated = await translateText(opt.textRu, 'ru', 'tj');
             updateOption(qIndex, optIndex, 'textTj', translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const autoTranslateOptionTjToRu = async (qIndex, optIndex) => {
+        const key = `opt_${qIndex}_${optIndex}`;
+        setTranslating(prev => ({ ...prev, [key]: true }));
+        try {
+            const opt = questions[qIndex].options[optIndex];
+            const translated = await translateText(opt.textTj, 'tj', 'ru');
+            updateOption(qIndex, optIndex, 'textRu', translated);
         } finally {
             setTranslating(prev => ({ ...prev, [key]: false }));
         }
@@ -147,6 +170,18 @@ const TestEditor = ({ data, onChange, lang }) => {
         }
     };
 
+    const autoTranslateLeftItemTjToRu = async (qIndex, itemIndex) => {
+        const key = `left_${qIndex}_${itemIndex}`;
+        setTranslating(prev => ({ ...prev, [key]: true }));
+        try {
+            const item = questions[qIndex].leftItems[itemIndex];
+            const translated = await translateText(item.textTj, 'tj', 'ru');
+            updateLeftItem(qIndex, itemIndex, 'textRu', translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
     const autoTranslateRightItem = async (qIndex, itemIndex) => {
         const key = `right_${qIndex}_${itemIndex}`;
         setTranslating(prev => ({ ...prev, [key]: true }));
@@ -154,6 +189,18 @@ const TestEditor = ({ data, onChange, lang }) => {
             const item = questions[qIndex].rightItems[itemIndex];
             const translated = await translateText(item.textRu, 'ru', 'tj');
             updateRightItem(qIndex, itemIndex, 'textTj', translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, [key]: false }));
+        }
+    };
+
+    const autoTranslateRightItemTjToRu = async (qIndex, itemIndex) => {
+        const key = `right_${qIndex}_${itemIndex}`;
+        setTranslating(prev => ({ ...prev, [key]: true }));
+        try {
+            const item = questions[qIndex].rightItems[itemIndex];
+            const translated = await translateText(item.textTj, 'tj', 'ru');
+            updateRightItem(qIndex, itemIndex, 'textRu', translated);
         } finally {
             setTranslating(prev => ({ ...prev, [key]: false }));
         }
@@ -225,14 +272,22 @@ const TestEditor = ({ data, onChange, lang }) => {
                             </div>
 
                             {/* Текст вопроса RU */}
-                            <div className="mb-3">
+                            <div className="flex gap-2 mb-3">
                                 <input
                                     type="text"
                                     value={q.textRu}
                                     onChange={(e) => updateQuestion(qIndex, 'textRu', e.target.value)}
                                     placeholder={lang === 'ru' ? 'Текст вопроса (RU)' : 'Матни савол (RU)'}
-                                    className="w-full bg-gaming-bg/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:border-gaming-pink/50 transition-colors"
+                                    className="flex-1 bg-gaming-bg/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:border-gaming-pink/50 transition-colors"
                                 />
+                                <button
+                                    onClick={() => autoTranslateQuestionTjToRu(qIndex)}
+                                    disabled={translating[`q_${qIndex}`]}
+                                    className="px-2 py-2 bg-gaming-primary/20 text-gaming-primary rounded-lg hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
+                                    title="Перевести TJ -> RU"
+                                >
+                                    {translating[`q_${qIndex}`] ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} className="rotate-180" />}
+                                </button>
                             </div>
 
                             {/* Текст вопроса TJ */}
@@ -241,14 +296,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                                     type="text"
                                     value={q.textTj}
                                     onChange={(e) => updateQuestion(qIndex, 'textTj', e.target.value)}
-                                    placeholder={lang === 'ru' ? 'Матни савол (TJ)' : 'Матни савол (TJ)'}
+                                    placeholder={lang === 'ru' ? 'Текст вопроса (TJ)' : 'Матни савол (TJ)'}
                                     className="flex-1 bg-gaming-bg/50 border border-white/10 rounded-lg px-3 py-2 text-white placeholder-white/30 focus:outline-none focus:border-gaming-accent/50 transition-colors"
                                 />
                                 <button
                                     onClick={() => autoTranslateQuestion(qIndex)}
                                     disabled={translating[`q_${qIndex}`]}
                                     className="px-2 py-2 bg-gaming-accent/20 text-gaming-accent rounded-lg hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
-                                    title="Авто-перевод"
+                                    title="Перевести RU -> TJ"
                                 >
                                     {translating[`q_${qIndex}`] ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                 </button>
@@ -279,6 +334,13 @@ const TestEditor = ({ data, onChange, lang }) => {
                                                 placeholder="RU"
                                                 className="flex-1 bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50"
                                             />
+                                            <button
+                                                onClick={() => autoTranslateOptionTjToRu(qIndex, optIndex)}
+                                                disabled={translating[`opt_${qIndex}_${optIndex}`]}
+                                                className="p-1.5 bg-gaming-primary/20 text-gaming-primary rounded-lg hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
+                                            >
+                                                {translating[`opt_${qIndex}_${optIndex}`] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} className="rotate-180" />}
+                                            </button>
                                             <input
                                                 type="text"
                                                 value={opt.textTj}
@@ -301,14 +363,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                             {/* ТИП: Соответствия */}
                             {q.type === 'matching' && (
                                 <div className="space-y-4 ml-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {/* Левая колонка (A, B, C, D) */}
                                         <div className="space-y-2">
                                             <span className="text-xs text-gaming-textMuted block mb-2">
                                                 {lang === 'ru' ? 'Левая колонка (A, B, C, D)' : 'Сутуну чап'}
                                             </span>
                                             {q.leftItems.map((item, idx) => (
-                                                <div key={item.id} className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                                                <div key={item.id} className="p-2 sm:p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-gaming-pink font-bold w-6">{item.id})</span>
                                                         <input
@@ -319,21 +381,28 @@ const TestEditor = ({ data, onChange, lang }) => {
                                                             className="flex-1 bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gaming-pink/50"
                                                         />
                                                         <button
+                                                            onClick={() => autoTranslateLeftItemTjToRu(qIndex, idx)}
+                                                            disabled={translating[`left_${qIndex}_${idx}`]}
+                                                            className="p-1.5 bg-gaming-primary/20 text-gaming-primary rounded-lg hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {translating[`left_${qIndex}_${idx}`] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} className="rotate-180" />}
+                                                        </button>
+                                                    </div>
+                                                    <div className="pl-8 flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={item.textTj}
+                                                            onChange={(e) => updateLeftItem(qIndex, idx, 'textTj', e.target.value)}
+                                                            placeholder="TJ"
+                                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-gaming-accent/50"
+                                                        />
+                                                        <button
                                                             onClick={() => autoTranslateLeftItem(qIndex, idx)}
                                                             disabled={translating[`left_${qIndex}_${idx}`]}
                                                             className="p-1.5 bg-gaming-accent/20 text-gaming-accent rounded-lg hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
                                                         >
                                                             {translating[`left_${qIndex}_${idx}`] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                                         </button>
-                                                    </div>
-                                                    <div className="pl-8">
-                                                        <input
-                                                            type="text"
-                                                            value={item.textTj}
-                                                            onChange={(e) => updateLeftItem(qIndex, idx, 'textTj', e.target.value)}
-                                                            placeholder="TJ (перевод)"
-                                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-gaming-accent/50"
-                                                        />
                                                     </div>
                                                 </div>
                                             ))}
@@ -344,7 +413,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                                 {lang === 'ru' ? 'Правая колонка (1-5)' : 'Сутуну рост'}
                                             </span>
                                             {q.rightItems.map((item, idx) => (
-                                                <div key={item.id} className="p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
+                                                <div key={item.id} className="p-2 sm:p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-gaming-accent font-bold w-6">{item.id})</span>
                                                         <input
@@ -355,21 +424,28 @@ const TestEditor = ({ data, onChange, lang }) => {
                                                             className="flex-1 bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50"
                                                         />
                                                         <button
+                                                            onClick={() => autoTranslateRightItemTjToRu(qIndex, idx)}
+                                                            disabled={translating[`right_${qIndex}_${idx}`]}
+                                                            className="p-1.5 bg-gaming-primary/20 text-gaming-primary rounded-lg hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {translating[`right_${qIndex}_${idx}`] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} className="rotate-180" />}
+                                                        </button>
+                                                    </div>
+                                                    <div className="pl-8 flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={item.textTj}
+                                                            onChange={(e) => updateRightItem(qIndex, idx, 'textTj', e.target.value)}
+                                                            placeholder="TJ"
+                                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-gaming-accent/50"
+                                                        />
+                                                        <button
                                                             onClick={() => autoTranslateRightItem(qIndex, idx)}
                                                             disabled={translating[`right_${qIndex}_${idx}`]}
                                                             className="p-1.5 bg-gaming-accent/20 text-gaming-accent rounded-lg hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
                                                         >
                                                             {translating[`right_${qIndex}_${idx}`] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                                         </button>
-                                                    </div>
-                                                    <div className="pl-8">
-                                                        <input
-                                                            type="text"
-                                                            value={item.textTj}
-                                                            onChange={(e) => updateRightItem(qIndex, idx, 'textTj', e.target.value)}
-                                                            placeholder="TJ (перевод)"
-                                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white/70 placeholder-white/20 focus:outline-none focus:border-gaming-accent/50"
-                                                        />
                                                     </div>
                                                 </div>
                                             ))}

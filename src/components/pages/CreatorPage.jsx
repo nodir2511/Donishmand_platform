@@ -589,7 +589,37 @@ const CreatorPage = ({ lang, t }) => {
         }
     };
 
-    const renderDualInput = (valueRu, setValueRu, valueTj, setValueTj, onAutoTranslate, placeholderRu = 'Название (RU)', placeholderTj = 'Номи (TJ)') => (
+    const handleAutoTranslateSectionTjToRu = async () => {
+        setTranslating(prev => ({ ...prev, section: true }));
+        try {
+            const translated = await translateText(newSectionTitleTj, 'tj', 'ru');
+            setNewSectionTitleRu(translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, section: false }));
+        }
+    };
+
+    const handleAutoTranslateTopicTjToRu = async () => {
+        setTranslating(prev => ({ ...prev, topic: true }));
+        try {
+            const translated = await translateText(newTopicTitleTj, 'tj', 'ru');
+            setNewTopicTitleRu(translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, topic: false }));
+        }
+    };
+
+    const handleAutoTranslateLessonTjToRu = async () => {
+        setTranslating(prev => ({ ...prev, lesson: true }));
+        try {
+            const translated = await translateText(newLessonTitleTj, 'tj', 'ru');
+            setNewLessonTitleRu(translated);
+        } finally {
+            setTranslating(prev => ({ ...prev, lesson: false }));
+        }
+    };
+
+    const renderDualInput = (valueRu, setValueRu, valueTj, setValueTj, onAutoTranslateRuToTj, onAutoTranslateTjToRu, placeholderRu = 'Название (RU)', placeholderTj = 'Номи (TJ)') => (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
@@ -597,6 +627,9 @@ const CreatorPage = ({ lang, t }) => {
                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50 transition-colors" />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 font-medium">RU</span>
                 </div>
+                <button type="button" onClick={onAutoTranslateTjToRu} className="flex items-center gap-1 px-3 py-3 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors text-sm" title="Перевести TJ -> RU">
+                    <Sparkles size={16} className="rotate-180" />
+                </button>
             </div>
             <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
@@ -604,7 +637,7 @@ const CreatorPage = ({ lang, t }) => {
                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-accent/50 transition-colors" />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 font-medium">TJ</span>
                 </div>
-                <button type="button" onClick={onAutoTranslate} className="flex items-center gap-1 px-3 py-3 bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors text-sm" title="Авто-перевод">
+                <button type="button" onClick={onAutoTranslateRuToTj} className="flex items-center gap-1 px-3 py-3 bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors text-sm" title="Перевести RU -> TJ">
                     <Sparkles size={16} />
                 </button>
             </div>
@@ -622,27 +655,27 @@ const CreatorPage = ({ lang, t }) => {
     return (
         <div className="min-h-screen bg-gaming-bg font-sans text-white p-6">
             {/* Шапка */}
-            <div className="flex items-center justify-between mb-8">
-                <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+                <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors self-start">
                     <ChevronLeft size={20} />
                     {lang === 'ru' ? 'Назад' : 'Бозгашт'}
                 </button>
             </div>
 
-            <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-                <GraduationCap className="text-gaming-primary" size={40} />
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
+                <GraduationCap className="text-gaming-primary" size={32} />
                 {lang === 'ru' ? 'Панель Создателя' : 'Панели Эҷодкор'}
             </h1>
-            <p className="text-gaming-textMuted text-lg mb-8">
+            <p className="text-gaming-textMuted text-base sm:text-lg mb-6 sm:mb-8">
                 {lang === 'ru' ? 'Добавляйте разделы, темы и уроки. Перетаскивайте для сортировки.' : 'Бахшҳо, мавзӯъҳо ва дарсҳоро илова кунед. Барои мураттаб кардан кашед.'}
             </p>
 
             {/* Селектор предмета */}
-            <div className="mb-8">
+            <div className="mb-6 sm:mb-8">
                 <label className="block text-sm text-gaming-textMuted mb-2">{lang === 'ru' ? 'Выберите предмет' : 'Фанро интихоб кунед'}</label>
                 <div className="relative">
                     <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}
-                        className="w-full max-w-md bg-gaming-card/60 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white appearance-none cursor-pointer focus:outline-none focus:border-gaming-primary/50 transition-colors">
+                        className="w-full sm:max-w-md bg-gaming-card/60 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white appearance-none cursor-pointer focus:outline-none focus:border-gaming-primary/50 transition-colors">
                         {ALL_SUBJECTS_LIST.map(subjectId => (
                             <option key={subjectId} value={subjectId} className="bg-gaming-card text-white">{SUBJECT_NAMES[subjectId]?.[lang] || subjectId}</option>
                         ))}
@@ -652,13 +685,13 @@ const CreatorPage = ({ lang, t }) => {
             </div>
 
             {/* Область контента */}
-            <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-6">
-                <div className="flex items-center justify-between mb-6">
+            <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Layers className="text-gaming-primary" size={24} />
                         {lang === 'ru' ? 'Разделы' : 'Бахшҳо'}
                     </h2>
-                    <button onClick={() => setShowAddSection(true)} className="flex items-center gap-2 px-4 py-2 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors active:scale-95">
+                    <button onClick={() => setShowAddSection(true)} className="flex items-center justify-center gap-2 px-4 py-2 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors active:scale-95 w-full sm:w-auto">
                         <FolderPlus size={18} />
                         {lang === 'ru' ? 'Добавить раздел' : 'Илова кардани бахш'}
                     </button>
@@ -668,7 +701,7 @@ const CreatorPage = ({ lang, t }) => {
                 {showAddSection && (
                     <div className="mb-6 p-4 bg-gaming-bg/50 rounded-2xl border border-gaming-primary/30">
                         <h3 className="text-lg font-semibold mb-4 text-gaming-primary">{lang === 'ru' ? 'Новый раздел' : 'Бахши нав'}</h3>
-                        {renderDualInput(newSectionTitleRu, setNewSectionTitleRu, newSectionTitleTj, setNewSectionTitleTj, handleAutoTranslateSectionRuToTj)}
+                        {renderDualInput(newSectionTitleRu, setNewSectionTitleRu, newSectionTitleTj, setNewSectionTitleTj, handleAutoTranslateSectionRuToTj, handleAutoTranslateSectionTjToRu)}
                         <div className="flex gap-3 mt-4">
                             <button onClick={handleAddSection} className="flex items-center gap-2 px-4 py-2 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95">
                                 <Save size={16} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
@@ -714,7 +747,7 @@ const CreatorPage = ({ lang, t }) => {
                                                     {showAddTopic === section.id && (
                                                         <div className="mb-4 p-4 bg-gaming-card/50 rounded-xl border border-gaming-accent/30">
                                                             <h4 className="text-md font-semibold mb-3 text-gaming-accent">{lang === 'ru' ? 'Новая тема' : 'Мавзӯи нав'}</h4>
-                                                            {renderDualInput(newTopicTitleRu, setNewTopicTitleRu, newTopicTitleTj, setNewTopicTitleTj, handleAutoTranslateTopicRuToTj)}
+                                                            {renderDualInput(newTopicTitleRu, setNewTopicTitleRu, newTopicTitleTj, setNewTopicTitleTj, handleAutoTranslateTopicRuToTj, handleAutoTranslateTopicTjToRu)}
                                                             <div className="flex gap-3 mt-4">
                                                                 <button onClick={() => handleAddTopic(section.id)} className="flex items-center gap-2 px-3 py-2 bg-gaming-accent text-white rounded-lg hover:bg-gaming-accent/80 transition-colors active:scale-95 text-sm">
                                                                     <Save size={14} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
@@ -759,7 +792,7 @@ const CreatorPage = ({ lang, t }) => {
                                                                                     {showAddLesson?.sectionId === section.id && showAddLesson?.topicId === topic.id && (
                                                                                         <div className="mb-3 p-3 bg-gaming-bg/50 rounded-lg border border-gaming-pink/30">
                                                                                             <h5 className="text-sm font-semibold mb-3 text-gaming-pink">{lang === 'ru' ? 'Новый урок' : 'Дарси нав'}</h5>
-                                                                                            {renderDualInput(newLessonTitleRu, setNewLessonTitleRu, newLessonTitleTj, setNewLessonTitleTj, handleAutoTranslateLessonRuToTj)}
+                                                                                            {renderDualInput(newLessonTitleRu, setNewLessonTitleRu, newLessonTitleTj, setNewLessonTitleTj, handleAutoTranslateLessonRuToTj, handleAutoTranslateLessonTjToRu)}
                                                                                             <div className="mt-3">
                                                                                                 <label className="block text-xs text-gaming-textMuted mb-2">{lang === 'ru' ? 'Тип урока' : 'Намуди дарс'}</label>
                                                                                                 <div className="flex flex-wrap gap-2">

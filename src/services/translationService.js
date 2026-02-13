@@ -81,18 +81,27 @@ const DICTIONARY = {
     'информатика': 'информатика',
 };
 
+const REVERSE_DICTIONARY = Object.entries(DICTIONARY).reduce((acc, [ru, tj]) => {
+    acc[tj] = ru;
+    return acc;
+}, {});
+
 // Перевод с использованием словаря (пословно)
-const translateWithDictionary = (text) => {
+const translateWithDictionary = (text, from = 'ru', to = 'tj') => {
     if (!text) return '';
 
     let result = text.toLowerCase();
 
-    // Сортировка словаря по длине ключа (сначала самые длинные) для сопоставления более длинных фраз в первую очередь
-    const sortedEntries = Object.entries(DICTIONARY).sort((a, b) => b[0].length - a[0].length);
+    // Определяем направление перевода и используемый словарь
+    const isRuToTj = (from === 'ru' && to === 'tj') || (from === 'ru' && to === 'tg');
+    const dict = isRuToTj ? DICTIONARY : REVERSE_DICTIONARY;
 
-    for (const [ru, tj] of sortedEntries) {
-        const regex = new RegExp(ru, 'gi');
-        result = result.replace(regex, tj);
+    // Сортировка словаря по длине ключа (сначала самые длинные) для сопоставления более длинных фраз в первую очередь
+    const sortedEntries = Object.entries(dict).sort((a, b) => b[0].length - a[0].length);
+
+    for (const [source, target] of sortedEntries) {
+        const regex = new RegExp(source, 'gi');
+        result = result.replace(regex, target);
     }
 
     // Сделать первую букву заглавной
@@ -120,21 +129,25 @@ const translateWithGoogle = async (text, from = 'ru', to = 'tg') => {
 export const translateText = async (text, from = 'ru', to = 'tj') => {
     if (!text || !text.trim()) return '';
 
+    // Приведение кодов языков к стандарту Google Translate (tg для таджикского)
+    const googleTo = to === 'tj' ? 'tg' : to;
+    const googleFrom = from === 'tj' ? 'tg' : from;
+
     // Сначала пробуем Google Translate
-    const googleResult = await translateWithGoogle(text, from, to === 'tj' ? 'tg' : to);
+    const googleResult = await translateWithGoogle(text, googleFrom, googleTo);
 
     if (googleResult) {
         return googleResult;
     }
 
     // Резервный вариант — словарь
-    return translateWithDictionary(text);
+    return translateWithDictionary(text, from, to);
 };
 
 // Синхронная версия с использованием только словаря (для мгновенной обратной связи в интерфейсе)
 export const translateTextSync = (text, from = 'ru', to = 'tj') => {
     if (!text || !text.trim()) return '';
-    return translateWithDictionary(text);
+    return translateWithDictionary(text, from, to);
 };
 
 export default {

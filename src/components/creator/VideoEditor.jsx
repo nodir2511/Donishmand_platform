@@ -19,6 +19,16 @@ const VideoEditor = ({ data, onChange, lang }) => {
         }
     };
 
+    const handleAutoTranslateDescTjToRu = async () => {
+        setTranslating(true);
+        try {
+            const translated = await translateText(data.descriptionTj || '', 'tj', 'ru');
+            handleChange('descriptionRu', translated);
+        } finally {
+            setTranslating(false);
+        }
+    };
+
     const handleCopyUrl = () => {
         handleChange('urlTj', data.url || '');
     };
@@ -79,17 +89,28 @@ const VideoEditor = ({ data, onChange, lang }) => {
             <div className="border-t border-white/5 pt-4" />
 
             {/* Описание (RU) */}
-            <div>
-                <label className="block text-sm text-gaming-textMuted mb-2">
-                    {lang === 'ru' ? 'Описание видео (RU)' : 'Тавсифи видео (RU)'}
-                </label>
-                <textarea
-                    value={data.descriptionRu || ''}
-                    onChange={(e) => handleChange('descriptionRu', e.target.value)}
-                    placeholder={lang === 'ru' ? 'Краткое описание видео...' : 'Тавсифи мухтасар...'}
-                    rows={3}
-                    className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50 transition-colors resize-none"
-                />
+            <div className="flex gap-2">
+                <div className="flex-1">
+                    <label className="block text-sm text-gaming-textMuted mb-2">
+                        {lang === 'ru' ? 'Описание видео (RU)' : 'Тавсифи видео (RU)'}
+                    </label>
+                    <textarea
+                        value={data.descriptionRu || ''}
+                        onChange={(e) => handleChange('descriptionRu', e.target.value)}
+                        placeholder={lang === 'ru' ? 'Краткое описание видео...' : 'Тавсифи мухтасар...'}
+                        rows={3}
+                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50 transition-colors resize-none"
+                    />
+                </div>
+                <button
+                    type="button"
+                    onClick={handleAutoTranslateDescTjToRu}
+                    disabled={translating}
+                    className="mt-7 flex items-center gap-1 px-3 py-3 h-fit bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
+                    title="Перевести TJ -> RU"
+                >
+                    {translating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} className="rotate-180" />}
+                </button>
             </div>
 
             {/* Описание (TJ) */}
@@ -111,7 +132,7 @@ const VideoEditor = ({ data, onChange, lang }) => {
                     onClick={handleAutoTranslateDesc}
                     disabled={translating}
                     className="mt-7 flex items-center gap-1 px-3 py-3 h-fit bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
-                    title="Авто-перевод"
+                    title="Перевести RU -> TJ"
                 >
                     {translating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 </button>

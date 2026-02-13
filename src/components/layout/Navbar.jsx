@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Menu, X, Sparkles } from 'lucide-react';
 
 const Navbar = ({ lang, setLang, t }) => {
@@ -29,22 +30,22 @@ const Navbar = ({ lang, setLang, t }) => {
 
                     {/* Навигация для десктопа */}
                     <div className="hidden md:flex items-center bg-white/5 backdrop-blur-md rounded-full border border-white/5 p-1.5 shadow-sm">
-                        <a href="#" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t.navCourses}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </a>
-                        <a href="#" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        </Link>
+                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t.navLibrary}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </a>
-                        <a href="#" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        </Link>
+                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t.navAbout}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </a>
-                        <a href="/Donishmand_platform/creator" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        </Link>
+                        <Link to="/creator" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t.navCreator}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </a>
+                        </Link>
                         <div className="w-px h-4 bg-white/10 mx-2"></div>
                         <button
                             onClick={toggleLang}
@@ -73,18 +74,18 @@ const Navbar = ({ lang, setLang, t }) => {
             {isOpen && (
                 <div className="absolute top-full left-0 right-0 bg-gaming-card border-b border-white/5 p-4 shadow-xl md:hidden glass-panel">
                     <div className="flex flex-col gap-4">
-                        <a href="#" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t.navCourses}
-                        </a>
-                        <a href="#" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        </Link>
+                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t.navLibrary}
-                        </a>
-                        <a href="#" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        </Link>
+                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t.navAbout}
-                        </a>
-                        <a href="/Donishmand_platform/creator" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        </Link>
+                        <Link to="/creator" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t.navCreator}
-                        </a>
+                        </Link>
                         <div className="border-t border-white/5 pt-4 flex items-center justify-between px-4">
                             <button onClick={toggleLang} className="px-3 py-1 bg-white/5 text-white rounded-md text-xs font-bold uppercase ring-1 ring-white/10">
                                 {lang}

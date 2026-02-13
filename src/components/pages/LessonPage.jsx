@@ -5,11 +5,12 @@ import { findLessonContext } from '../../utils/syllabusHelpers';
 import CourseLayout from '../layout/CourseLayout';
 import SlidesViewer from '../viewer/SlidesViewer';
 import TestViewer from '../viewer/TestViewer';
+import TestTeacherView from '../viewer/TestTeacherView';
 
 // Ключи для отслеживания прогресса
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
 
-const LessonPage = ({ lang, t }) => {
+const LessonPage = ({ lang, t, userRole }) => {
     const { lessonId } = useParams();
     const navigate = useNavigate();
     const PASS_THRESHOLD = 80;
@@ -27,6 +28,9 @@ const LessonPage = ({ lang, t }) => {
         slidesViewed: JSON.parse(localStorage.getItem(getProgressKey(lessonId, 'slides')) || '[]'),
         testHistory: JSON.parse(localStorage.getItem(`test_history_${lessonId}`) || '[]')
     }));
+
+    // Определяем режим учителя
+    const isTeacher = userRole === 'teacher';
 
     // Получение контента урока из localStorage (созданного через CreatorPage)
     const lessonContent = useMemo(() => {
@@ -84,7 +88,8 @@ const LessonPage = ({ lang, t }) => {
     const isVideoComplete = !hasVideo || progress.videoWatched;
     const isTextComplete = !hasText || progress.textRead;
     const isSlidesComplete = !hasSlides || allSlidesViewed;
-    const canTakeTest = isVideoComplete && isTextComplete && isSlidesComplete;
+    // Учитель всегда может пройти тест
+    const canTakeTest = isTeacher || (isVideoComplete && isTextComplete && isSlidesComplete);
 
     // Расчет общего процента выполнения
     const totalSteps = [hasVideo, hasText, hasSlides, hasTest].filter(Boolean).length;
@@ -106,12 +111,14 @@ const LessonPage = ({ lang, t }) => {
 
     // Пометить видео как просмотренное
     const handleVideoComplete = () => {
+        if (isTeacher) return; // Учитель не сохраняет прогресс
         localStorage.setItem(getProgressKey(lessonId, 'video'), 'true');
         setProgress(prev => ({ ...prev, videoWatched: true }));
     };
 
     // Пометить текст как прочитанный
     const handleTextRead = () => {
+        if (isTeacher) return; // Учитель не сохраняет прогресс
         if (!progress.textRead) {
             localStorage.setItem(getProgressKey(lessonId, 'text'), 'true');
             setProgress(prev => ({ ...prev, textRead: true }));
@@ -120,6 +127,7 @@ const LessonPage = ({ lang, t }) => {
 
     // Обновить прогресс просмотра слайдов
     const handleSlideView = (slideId) => {
+        if (isTeacher) return; // Учитель не сохраняет прогресс
         const newViewed = [...new Set([...progress.slidesViewed, slideId])];
         localStorage.setItem(getProgressKey(lessonId, 'slides'), JSON.stringify(newViewed));
         setProgress(prev => ({ ...prev, slidesViewed: newViewed }));
@@ -171,120 +179,131 @@ const LessonPage = ({ lang, t }) => {
             <div className="max-w-4xl">
                 {/* Шапка */}
                 <header className="mb-6">
-                    <p className="text-sm text-gaming-textMuted mb-1">
-                        {lang === 'ru' ? 'Урок' : 'Дарс'} {lessonIndex + 1} / {topic.lessons.length}
-                    </p>
-                    <h1 className="text-3xl font-bold mb-2 text-gaming-pink">
-                        {lessonIndex + 1}. {getTitle(lesson)}
-                    </h1>
-                    <p className="text-gaming-textMuted flex items-center gap-2 text-sm">
-                        <span>{sectionIndex + 1}.{topicIndex + 1}. {getTitle(topic)}</span>
-                    </p>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm text-gaming-textMuted mb-1">
+                                {lang === 'ru' ? 'Урок' : 'Дарс'} {lessonIndex + 1} / {topic.lessons.length}
+                            </p>
+                            <h1 className="text-3xl font-bold mb-2 text-gaming-pink">
+                                {lessonIndex + 1}. {getTitle(lesson)}
+                            </h1>
+                            <p className="text-gaming-textMuted flex items-center gap-2 text-sm">
+                                <span>{sectionIndex + 1}.{topicIndex + 1}. {getTitle(topic)}</span>
+                            </p>
+                        </div>
+                        {isTeacher && (
+                            <div className="px-3 py-1 bg-gaming-pink text-white text-xs font-bold rounded-full uppercase tracking-wider animate-pulse">
+                                {lang === 'ru' ? 'Режим учителя' : 'Реҷаи омӯзгор'}
+                            </div>
+                        )}
+                    </div>
                 </header>
 
-                {/* Карточка прогресса (Перемещена наверх) */}
-                <div className="mb-8 bg-gradient-to-br from-gaming-primary/20 to-gaming-pink/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                    <div className="relative z-10">
-                        <div className="flex justify-between items-end mb-4">
-                            <div>
-                                <h4 className="font-bold text-lg mb-1">{lang === 'ru' ? 'Прогресс урока' : 'Пешрафти дарс'}</h4>
-                                <p className="text-gaming-textMuted text-sm">
-                                    {completedSteps} / {totalSteps} {lang === 'ru' ? 'этапов завершено' : 'марҳила анҷом ёфт'}
-                                </p>
+                {/* Карточка прогресса (Скрыта для учителя) */}
+                {!isTeacher && (
+                    <div className="mb-8 bg-gradient-to-br from-gaming-primary/20 to-gaming-pink/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-end mb-4">
+                                <div>
+                                    <h4 className="font-bold text-lg mb-1">{lang === 'ru' ? 'Прогресс урока' : 'Пешрафти дарс'}</h4>
+                                    <p className="text-gaming-textMuted text-sm">
+                                        {completedSteps} / {totalSteps} {lang === 'ru' ? 'этапов завершено' : 'марҳила анҷом ёфт'}
+                                    </p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-3xl font-bold text-gaming-primary">{completionPercentage}%</div>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-3xl font-bold text-gaming-primary">{completionPercentage}%</div>
+
+                            {/* Прогресс бар */}
+                            <div className="w-full h-3 bg-black/30 rounded-full mb-6 overflow-hidden">
+                                <div
+                                    className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink transition-all duration-1000 ease-out"
+                                    style={{ width: `${completionPercentage}%` }}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {hasVideo && (
+                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.videoWatched
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.videoWatched ? 'bg-green-500/20' : 'bg-white/10'}`}>
+                                            {progress.videoWatched ? <Check size={20} /> : <Video size={20} />}
+                                        </div>
+                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Видео' : 'Видео'}</span>
+                                    </div>
+                                )}
+
+                                {hasText && (
+                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.textRead
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.textRead ? 'bg-green-500/20' : 'bg-white/10'}`}>
+                                            {progress.textRead ? <Check size={20} /> : <FileText size={20} />}
+                                        </div>
+                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Текст' : 'Матн'}</span>
+                                    </div>
+                                )}
+
+                                {hasSlides && (
+                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${allSlidesViewed
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${allSlidesViewed ? 'bg-green-500/20' : 'bg-white/10'}`}>
+                                            {allSlidesViewed ? <Check size={20} /> : <Presentation size={20} />}
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-medium text-sm">{lang === 'ru' ? 'Слайды' : 'Слайдҳо'}</span>
+                                            <span className="text-xs opacity-70">{viewedSlidesCount}/{totalSlides}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {hasTest && (
+                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${testStats?.isPassed
+                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${testStats?.isPassed ? 'bg-green-500/20' : 'bg-white/10'}`}>
+                                            {testStats?.isPassed ? <Check size={20} /> : <CheckCircle size={20} />}
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <span className="font-medium text-sm">{lang === 'ru' ? 'Тест' : 'Тест'}</span>
+                                            {testStats && <span className="text-xs font-bold">{testStats.bestScore}%</span>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* Прогресс бар */}
-                        <div className="w-full h-3 bg-black/30 rounded-full mb-6 overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink transition-all duration-1000 ease-out"
-                                style={{ width: `${completionPercentage}%` }}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                            {hasVideo && (
-                                <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.videoWatched
-                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                    : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.videoWatched ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                        {progress.videoWatched ? <Check size={20} /> : <Video size={20} />}
-                                    </div>
-                                    <span className="font-medium text-sm">{lang === 'ru' ? 'Видео' : 'Видео'}</span>
-                                </div>
-                            )}
-
-                            {hasText && (
-                                <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.textRead
-                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                    : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.textRead ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                        {progress.textRead ? <Check size={20} /> : <FileText size={20} />}
-                                    </div>
-                                    <span className="font-medium text-sm">{lang === 'ru' ? 'Текст' : 'Матн'}</span>
-                                </div>
-                            )}
-
-                            {hasSlides && (
-                                <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${allSlidesViewed
-                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                    : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${allSlidesViewed ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                        {allSlidesViewed ? <Check size={20} /> : <Presentation size={20} />}
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Слайды' : 'Слайдҳо'}</span>
-                                        <span className="text-xs opacity-70">{viewedSlidesCount}/{totalSlides}</span>
+                        {/* Детальная статистика теста (если есть) */}
+                        {testStats && (
+                            <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap gap-4">
+                                <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                    <RotateCcw size={18} className="text-gaming-gold" />
+                                    <div>
+                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Попыток' : 'Кӯшишҳо'}</div>
+                                        <div className="font-bold text-white">{testStats.totalAttempts}</div>
                                     </div>
                                 </div>
-                            )}
-
-                            {hasTest && (
-                                <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${testStats?.isPassed
-                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                    : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${testStats?.isPassed ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                        {testStats?.isPassed ? <Check size={20} /> : <CheckCircle size={20} />}
-                                    </div>
-                                    <div className="flex flex-col items-center">
-                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Тест' : 'Тест'}</span>
-                                        {testStats && <span className="text-xs font-bold">{testStats.bestScore}%</span>}
+                                <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
+                                    <Clock size={18} className="text-gaming-primary" />
+                                    <div>
+                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Последняя' : 'Охирин'}</div>
+                                        <div className="font-bold text-white">
+                                            {testStats.lastAttemptAt ? new Intl.DateTimeFormat(lang === 'tj' ? 'tg-TJ' : 'ru-RU', {
+                                                day: 'numeric',
+                                                month: 'short',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }).format(new Date(testStats.lastAttemptAt)) : '-'}
+                                        </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
-
-                    {/* Детальная статистика теста (если есть) */}
-                    {testStats && (
-                        <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap gap-4">
-                            <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                                <RotateCcw size={18} className="text-gaming-gold" />
-                                <div>
-                                    <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Попыток' : 'Кӯшишҳо'}</div>
-                                    <div className="font-bold text-white">{testStats.totalAttempts}</div>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                                <Clock size={18} className="text-gaming-primary" />
-                                <div>
-                                    <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Последняя' : 'Охирин'}</div>
-                                    <div className="font-bold text-white">
-                                        {testStats.lastAttemptAt ? new Intl.DateTimeFormat(lang === 'tj' ? 'tg-TJ' : 'ru-RU', {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        }).format(new Date(testStats.lastAttemptAt)) : '-'}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                )}
 
                 {/* Контент существует - показываем вкладки и область контента */}
                 {hasContent ? (
@@ -302,7 +321,7 @@ const LessonPage = ({ lang, t }) => {
                                         >
                                             <Icon size={18} />
                                             {tab.label[lang]}
-                                            {tab.complete && (
+                                            {tab.complete && !isTeacher && (
                                                 <Check size={14} className="text-green-400" />
                                             )}
                                             {activeTab === tab.id && (
@@ -338,7 +357,7 @@ const LessonPage = ({ lang, t }) => {
                                                 onPlay={() => setTimeout(handleVideoComplete, 30000)}
                                             />
                                         )}
-                                        {!progress.videoWatched && (
+                                        {!progress.videoWatched && !isTeacher && (
                                             <button
                                                 onClick={handleVideoComplete}
                                                 className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
@@ -361,7 +380,7 @@ const LessonPage = ({ lang, t }) => {
                                         <div className="whitespace-pre-wrap">
                                             {lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu}
                                         </div>
-                                        {!progress.textRead && (
+                                        {!progress.textRead && !isTeacher && (
                                             <button
                                                 onClick={handleTextRead}
                                                 className="mt-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
@@ -412,7 +431,7 @@ const LessonPage = ({ lang, t }) => {
                                                     </div>
 
                                                     {/* Индикатор просмотра */}
-                                                    {progress.slidesViewed.includes(slide.id) && (
+                                                    {(progress.slidesViewed.includes(slide.id) || isTeacher) && (
                                                         <div className="absolute top-4 right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg animate-in fade-in zoom-in">
                                                             <Check size={16} className="text-white" />
                                                         </div>
@@ -508,12 +527,17 @@ const LessonPage = ({ lang, t }) => {
                     <button
                         onClick={handleTestClick}
                         className={`group font-bold py-3 px-8 rounded-xl flex items-center gap-2 transition-all transform hover:scale-[1.02] active:scale-95 shadow-lg border border-white/10 ${canTakeTest
-                            ? 'bg-gaming-primary hover:bg-gaming-primary/80 text-white shadow-gaming-primary/25'
+                            ? isTeacher ? 'bg-gaming-pink hover:bg-gaming-pink/80 text-white shadow-gaming-pink/25' : 'bg-gaming-primary hover:bg-gaming-primary/80 text-white shadow-gaming-primary/25'
                             : 'bg-gaming-card/60 text-gaming-textMuted cursor-not-allowed'
                             }`}
                     >
-                        <CheckCircle size={20} />
-                        <span>{lang === 'ru' ? 'Пройти тест' : 'Супоридани тест'}</span>
+                        {isTeacher ? <Eye size={20} /> : <CheckCircle size={20} />}
+                        <span>
+                            {isTeacher
+                                ? (lang === 'ru' ? 'Просмотреть тест' : 'Дидани тест')
+                                : (lang === 'ru' ? 'Пройти тест' : 'Супоридани тест')
+                            }
+                        </span>
                         {!canTakeTest && <AlertCircle size={16} className="text-yellow-400" />}
                     </button>
                 </div>
@@ -531,16 +555,24 @@ const LessonPage = ({ lang, t }) => {
                 />
             )}
 
-            {/* Окно тестирования */}
+            {/* Окно тестирования (Ученик) или Просмотра (Учитель) */}
             {
                 showTestViewer && (
-                    <TestViewer
-                        questions={testQuestions}
-                        lessonId={lessonId}
-                        lang={lang}
-                        onClose={() => setShowTestViewer(false)}
-                        onComplete={handleTestComplete}
-                    />
+                    isTeacher ? (
+                        <TestTeacherView
+                            questions={testQuestions}
+                            lang={lang}
+                            onClose={() => setShowTestViewer(false)}
+                        />
+                    ) : (
+                        <TestViewer
+                            questions={testQuestions}
+                            lessonId={lessonId}
+                            lang={lang}
+                            onClose={() => setShowTestViewer(false)}
+                            onComplete={handleTestComplete}
+                        />
+                    )
                 )
             }
         </CourseLayout >

@@ -13,6 +13,7 @@ import { TRANSLATIONS } from './constants/data';
 
 function AppContent() {
     const [lang, setLang] = useState('tj');
+    const [userRole, setUserRole] = useState('student'); // 'student' | 'teacher'
     const t = TRANSLATIONS[lang];
     const location = useLocation();
 
@@ -27,11 +28,11 @@ function AppContent() {
 
             <main className="flex-grow pt-24">
                 <Routes>
-                    <Route path="/" element={<HomePage lang={lang} t={t} setLang={setLang} />} />
+                    <Route path="/" element={<HomePage lang={lang} t={t} setLang={setLang} userRole={userRole} setUserRole={setUserRole} />} />
                     <Route path="/subject/:subjectId" element={<SubjectPage lang={lang} t={t} />} />
                     <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage lang={lang} t={t} />} />
                     <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage lang={lang} t={t} />} />
-                    <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} />} />
+                    <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
                     <Route path="/creator" element={<CreatorPage lang={lang} t={t} />} />
                     <Route path="*" element={<NotFoundPage lang={lang} t={t} />} />
                 </Routes>

@@ -4,7 +4,7 @@ import ClusterSelect from '../features/ClusterSelect';
 import CourseCard from '../features/CourseCard';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
 
-const HomePage = ({ lang, t, setLang }) => {
+const HomePage = ({ lang, t, setLang, userRole, setUserRole }) => {
     const [activeClusterId, setActiveClusterId] = useState(0);
 
     let subjectsToDisplay = [];
@@ -21,6 +21,22 @@ const HomePage = ({ lang, t, setLang }) => {
 
     return (
         <main className="relative">
+            {/* Переключатель роли (Временный) */}
+            <div className="absolute top-24 right-4 z-40 bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/10 flex gap-1 shadow-2xl">
+                <button
+                    onClick={() => setUserRole('student')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'student' ? 'bg-gaming-primary text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
+                >
+                    {lang === 'ru' ? 'Ученик' : 'Хонанда'}
+                </button>
+                <button
+                    onClick={() => setUserRole('teacher')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'teacher' ? 'bg-gaming-pink text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
+                >
+                    {lang === 'ru' ? 'Учитель' : 'Омӯзгор'}
+                </button>
+            </div>
+
             <HeroSection lang={lang} t={t} />
 
             {/* КОНТЕЙНЕР ВКЛАДОК */}

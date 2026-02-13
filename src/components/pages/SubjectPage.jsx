@@ -6,11 +6,12 @@ import { SUBJECT_NAMES } from '../../constants/data';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats } from '../../utils/progressHelpers';
 
-const SubjectPage = ({ lang, t }) => {
+const SubjectPage = ({ lang, t, userRole }) => {
     const { subjectId } = useParams();
     const navigate = useNavigate();
 
     const subjectData = MOCK_SYLLABUS[subjectId];
+    const isTeacher = userRole === 'teacher';
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
 
     if (!subjectData) {
@@ -58,7 +59,7 @@ const SubjectPage = ({ lang, t }) => {
                                     </p>
                                 </div>
 
-                                {stats && (
+                                {stats && !isTeacher && (
                                     <div className="mr-2 text-right">
                                         <div className="text-xl font-bold text-white leading-none">{stats.avgErrorRate}%</div>
                                         <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">

@@ -5,12 +5,13 @@ import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats, getLessonStats } from '../../utils/progressHelpers';
 
-const TopicPage = ({ lang, t }) => {
+const TopicPage = ({ lang, t, userRole }) => {
     const { subjectId, sectionId, topicId } = useParams();
     const navigate = useNavigate();
 
     const subjectData = MOCK_SYLLABUS[subjectId];
     const sectionData = subjectData?.sections.find(s => s.id === sectionId);
+    const isTeacher = userRole === 'teacher';
     const sectionIndex = subjectData?.sections.findIndex(s => s.id === sectionId) ?? -1;
     const topicData = sectionData?.topics.find(t => t.id === topicId);
     const topicIndex = sectionData?.topics.findIndex(t => t.id === topicId) ?? -1;
@@ -41,7 +42,7 @@ const TopicPage = ({ lang, t }) => {
                 {/* Статистика темы */}
                 {(() => {
                     const stats = getContainerStats(topicData.lessons.map(l => l.id));
-                    if (stats) {
+                    if (stats && !isTeacher) {
                         return (
                             <div className="mb-8 p-6 bg-gradient-to-r from-gaming-primary/10 to-gaming-purple/10 rounded-2xl border border-white/5 flex items-center gap-6">
                                 <div className="p-4 bg-gaming-primary/20 rounded-full text-gaming-primary">
@@ -86,7 +87,7 @@ const TopicPage = ({ lang, t }) => {
                                     </span>
                                 </div>
 
-                                {stats && (
+                                {stats && !isTeacher && (
                                     <div className="mr-2 text-right">
                                         <div className="text-xl font-bold text-white leading-none">{stats.avgErrorRate}%</div>
                                         <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">

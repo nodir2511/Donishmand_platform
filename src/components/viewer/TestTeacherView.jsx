@@ -80,27 +80,32 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                 </div>
 
                                 {/* Content */}
-                                <div className={`transition-all duration-300 ${isAnswerVisible ? 'opacity-100' : 'opacity-50 blur-sm select-none pointer-events-none'}`}>
+                                <div className="transition-all duration-300">
 
                                     {/* Multiple Choice */}
                                     {q.type === 'multiple_choice' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
-                                            {q.options.map((opt, oIdx) => (
-                                                <div
-                                                    key={opt.id}
-                                                    className={`p-3 rounded-xl border flex items-center gap-3 ${opt.id === q.correctId
+                                            {q.options.map((opt, oIdx) => {
+                                                const isCorrect = opt.id === q.correctId;
+                                                const showAsCorrect = isCorrect && isAnswerVisible;
+
+                                                return (
+                                                    <div
+                                                        key={opt.id}
+                                                        className={`p-3 rounded-xl border flex items-center gap-3 transition-all duration-300 ${showAsCorrect
                                                             ? 'bg-green-500/10 border-green-500/30 text-green-400 font-bold'
                                                             : 'bg-black/20 border-white/5 text-gaming-textMuted'
-                                                        }`}
-                                                >
-                                                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${opt.id === q.correctId ? 'bg-green-500 text-white' : 'bg-white/10'
-                                                        }`}>
-                                                        {String.fromCharCode(65 + oIdx)}
-                                                    </span>
-                                                    <span>{getOptionText(opt)}</span>
-                                                    {opt.id === q.correctId && <CheckCircle size={16} className="ml-auto" />}
-                                                </div>
-                                            ))}
+                                                            }`}
+                                                    >
+                                                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-colors ${showAsCorrect ? 'bg-green-500 text-white' : 'bg-white/10'
+                                                            }`}>
+                                                            {String.fromCharCode(65 + oIdx)}
+                                                        </span>
+                                                        <span>{getOptionText(opt)}</span>
+                                                        {showAsCorrect && <CheckCircle size={16} className="ml-auto animate-in zoom-in duration-300" />}
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
 
@@ -127,32 +132,36 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                     ))}
                                                 </div>
                                             </div>
-                                            <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl">
-                                                <p className="text-sm text-green-400 font-bold mb-2">{lang === 'ru' ? 'Правильные пары:' : 'Ҷуфтҳои дуруст:'}</p>
-                                                <div className="flex flex-wrap gap-3">
-                                                    {Object.entries(q.correctMatches).map(([l, r]) => {
-                                                        const lIdx = q.leftItems.findIndex(i => i.id === l);
-                                                        const rIdx = q.rightItems.findIndex(i => i.id === r);
-                                                        return (
-                                                            <span key={l} className="px-2 py-1 bg-green-500/10 rounded border border-green-500/20 text-sm">
-                                                                {String.fromCharCode(65 + lIdx)} — {rIdx + 1}
-                                                            </span>
-                                                        );
-                                                    })}
+
+                                            {isAnswerVisible && (
+                                                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <p className="text-sm text-green-400 font-bold mb-2">{lang === 'ru' ? 'Правильные пары:' : 'Ҷуфтҳои дуруст:'}</p>
+                                                    <div className="flex flex-wrap gap-3">
+                                                        {Object.entries(q.correctMatches).map(([l, r]) => {
+                                                            const lIdx = q.leftItems.findIndex(i => i.id === l);
+                                                            const rIdx = q.rightItems.findIndex(i => i.id === r);
+                                                            return (
+                                                                <span key={l} className="px-2 py-1 bg-green-500/10 rounded border border-green-500/20 text-sm">
+                                                                    {String.fromCharCode(65 + lIdx)} — {rIdx + 1}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
                                         </div>
                                     )}
 
                                     {/* Numeric */}
                                     {q.type === 'numeric' && (
                                         <div className="pl-11">
-                                            <div className="inline-flex items-center gap-3 px-4 py-2 bg-green-500/10 border border-green-500/30 rounded-xl">
-                                                <span className="text-sm text-green-400">{lang === 'ru' ? 'Ответ:' : 'Ҷавоб:'}</span>
-                                                <span className="text-xl font-bold text-white tracking-widest">
-                                                    {q.digits.join('')}
+                                            <div className="inline-flex items-center gap-3 px-4 py-2 bg-green-500/5 border border-white/5 rounded-xl transition-all duration-300">
+                                                <span className="text-sm text-gaming-textMuted">{lang === 'ru' ? 'Ответ:' : 'Ҷавоб:'}</span>
+                                                <span className={`text-xl font-bold tracking-widest transition-all duration-300 ${isAnswerVisible ? 'text-green-400' : 'text-white/20'}`}>
+                                                    {isAnswerVisible ? q.digits.join('') : '****'}
                                                 </span>
                                                 {q.unit && <span className="text-gaming-textMuted">{q.unit}</span>}
+                                                {isAnswerVisible && <CheckCircle size={16} className="text-green-400 animate-in zoom-in" />}
                                             </div>
                                         </div>
                                     )}

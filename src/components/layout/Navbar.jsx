@@ -19,14 +19,14 @@ const Navbar = ({ lang, setLang, t }) => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center">
                     {/* Логотип */}
-                    <div className="flex items-center gap-3 group cursor-pointer">
+                    <Link to="/" className="flex items-center gap-3 group cursor-pointer">
                         <div className="w-10 h-10 bg-gradient-to-br from-gaming-primary to-gaming-pink rounded-xl flex items-center justify-center shadow-lg shadow-gaming-primary/20 group-hover:scale-105 transition-transform duration-300">
                             <Sparkles className="text-white w-6 h-6" />
                         </div>
                         <span className="font-bold text-2xl tracking-tight text-white group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-gaming-primary/80 transition-all">
                             Donishmand
                         </span>
-                    </div>
+                    </Link>
 
                     {/* Навигация для десктопа */}
                     <div className="hidden md:flex items-center bg-white/5 backdrop-blur-md rounded-full border border-white/5 p-1.5 shadow-sm">

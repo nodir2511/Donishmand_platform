@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { X, CheckCircle, XCircle, ArrowRight, ChevronLeft, ChevronRight, Trophy, RotateCcw } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { X, CheckCircle, XCircle, ArrowRight, ChevronLeft, ChevronRight, Trophy, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
 import { shuffleArray } from '../../utils/shuffle';
 
 const PASS_THRESHOLD = 80;
@@ -9,6 +9,9 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const [answers, setAnswers] = useState({});
     const [showResults, setShowResults] = useState(false);
     const [testVersion, setTestVersion] = useState(0); // Используется для принудительного перемешивания
+    const [shakeWarning, setShakeWarning] = useState(false); // Предупреждение при незаполненных ответах
+    const [warningMessage, setWarningMessage] = useState('');
+    const [lockedQuestions, setLockedQuestions] = useState(new Set()); // Вопросы, заблокированные после перехода
 
     // --- ФУНКЦИИ БЕЗОПАСНОСТИ НАЧАЛО ---
     const [isFocused, setIsFocused] = useState(true);
@@ -37,31 +40,52 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     }, []);
     // --- ФУНКЦИИ БЕЗОПАСНОСТИ КОНЕЦ ---
 
-    // Рандомизация вопросов и ограничение до 10
+    const progressKey = `test_progress_${lessonId}`;
+
+    // Рандомизация вопросов с восстановлением прогресса
     const randomizedQuestions = useMemo(() => {
         if (!questions) return [];
 
-        // 1. Перемешиваем все доступные вопросы
-        const shuffledAll = shuffleArray(questions);
+        // Проверяем сохранённый прогресс
+        const savedRaw = localStorage.getItem(progressKey);
+        if (savedRaw && testVersion === 0) {
+            try {
+                const saved = JSON.parse(savedRaw);
+                if (saved.questions && saved.answers && saved.locked) {
+                    // Восстанавливаем ответы и блокировки
+                    setAnswers(saved.answers);
+                    setLockedQuestions(new Set(saved.locked));
+                    setCurrentIndex(saved.currentIndex || 0);
 
-        // 2. Берем первые 10 (или меньше, если всего вопросов < 10)
+                    // Отвеченные вопросы оставляем как были
+                    const lockedIds = new Set(saved.locked);
+                    const savedQuestions = saved.questions.filter(q => lockedIds.has(q.id));
+
+                    // Для оставшихся мест берём новые перемешанные вопросы
+                    const usedIds = new Set(savedQuestions.map(q => q.id));
+                    const remaining = shuffleArray(questions.filter(q => !usedIds.has(q.id)));
+                    const neededCount = Math.min(10, questions.length) - savedQuestions.length;
+
+                    const newQuestions = remaining.slice(0, Math.max(0, neededCount)).map(q => {
+                        if (q.type === 'multiple_choice') return { ...q, options: shuffleArray(q.options) };
+                        if (q.type === 'matching') return { ...q, leftItems: shuffleArray(q.leftItems), rightItems: shuffleArray(q.rightItems) };
+                        return q;
+                    });
+
+                    return [...savedQuestions, ...newQuestions];
+                }
+            } catch (e) {
+                console.warn('Ошибка восстановления прогресса теста:', e);
+            }
+        }
+
+        // Новый тест — стандартная рандомизация
+        const shuffledAll = shuffleArray(questions);
         const selectedQuestions = shuffledAll.slice(0, 10);
 
-        // 3. Перемешиваем содержимое внутри выбранных вопросов
         return selectedQuestions.map(q => {
-            if (q.type === 'multiple_choice') {
-                return {
-                    ...q,
-                    options: shuffleArray(q.options)
-                };
-            }
-            if (q.type === 'matching') {
-                return {
-                    ...q,
-                    leftItems: shuffleArray(q.leftItems),
-                    rightItems: shuffleArray(q.rightItems)
-                };
-            }
+            if (q.type === 'multiple_choice') return { ...q, options: shuffleArray(q.options) };
+            if (q.type === 'matching') return { ...q, leftItems: shuffleArray(q.leftItems), rightItems: shuffleArray(q.rightItems) };
             return q;
         });
     }, [questions, testVersion]);
@@ -69,14 +93,45 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const currentQuestion = randomizedQuestions[currentIndex];
     const totalQuestions = randomizedQuestions.length;
 
+    // Автосохранение прогресса при изменении ответов/блокировок
+    useEffect(() => {
+        if (randomizedQuestions.length > 0 && !showResults) {
+            const progressData = {
+                questions: randomizedQuestions,
+                answers,
+                locked: [...lockedQuestions],
+                currentIndex
+            };
+            localStorage.setItem(progressKey, JSON.stringify(progressData));
+        }
+    }, [answers, lockedQuestions, currentIndex, randomizedQuestions, showResults]);
+
+    // Проверка заблокирован ли ответ на вопрос (блокируется только после перехода)
+    const isQuestionLocked = (questionId) => {
+        return lockedQuestions.has(questionId);
+    };
+
+    // Заблокировать текущий вопрос (если ответ дан)
+    const lockCurrentQuestion = () => {
+        const q = randomizedQuestions[currentIndex];
+        if (!q) return;
+        const a = answers[q.id];
+        if (a !== undefined && a !== null && a !== '') {
+            setLockedQuestions(prev => new Set([...prev, q.id]));
+        }
+    };
+
     // Обработка ответа для различных типов вопросов
     const handleAnswer = (questionId, answer) => {
+        // Если ответ уже заблокирован — не разрешаем менять
+        if (isQuestionLocked(questionId)) return;
         setAnswers(prev => ({ ...prev, [questionId]: answer }));
     };
 
     // Навигация
     const goNext = () => {
         if (currentIndex < totalQuestions - 1) {
+            lockCurrentQuestion(); // Блокируем ответ при переходе
             setCurrentIndex(prev => prev + 1);
         }
     };
@@ -89,8 +144,43 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
     const [results, setResults] = useState(null);
 
+    // Подсчёт неотвеченных вопросов
+    const unansweredCount = useMemo(() => {
+        return randomizedQuestions.filter(q => {
+            const a = answers[q.id];
+            if (a === undefined || a === null || a === '') return true;
+            if (q.type === 'matching' && typeof a === 'object') {
+                return Object.keys(a).length < q.leftItems.length;
+            }
+            return false;
+        }).length;
+    }, [answers, randomizedQuestions]);
+
+    // Автоскрытие предупреждения через 3 секунды
+    useEffect(() => {
+        if (shakeWarning) {
+            const timer = setTimeout(() => {
+                setShakeWarning(false);
+                setWarningMessage('');
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [shakeWarning]);
+
     // Отправить тест и рассчитать результаты
     const handleSubmit = () => {
+        // Валидация: проверяем наличие ответов на все вопросы
+        // Блокируем последний вопрос перед отправкой
+        lockCurrentQuestion();
+
+        if (unansweredCount > 0) {
+            setShakeWarning(true);
+            const msg = lang === 'ru'
+                ? `Вы не ответили на ${unansweredCount} ${unansweredCount === 1 ? 'вопрос' : unansweredCount < 5 ? 'вопроса' : 'вопросов'}!`
+                : `Шумо ба ${unansweredCount} савол ҷавоб надодаед!`;
+            setWarningMessage(msg);
+            return;
+        }
         let correct = 0;
         const details = randomizedQuestions.map(q => {
             const userAnswer = answers[q.id];
@@ -140,12 +230,19 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
         setResults({ correct, total: totalQuestions, score, isPassed, details });
         setShowResults(true);
+
+        // Очищаем сохранённый прогресс после завершения теста
+        localStorage.removeItem(progressKey);
     };
 
     // Перезапустить тест
     const handleRestart = () => {
+        localStorage.removeItem(progressKey); // Очищаем сохранённый прогресс
         setCurrentIndex(0);
         setAnswers({});
+        setShakeWarning(false);
+        setWarningMessage('');
+        setLockedQuestions(new Set()); // Сброс блокировок
         setResults(null);
         setShowResults(false);
         setTestVersion(v => v + 1); // Перемешиваем заново при перезапуске
@@ -302,9 +399,25 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                             {lang === 'ru' ? 'Вопрос' : 'Савол'} {currentIndex + 1} / {totalQuestions}
                         </span>
                         <div className="flex gap-1">
-                            {randomizedQuestions.map((_, idx) => (
-                                <div key={idx} className={`w-2 h-2 rounded-full ${idx === currentIndex ? 'bg-gaming-primary' : answers[randomizedQuestions[idx]?.id] ? 'bg-green-500' : 'bg-white/20'}`} />
-                            ))}
+                            {randomizedQuestions.map((q, idx) => {
+                                const hasAnswer = (() => {
+                                    const a = answers[q?.id];
+                                    if (a === undefined || a === null || a === '') return false;
+                                    if (q?.type === 'matching' && typeof a === 'object') {
+                                        return Object.keys(a).length >= q.leftItems.length;
+                                    }
+                                    return true;
+                                })();
+                                const isUnanswered = shakeWarning && !hasAnswer;
+                                return (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setCurrentIndex(idx)}
+                                        title={`${lang === 'ru' ? 'Вопрос' : 'Савол'} ${idx + 1}${!hasAnswer ? (lang === 'ru' ? ' (нет ответа)' : ' (ҷавоб нест)') : ''}`}
+                                        className={`w-2.5 h-2.5 rounded-full transition-all duration-300 cursor-pointer hover:scale-150 ${idx === currentIndex ? 'bg-gaming-primary scale-125' : hasAnswer ? 'bg-white/60' : isUnanswered ? 'bg-red-500 animate-pulse scale-125' : 'bg-white/20 hover:bg-white/40'}`}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 text-gaming-textMuted hover:text-white">
@@ -325,32 +438,48 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     )}
 
                     {/* Один из многих (выбор варианта) */}
-                    {currentQuestion.type === 'multiple_choice' && (
-                        <div className="space-y-3">
-                            {currentQuestion.options.map((opt, idx) => {
-                                const isSelected = answers[currentQuestion.id] === opt.id;
-                                return (
-                                    <button
-                                        key={opt.id}
-                                        onClick={() => handleAnswer(currentQuestion.id, opt.id)}
-                                        className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${isSelected ? 'bg-gaming-primary/20 border-gaming-primary' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-                                    >
-                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${isSelected ? 'bg-gaming-primary text-white' : 'bg-white/10'}`}>
-                                            {String.fromCharCode(65 + idx)}
-                                        </span>
-                                        <div className="flex flex-col gap-2 w-full">
-                                            <span>{getOptionText(opt)}</span>
-                                            {opt.image && (
-                                                <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[200px]">
-                                                    <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
+                    {currentQuestion.type === 'multiple_choice' && (() => {
+                        const locked = isQuestionLocked(currentQuestion.id);
+                        return (
+                            <div className="space-y-3">
+                                {locked && (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg text-sm text-gaming-textMuted">
+                                        <Lock size={14} />
+                                        <span>{lang === 'ru' ? 'Ответ зафиксирован' : 'Ҷавоб қайд шуд'}</span>
+                                    </div>
+                                )}
+                                {currentQuestion.options.map((opt, idx) => {
+                                    const isSelected = answers[currentQuestion.id] === opt.id;
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => handleAnswer(currentQuestion.id, opt.id)}
+                                            disabled={locked}
+                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${isSelected
+                                                ? 'bg-gaming-primary/20 border-gaming-primary'
+                                                : locked
+                                                    ? 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed'
+                                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                                }`}
+                                        >
+                                            <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${isSelected ? 'bg-gaming-primary text-white' : 'bg-white/10'}`}>
+                                                {String.fromCharCode(65 + idx)}
+                                            </span>
+                                            <div className="flex flex-col gap-2 w-full">
+                                                <span>{getOptionText(opt)}</span>
+                                                {opt.image && (
+                                                    <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[200px]">
+                                                        <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {isSelected && locked && <Lock size={16} className="text-gaming-textMuted shrink-0" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
 
                     {/* Установление соответствия */}
                     {currentQuestion.type === 'matching' && (
@@ -415,6 +544,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                                     </td>
                                                     {currentQuestion.rightItems.map(right => {
                                                         const isSelected = answers[currentQuestion.id]?.[left.id] === right.id;
+                                                        const matchingLocked = isQuestionLocked(currentQuestion.id);
                                                         return (
                                                             <td key={right.id} className="text-center p-0.5">
                                                                 <button
@@ -422,10 +552,13 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                                                         ...(answers[currentQuestion.id] || {}),
                                                                         [left.id]: right.id
                                                                     })}
+                                                                    disabled={matchingLocked}
                                                                     className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center
                                                                         ${isSelected
                                                                             ? 'bg-gaming-primary border-gaming-primary'
-                                                                            : 'bg-white/5 border-white/20 hover:border-white/40'}`}
+                                                                            : matchingLocked
+                                                                                ? 'bg-white/5 border-white/10 opacity-30 cursor-not-allowed'
+                                                                                : 'bg-white/5 border-white/20 hover:border-white/40'}`}
                                                                 >
                                                                     {isSelected && <div className="w-3 h-3 bg-white rounded-full" />}
                                                                 </button>
@@ -442,38 +575,49 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     )}
 
                     {/* Числовой ответ */}
-                    {currentQuestion.type === 'numeric' && (
-                        <div className="space-y-4">
-                            <p className="text-sm text-gaming-textMuted">{lang === 'ru' ? 'Введите ответ:' : 'Ҷавобро ворид кунед:'}</p>
-                            <div className="flex items-center justify-center gap-2">
-                                {[0, 1, 2, 3].map(idx => (
-                                    <input
-                                        key={idx}
-                                        type="text"
-                                        maxLength={1}
-                                        value={(answers[currentQuestion.id] || '')[idx] || ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value;
-                                            if (val && !/^\d$/.test(val)) return;
-                                            const current = answers[currentQuestion.id] || '';
-                                            const arr = current.split('');
-                                            arr[idx] = val;
-                                            handleAnswer(currentQuestion.id, arr.join(''));
-                                            // Автофокус на следующий ввод
-                                            if (val && idx < 3) {
-                                                const next = e.target.nextElementSibling;
-                                                if (next) next.focus();
-                                            }
-                                        }}
-                                        className="w-14 h-14 text-center text-2xl font-bold bg-gaming-bg/50 border-2 border-white/20 rounded-lg text-white focus:outline-none focus:border-gaming-primary"
-                                    />
-                                ))}
-                                {currentQuestion.unit && (
-                                    <span className="text-xl text-gaming-textMuted ml-2">{currentQuestion.unit}</span>
-                                )}
+                    {currentQuestion.type === 'numeric' && (() => {
+                        const numericLocked = isQuestionLocked(currentQuestion.id);
+                        return (
+                            <div className="space-y-4">
+                                <p className="text-sm text-gaming-textMuted">
+                                    {numericLocked
+                                        ? <span className="flex items-center gap-2"><Lock size={14} /> {lang === 'ru' ? 'Ответ зафиксирован' : 'Ҷавоб қайд шуд'}</span>
+                                        : (lang === 'ru' ? 'Введите ответ:' : 'Ҷавобро ворид кунед:')}
+                                </p>
+                                <div className="flex items-center justify-center gap-2">
+                                    {[0, 1, 2, 3].map(idx => (
+                                        <input
+                                            key={idx}
+                                            type="text"
+                                            maxLength={1}
+                                            disabled={numericLocked}
+                                            value={(answers[currentQuestion.id] || '')[idx] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val && !/^\d$/.test(val)) return;
+                                                const current = answers[currentQuestion.id] || '';
+                                                const arr = current.split('');
+                                                arr[idx] = val;
+                                                handleAnswer(currentQuestion.id, arr.join(''));
+                                                // Автофокус на следующий ввод
+                                                if (val && idx < 3) {
+                                                    const next = e.target.nextElementSibling;
+                                                    if (next) next.focus();
+                                                }
+                                            }}
+                                            className={`w-14 h-14 text-center text-2xl font-bold rounded-lg text-white focus:outline-none ${numericLocked
+                                                ? 'bg-gaming-bg/50 border-2 border-gaming-primary/30 opacity-70 cursor-not-allowed'
+                                                : 'bg-gaming-bg/50 border-2 border-white/20 focus:border-gaming-primary'
+                                                }`}
+                                        />
+                                    ))}
+                                    {currentQuestion.unit && (
+                                        <span className="text-xl text-gaming-textMuted ml-2">{currentQuestion.unit}</span>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
                 </div>
 
                 {/* Подвал */}
@@ -485,11 +629,23 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     </button>
 
                     {currentIndex === totalQuestions - 1 ? (
-                        <button onClick={handleSubmit}
-                            className="flex items-center gap-2 px-6 py-2 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80">
-                            <CheckCircle size={18} />
-                            {lang === 'ru' ? 'Завершить тест' : 'Тамом кардан'}
-                        </button>
+                        <div className="flex flex-col items-end gap-2">
+                            {/* Предупреждение о незаполненных ответах */}
+                            {shakeWarning && warningMessage && (
+                                <div className="flex items-center gap-2 px-4 py-2 bg-red-500/20 border border-red-500/40 text-red-400 rounded-xl text-sm animate-bounce">
+                                    <AlertTriangle size={16} className="shrink-0" />
+                                    <span>{warningMessage}</span>
+                                </div>
+                            )}
+                            <button onClick={handleSubmit}
+                                className={`flex items-center gap-2 px-6 py-2 rounded-xl transition-all ${shakeWarning
+                                    ? 'bg-red-500/80 text-white animate-[shake_0.5s_ease-in-out]'
+                                    : 'bg-gaming-primary text-white hover:bg-gaming-primary/80'
+                                    }`}>
+                                <CheckCircle size={18} />
+                                {lang === 'ru' ? 'Завершить тест' : 'Тамом кардан'}
+                            </button>
+                        </div>
                     ) : (
                         <button onClick={goNext}
                             className="flex items-center gap-2 px-4 py-2 text-white hover:bg-white/10 rounded-xl">

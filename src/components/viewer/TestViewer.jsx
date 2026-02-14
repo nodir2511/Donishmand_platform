@@ -498,7 +498,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     {currentQuestion.type === 'matching' && (
                         <div className="space-y-6">
                             {/* Списки определений (Варианты) */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-white/10">
+                            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-white/10">
                                 <div className="space-y-2">
                                     <p className="text-xs font-bold text-gaming-pink uppercase tracking-wider mb-2">
                                         {lang === 'ru' ? 'Группа 1' : 'Гурӯҳи 1'}

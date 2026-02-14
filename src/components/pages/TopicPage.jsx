@@ -32,19 +32,22 @@ const TopicPage = ({ lang, t, userRole }) => {
     return (
         <CourseLayout subjectId={subjectId} lang={lang}>
             <div className="max-w-5xl">
-                <button
-                    onClick={() => navigate(`/subject/${subjectId}/section/${sectionId}`)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all mb-4 group w-fit"
-                >
-                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">{lang === 'ru' ? 'К разделу' : 'Ба бахш'}</span>
-                </button>
                 <h1 className="text-3xl font-bold mb-2 text-gaming-accent">
                     {sectionIndex + 1}.{topicIndex + 1}. {getTitle(topicData)}
                 </h1>
-                <p className="text-gaming-textMuted mb-8">
-                    {topicData.lessons.length} {lang === 'ru' ? 'уроков' : 'дарс'}
-                </p>
+
+                <div className="flex items-center gap-4 mb-8">
+                    <button
+                        onClick={() => navigate(`/subject/${subjectId}/section/${sectionId}`)}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all group w-fit"
+                    >
+                        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-sm font-medium">{lang === 'ru' ? 'К разделу' : 'Ба бахш'}</span>
+                    </button>
+                    <p className="text-gaming-textMuted">
+                        {topicData.lessons.length} {lang === 'ru' ? 'уроков' : 'дарс'}
+                    </p>
+                </div>
 
                 {/* Статистика темы */}
                 {(() => {

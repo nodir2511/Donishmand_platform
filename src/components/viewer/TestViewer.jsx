@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { X, CheckCircle, XCircle, ArrowRight, ChevronLeft, ChevronRight, Trophy, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
 import { shuffleArray } from '../../utils/shuffle';
+import { renderKatex } from '../../utils/katexRenderer';
 
 const PASS_THRESHOLD = 80;
 
@@ -248,9 +249,21 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         setTestVersion(v => v + 1); // Перемешиваем заново при перезапуске
     };
 
-    // Получить текст вопроса в зависимости от языка
-    const getQuestionText = (q) => lang === 'tj' ? (q.textTj || q.textRu) : q.textRu;
-    const getOptionText = (opt) => lang === 'tj' ? (opt.textTj || opt.textRu) : opt.textRu;
+    // Получить текст вопроса в зависимости от языка (с поддержкой KaTeX-формул)
+    const getQuestionText = (q) => {
+        const text = lang === 'tj' ? (q.textTj || q.textRu) : q.textRu;
+        return renderKatex(text || '');
+    };
+    const getOptionText = (opt) => {
+        const text = lang === 'tj' ? (opt.textTj || opt.textRu) : opt.textRu;
+        return renderKatex(text || '');
+    };
+
+    // Вспомогательный компонент для рендеринга текста с KaTeX
+    const KatexText = ({ html, className = '', tag = 'span' }) => {
+        const Tag = tag;
+        return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+    };
 
     if (!questions || questions.length === 0) {
         return (
@@ -326,7 +339,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         {!detail.isCorrect && detail.question.type === 'multiple_choice' && (
                                             <div className="text-sm text-green-400 flex flex-wrap gap-1">
                                                 <span>{lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}</span>
-                                                <span className="font-semibold">{getOptionText(detail.question.options.find(o => o.id === detail.question.correctId))}</span>
+                                                <span className="font-semibold" dangerouslySetInnerHTML={{ __html: getOptionText(detail.question.options.find(o => o.id === detail.question.correctId)) }} />
                                             </div>
                                         )}
                                     </div>
@@ -466,7 +479,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                                 {String.fromCharCode(65 + idx)}
                                             </span>
                                             <div className="flex flex-col gap-2 w-full">
-                                                <span>{getOptionText(opt)}</span>
+                                                <span dangerouslySetInnerHTML={{ __html: getOptionText(opt) }} />
                                                 {opt.image && (
                                                     <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[200px]">
                                                         <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
@@ -494,7 +507,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         <div key={left.id} className="text-sm flex gap-2 items-start">
                                             <span className="font-bold text-gaming-pink min-w-[20px] pt-1">{String.fromCharCode(65 + idx)})</span>
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-gaming-textMuted leading-tight">{getOptionText(left)}</span>
+                                                <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(left) }} />
                                                 {left.image && (
                                                     <img src={left.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
                                                 )}
@@ -510,7 +523,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         <div key={right.id} className="text-sm flex gap-2 items-start">
                                             <span className="font-bold text-gaming-accent min-w-[20px] pt-1">{idx + 1})</span>
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-gaming-textMuted leading-tight">{getOptionText(right)}</span>
+                                                <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(right) }} />
                                                 {right.image && (
                                                     <img src={right.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
                                                 )}
@@ -622,11 +635,13 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
                 {/* Подвал */}
                 <div className="flex items-center justify-between p-4 border-t border-white/10 relative z-10">
-                    <button onClick={goPrev} disabled={currentIndex === 0}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl ${currentIndex === 0 ? 'text-white/30 cursor-not-allowed' : 'text-white hover:bg-white/10'}`}>
-                        <ChevronLeft size={18} />
-                        {lang === 'ru' ? 'Назад' : 'Қафо'}
-                    </button>
+                    {currentIndex > 0 ? (
+                        <button onClick={goPrev}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl text-white hover:bg-white/10">
+                            <ChevronLeft size={18} />
+                            {lang === 'ru' ? 'Назад' : 'Қафо'}
+                        </button>
+                    ) : <div />}
 
                     {currentIndex === totalQuestions - 1 ? (
                         <div className="flex flex-col items-end gap-2">

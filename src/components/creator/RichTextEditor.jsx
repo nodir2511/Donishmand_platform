@@ -8,6 +8,7 @@ import Color from '@tiptap/extension-color';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import Image from '@tiptap/extension-image';
+import Mathematics from '@tiptap/extension-mathematics';
 import { supabase } from '../../services/supabase';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
@@ -16,7 +17,7 @@ import {
     Undo, Redo,
     Heading1, Heading2, Heading3,
     Subscript as SubIcon, Superscript as SupIcon,
-    Palette
+    Palette, Sigma
 } from 'lucide-react';
 
 // Палитра цветов в стиле Dark Gaming UI
@@ -129,6 +130,21 @@ const MenuBar = ({ editor, minimal }) => {
                 </div>
             )}
 
+            {/* Формулы (LaTeX / KaTeX) */}
+            <div className="flex gap-0.5 items-center border-r border-white/10 pr-2 mr-1">
+                <Button
+                    onClick={() => {
+                        const formula = prompt('Введите формулу LaTeX (например: x^2 + y^2 = r^2):', 'x^2 + y^2 = r^2');
+                        if (formula) {
+                            editor.chain().focus().insertContent(`$${formula}$`).run();
+                        }
+                    }}
+                    title="Вставить формулу (LaTeX)"
+                >
+                    <Sigma size={16} />
+                </Button>
+            </div>
+
             {/* Палитра цветов */}
             <div className="flex gap-0.5 items-center pl-1">
                 {/* ... existing color palette implementation ... */}
@@ -211,6 +227,11 @@ const RichTextEditor = ({ content, onChange, placeholder, minHeight = '200px', m
         Image.configure({
             inline: true,
             allowBase64: true,
+        }),
+        Mathematics.configure({
+            katexOptions: {
+                throwOnError: false,
+            },
         }),
     ], []);
 

@@ -6,6 +6,7 @@ import SlidesViewer from '../viewer/SlidesViewer';
 import TestViewer from '../viewer/TestViewer';
 import TestTeacherView from '../viewer/TestTeacherView';
 import { syllabusService } from '../../services/syllabusService';
+import { renderKatex } from '../../utils/katexRenderer';
 
 // Ключи для отслеживания прогресса
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
@@ -431,7 +432,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                         }}
                                     >
                                         <div
-                                            dangerouslySetInnerHTML={{ __html: lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu }}
+                                            dangerouslySetInnerHTML={{ __html: renderKatex(lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu) }}
                                         />
                                         {!progress.textRead && !isTeacher && (
                                             <button

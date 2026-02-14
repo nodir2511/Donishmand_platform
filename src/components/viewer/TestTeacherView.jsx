@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, Eye, EyeOff } from 'lucide-react';
+import { renderKatex } from '../../utils/katexRenderer';
 
 const TestTeacherView = ({ questions, lang, onClose }) => {
     const [showAllAnswers, setShowAllAnswers] = useState(false);
@@ -19,8 +20,14 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
         setVisibleAnswers(newVisible);
     };
 
-    const getQuestionText = (q) => lang === 'tj' ? (q.textTj || q.textRu) : q.textRu;
-    const getOptionText = (opt) => lang === 'tj' ? (opt.textTj || opt.textRu) : opt.textRu;
+    const getQuestionText = (q) => {
+        const text = lang === 'tj' ? (q.textTj || q.textRu) : q.textRu;
+        return renderKatex(text || '');
+    };
+    const getOptionText = (opt) => {
+        const text = lang === 'tj' ? (opt.textTj || opt.textRu) : opt.textRu;
+        return renderKatex(text || '');
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
@@ -108,7 +115,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                             {String.fromCharCode(65 + oIdx)}
                                                         </span>
                                                         <div className="flex flex-col gap-1 w-full">
-                                                            <span>{getOptionText(opt)}</span>
+                                                            <span dangerouslySetInnerHTML={{ __html: getOptionText(opt) }} />
                                                             {opt.image && (
                                                                 <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[150px]">
                                                                     <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
@@ -132,7 +139,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                         <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
                                                             <span className="text-gaming-pink font-bold mt-0.5">{String.fromCharCode(65 + i)})</span>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-white/80">{getOptionText(item)}</span>
+                                                                <span className="text-white/80" dangerouslySetInnerHTML={{ __html: getOptionText(item) }} />
                                                                 {item.image && (
                                                                     <img src={item.image} alt="Item" className="w-16 h-16 object-cover rounded-md border border-white/10" />
                                                                 )}
@@ -146,7 +153,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                         <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
                                                             <span className="text-gaming-accent font-bold mt-0.5">{i + 1})</span>
                                                             <div className="flex flex-col gap-1">
-                                                                <span className="text-white/80">{getOptionText(item)}</span>
+                                                                <span className="text-white/80" dangerouslySetInnerHTML={{ __html: getOptionText(item) }} />
                                                                 {item.image && (
                                                                     <img src={item.image} alt="Item" className="w-16 h-16 object-cover rounded-md border border-white/10" />
                                                                 )}

@@ -394,7 +394,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 </div>
             )}
 
-            <div className={`w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 ${!isFocused ? 'opacity-0 pointer-events-none' : ''}`}>
+            <div className={`w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 flex flex-col max-h-[90vh] ${!isFocused ? 'opacity-0 pointer-events-none' : ''}`}>
 
                 {/* ВОДЯНОЙ ЗНАК */}
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.03] flex flex-wrap content-center justify-center gap-8 rotate-12 scale-150">
@@ -439,7 +439,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 </div>
 
                 {/* Вопрос */}
-                <div className="p-6 relative z-10">
+                <div className="p-6 relative z-10 overflow-y-auto flex-1">
                     <div
                         className="text-xl font-medium mb-6 prose prose-invert max-w-none [&>p]:inline [&>p]:m-0"
                         dangerouslySetInnerHTML={{ __html: getQuestionText(currentQuestion) }}

@@ -34,7 +34,7 @@ const TopicPage = ({ lang, t, userRole }) => {
             <div className="max-w-5xl">
                 <button
                     onClick={() => navigate(`/subject/${subjectId}/section/${sectionId}`)}
-                    className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
+                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all mb-4 group w-fit"
                 >
                     <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
                     <span className="text-sm font-medium">{lang === 'ru' ? 'К разделу' : 'Ба бахш'}</span>

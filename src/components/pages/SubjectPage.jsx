@@ -67,17 +67,20 @@ const SubjectPage = ({ lang, t, userRole }) => {
     return (
         <CourseLayout subjectId={subjectId} lang={lang}>
             <div className="max-w-5xl">
-                <button
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
-                >
-                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">{lang === 'ru' ? 'На главную' : 'Ба асосӣ'}</span>
-                </button>
                 <h1 className="text-4xl font-bold mb-2 text-white">{subjectName}</h1>
-                <p className="text-gaming-textMuted text-lg mb-8">
-                    {lang === 'ru' ? 'Выберите раздел для изучения' : 'Барои омӯзиш бахшро интихоб кунед'}
-                </p>
+
+                <div className="flex items-center gap-4 mb-8">
+                    <button
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all group w-fit"
+                    >
+                        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-sm font-medium">{lang === 'ru' ? 'На главную' : 'Ба асосӣ'}</span>
+                    </button>
+                    <p className="text-gaming-textMuted text-lg">
+                        {lang === 'ru' ? 'Выберите раздел для изучения' : 'Барои омӯзиш бахшро интихоб кунед'}
+                    </p>
+                </div>
 
                 <div className="space-y-4">
                     {subjectData.sections.map((section, index) => {

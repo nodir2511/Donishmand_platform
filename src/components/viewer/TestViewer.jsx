@@ -87,15 +87,10 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         }
     };
 
-    // Отправить тест
+    const [results, setResults] = useState(null);
+
+    // Отправить тест и рассчитать результаты
     const handleSubmit = () => {
-        setShowResults(true);
-    };
-
-    // Расчет результатов
-    const results = useMemo(() => {
-        if (!showResults) return null;
-
         let correct = 0;
         const details = randomizedQuestions.map(q => {
             const userAnswer = answers[q.id];
@@ -140,18 +135,18 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         // Сбор монет при успешной сдаче
         if (isPassed) {
             const currentCoins = parseInt(localStorage.getItem('user_coins') || '0');
-            // Проверяем, получал ли уже монету за этот урок (чтобы не фармили)
-            // Пока просто даем монету за каждую успешную сдачу, как поощрение
             localStorage.setItem('user_coins', (currentCoins + 1).toString());
         }
 
-        return { correct, total: totalQuestions, score, isPassed, details };
-    }, [showResults, questions, answers, lessonId, totalQuestions]);
+        setResults({ correct, total: totalQuestions, score, isPassed, details });
+        setShowResults(true);
+    };
 
     // Перезапустить тест
     const handleRestart = () => {
         setCurrentIndex(0);
         setAnswers({});
+        setResults(null);
         setShowResults(false);
         setTestVersion(v => v + 1); // Перемешиваем заново при перезапуске
     };
@@ -227,12 +222,15 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                 <div className="flex items-start gap-3">
                                     {detail.isCorrect ? <CheckCircle className="text-green-400 mt-1" size={20} /> : <XCircle className="text-red-400 mt-1" size={20} />}
                                     <div className="flex-1">
-                                        <p className="font-medium mb-1">{idx + 1}. {getQuestionText(detail.question)}</p>
+                                        <div className="font-medium mb-1 flex gap-1">
+                                            <span>{idx + 1}.</span>
+                                            <div dangerouslySetInnerHTML={{ __html: getQuestionText(detail.question) }} className="[&>p]:inline [&>p]:m-0" />
+                                        </div>
                                         {!detail.isCorrect && detail.question.type === 'multiple_choice' && (
-                                            <p className="text-sm text-green-400">
-                                                {lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}
-                                                {getOptionText(detail.question.options.find(o => o.id === detail.question.correctId))}
-                                            </p>
+                                            <div className="text-sm text-green-400 flex flex-wrap gap-1">
+                                                <span>{lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}</span>
+                                                <span className="font-semibold">{getOptionText(detail.question.options.find(o => o.id === detail.question.correctId))}</span>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -242,10 +240,6 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
                     {/* Действия */}
                     <div className="p-6 border-t border-white/10 flex gap-4 justify-center">
-                        <button onClick={handleRestart} className="flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20">
-                            <RotateCcw size={18} />
-                            {lang === 'ru' ? 'Пройти заново' : 'Аз нав'}
-                        </button>
                         <button onClick={handleRestart} className="flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20">
                             <RotateCcw size={18} />
                             {lang === 'ru' ? 'Пройти заново' : 'Аз нав'}
@@ -320,7 +314,15 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
                 {/* Вопрос */}
                 <div className="p-6 relative z-10">
-                    <h3 className="text-xl font-medium mb-6">{getQuestionText(currentQuestion)}</h3>
+                    <div
+                        className="text-xl font-medium mb-6 prose prose-invert max-w-none [&>p]:inline [&>p]:m-0"
+                        dangerouslySetInnerHTML={{ __html: getQuestionText(currentQuestion) }}
+                    />
+                    {currentQuestion.image && (
+                        <div className="mb-6 rounded-xl overflow-hidden border border-white/10 bg-black/20 flex justify-center">
+                            <img src={currentQuestion.image} alt="Question" className="max-w-full max-h-[400px] object-contain" />
+                        </div>
+                    )}
 
                     {/* Один из многих (выбор варианта) */}
                     {currentQuestion.type === 'multiple_choice' && (
@@ -333,10 +335,17 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         onClick={() => handleAnswer(currentQuestion.id, opt.id)}
                                         className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${isSelected ? 'bg-gaming-primary/20 border-gaming-primary' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                                     >
-                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${isSelected ? 'bg-gaming-primary text-white' : 'bg-white/10'}`}>
+                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${isSelected ? 'bg-gaming-primary text-white' : 'bg-white/10'}`}>
                                             {String.fromCharCode(65 + idx)}
                                         </span>
-                                        <span>{getOptionText(opt)}</span>
+                                        <div className="flex flex-col gap-2 w-full">
+                                            <span>{getOptionText(opt)}</span>
+                                            {opt.image && (
+                                                <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[200px]">
+                                                    <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
+                                                </div>
+                                            )}
+                                        </div>
                                     </button>
                                 );
                             })}
@@ -354,8 +363,13 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                     </p>
                                     {currentQuestion.leftItems.map((left, idx) => (
                                         <div key={left.id} className="text-sm flex gap-2 items-start">
-                                            <span className="font-bold text-gaming-pink min-w-[20px]">{String.fromCharCode(65 + idx)})</span>
-                                            <span className="text-gaming-textMuted leading-tight">{getOptionText(left)}</span>
+                                            <span className="font-bold text-gaming-pink min-w-[20px] pt-1">{String.fromCharCode(65 + idx)})</span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-gaming-textMuted leading-tight">{getOptionText(left)}</span>
+                                                {left.image && (
+                                                    <img src={left.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -365,8 +379,13 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                     </p>
                                     {currentQuestion.rightItems.map((right, idx) => (
                                         <div key={right.id} className="text-sm flex gap-2 items-start">
-                                            <span className="font-bold text-gaming-accent min-w-[20px]">{idx + 1})</span>
-                                            <span className="text-gaming-textMuted leading-tight">{getOptionText(right)}</span>
+                                            <span className="font-bold text-gaming-accent min-w-[20px] pt-1">{idx + 1})</span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className="text-gaming-textMuted leading-tight">{getOptionText(right)}</span>
+                                                {right.image && (
+                                                    <img src={right.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

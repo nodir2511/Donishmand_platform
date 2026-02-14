@@ -14,6 +14,9 @@ import { translateText } from '../../services/translationService';
 
 
 
+import { syllabusService } from '../../services/syllabusService';
+import useDebounce from '../../hooks/useDebounce';
+
 const LESSON_TYPES = [
     { id: 'video', icon: Video, label: { ru: 'Видео', tj: 'Видео' } },
     { id: 'text', icon: FileText, label: { ru: 'Текст', tj: 'Матн' } },
@@ -79,20 +82,25 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2 bg-gaming-bg/30 rounded-lg border border-white/5">
-            <div className="flex items-center gap-2">
-                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white">
+        <div ref={setNodeRef} style={style} className="flex items-center justify-between gap-3 p-2 bg-gaming-bg/30 rounded-lg border border-white/5">
+            <div
+                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer group hover:bg-white/5 p-1 rounded-md transition-colors"
+                onClick={() => onEdit(lesson)}
+                title={lang === 'ru' ? 'Нажмите для редактирования' : 'Барои таҳрир зер кунед'}
+            >
+                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0" onClick={(e) => e.stopPropagation()}>
                     <GripVertical size={14} />
                 </div>
-                <LessonIcon size={14} className="text-gaming-pink" />
-                <span className="text-sm">
+                <LessonIcon size={14} className="text-gaming-pink shrink-0" />
+                <span className="text-sm truncate block group-hover:text-gaming-primary transition-colors">
                     {sectionIndex + 1}.{topicIndex + 1}.{lessonIndex + 1}. {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
                 </span>
-                <span className="text-xs px-2 py-0.5 bg-gaming-card/50 rounded-full text-gaming-textMuted">
+                <span className="text-xs px-2 py-0.5 bg-gaming-card/50 rounded-full text-gaming-textMuted shrink-0 hidden xs:inline-block">
                     {LESSON_TYPES.find(lt => lt.id === lesson.type)?.label[lang] || lesson.type}
                 </span>
             </div>
-            <div className="flex items-center gap-1">
+
+            <div className="flex items-center gap-1 shrink-0">
                 {/* Move Button */}
                 <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'move'); }}
@@ -103,15 +111,9 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                 </button>
 
                 <button
-                    onClick={() => onEdit(lesson)}
-                    className="p-1 text-gaming-accent hover:text-gaming-accent/80 transition-colors"
-                    title={lang === 'ru' ? 'Редактировать содержимое' : 'Таҳрири мундариҷа'}
-                >
-                    <Edit3 size={14} />
-                </button>
-                <button
-                    onClick={() => onDelete(lesson.id)}
+                    onClick={(e) => { e.stopPropagation(); onDelete(lesson.id); }}
                     className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
+                    title={lang === 'ru' ? 'Удалить' : 'Ҳазф кардан'}
                 >
                     <Trash2 size={14} />
                 </button>
@@ -222,6 +224,34 @@ const CreatorPage = ({ lang, t }) => {
         }
         return { ...MOCK_SYLLABUS };
     });
+
+    // --- ЛОГИКА АВТО-СОХРАНЕНИЯ НАЧАЛО ---
+    const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' (сохранено), 'saving' (сохранение), 'error' (ошибка)
+    const debouncedSyllabus = useDebounce(syllabus, 2000); // Ждем 2 сек после последнего изменения
+
+    useEffect(() => {
+        // Пропускаем начальную загрузку или пустой объект
+        if (!debouncedSyllabus) return;
+
+        const syncToCloud = async () => {
+            setSaveStatus('saving');
+            try {
+                // Сохраняем структуру для ТЕКУЩЕГО предмета.
+                // Мы исходим из того, что пользователь редактирует только выбранный предмет.
+
+                if (debouncedSyllabus[selectedSubject]) {
+                    await syllabusService.saveStructure(selectedSubject, debouncedSyllabus[selectedSubject]);
+                }
+                setSaveStatus('saved');
+            } catch (error) {
+                console.error('Ошибка авто-сохранения:', error);
+                setSaveStatus('error');
+            }
+        };
+
+        syncToCloud();
+    }, [debouncedSyllabus, selectedSubject]);
+    // --- ЛОГИКА АВТО-СОХРАНЕНИЯ КОНЕЦ ---
 
     const [expandedSections, setExpandedSections] = useState({});
     const [expandedTopics, setExpandedTopics] = useState({});
@@ -527,33 +557,120 @@ const CreatorPage = ({ lang, t }) => {
         setMoveModal(null);
     };
 
+    // --- СИНХРОНИЗАЦИЯ С ОБЛАКОМ (ЗАГРУЗКА) ---
+    useEffect(() => {
+        const loadFromCloud = async () => {
+            // Если мы переключили предмет, попробуем загрузить его структуру из Supabase
+            // Чтобы всегда видеть актуальные данные.
+            try {
+                // Можно добавить preloader, но пока просто в фоне или setSaveStatus('saving') чтобы показать активность
+                // Но лучше отдельный индикатор или просто молча, если локально что-то есть.
+                // Для надежности покажем, что идет синхронизация.
+                setSaveStatus('saving');
+
+                const cloudData = await syllabusService.getStructure(selectedSubject);
+                if (cloudData) {
+                    setSyllabus(prev => ({
+                        ...prev,
+                        [selectedSubject]: cloudData // В БД лежит объект { sections: [...] }
+                    }));
+                }
+                setSaveStatus('saved');
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                // Не ставим error статус жестко, чтобы не пугать, если просто нет инета или данных нет
+            }
+        };
+
+        loadFromCloud();
+    }, [selectedSubject]);
+
+
     // ОБРАБОТЧИКИ РЕДАКТОРА КОНТЕНТА
-    const handleEditLesson = (lesson, sectionId, topicId) => {
-        setEditingLesson(lesson);
-        setEditingLessonContext({ sectionId, topicId });
+    const [isLoadingLesson, setIsLoadingLesson] = useState(false);
+
+    const handleEditLesson = async (lesson, sectionId, topicId) => {
+        setIsLoadingLesson(true);
+        try {
+            let lessonToEdit = lesson;
+
+            // Если контента нет (он не загружен в структуру), загружаем его отдельно
+            // Проверяем наличие ключей контента или явно поле content
+            if (!lesson.content) {
+                const loadedLesson = await syllabusService.getLesson(lesson.id);
+                if (loadedLesson && loadedLesson.content) {
+                    lessonToEdit = { ...lesson, content: loadedLesson.content };
+
+                    // Обновим локальный стейт, чтобы закешировать загруженный контент
+                    // (Опционально, но полезно, чтобы при повторном открытии не качать)
+                    setSyllabus(prev => ({
+                        ...prev,
+                        [selectedSubject]: {
+                            ...prev[selectedSubject],
+                            sections: prev[selectedSubject].sections.map(sec =>
+                                sec.id === sectionId ? {
+                                    ...sec,
+                                    topics: sec.topics.map(top =>
+                                        top.id === topicId ? {
+                                            ...top,
+                                            lessons: top.lessons.map(les => les.id === lesson.id ? lessonToEdit : les)
+                                        } : top
+                                    )
+                                } : sec
+                            )
+                        }
+                    }));
+                }
+            }
+
+            setEditingLesson(lessonToEdit);
+            setEditingLessonContext({ sectionId, topicId });
+        } catch (error) {
+            console.error('Ошибка подготовки урока:', error);
+            alert('Не удалось загрузить урок');
+        } finally {
+            setIsLoadingLesson(false);
+        }
     };
 
-    const handleSaveLesson = (updatedLesson) => {
-        const { sectionId, topicId } = editingLessonContext;
-        setSyllabus(prev => ({
-            ...prev,
-            [selectedSubject]: {
-                ...prev[selectedSubject],
-                sections: prev[selectedSubject].sections.map(sec =>
-                    sec.id === sectionId ? {
-                        ...sec,
-                        topics: sec.topics.map(top =>
-                            top.id === topicId ? {
-                                ...top,
-                                lessons: top.lessons.map(les => les.id === updatedLesson.id ? updatedLesson : les)
-                            } : top
-                        )
-                    } : sec
-                )
-            }
-        }));
-        setEditingLesson(null);
-        setEditingLessonContext(null);
+    const [isLessonSaving, setIsLessonSaving] = useState(false);
+
+    const handleSaveLesson = async (updatedLesson) => {
+        setIsLessonSaving(true);
+        try {
+            const { sectionId, topicId } = editingLessonContext;
+
+            // 1. Сохраняем контент в Supabase
+            await syllabusService.saveLesson(updatedLesson, selectedSubject);
+
+            // 2. Обновляем локальный стейт (это также запустит авто-сохранение структуры, если поменялось название)
+            setSyllabus(prev => ({
+                ...prev,
+                [selectedSubject]: {
+                    ...prev[selectedSubject],
+                    sections: prev[selectedSubject].sections.map(sec =>
+                        sec.id === sectionId ? {
+                            ...sec,
+                            topics: sec.topics.map(top =>
+                                top.id === topicId ? {
+                                    ...top,
+                                    lessons: top.lessons.map(les => les.id === updatedLesson.id ? updatedLesson : les)
+                                } : top
+                            )
+                        } : sec
+                    )
+                }
+            }));
+
+            // 3. Закрываем редактор только после успеха
+            setEditingLesson(null);
+            setEditingLessonContext(null);
+        } catch (error) {
+            console.error('Ошибка сохранения урока:', error);
+            alert(lang === 'ru' ? 'Ошибка сохранения урока' : 'Хатоги ҳангоми сабти дарс');
+        } finally {
+            setIsLessonSaving(false);
+        }
     };
 
     // АВТО-ПЕРЕВОД
@@ -660,6 +777,28 @@ const CreatorPage = ({ lang, t }) => {
                     <ChevronLeft size={20} />
                     {lang === 'ru' ? 'Назад' : 'Бозгашт'}
                 </button>
+
+                {/* Индикатор синхронизации */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gaming-card/50 border border-white/5 text-sm font-medium">
+                    {saveStatus === 'saved' && (
+                        <>
+                            <span className="text-gaming-accent">☁️</span>
+                            <span className="text-gaming-textMuted">{lang === 'ru' ? 'Все сохранено' : 'Ҳамааш сабт шуд'}</span>
+                        </>
+                    )}
+                    {saveStatus === 'saving' && (
+                        <>
+                            <Loader2 size={16} className="text-gaming-primary animate-spin" />
+                            <span className="text-white">{lang === 'ru' ? 'Сохранение...' : 'Сабт мешавад...'}</span>
+                        </>
+                    )}
+                    {saveStatus === 'error' && (
+                        <>
+                            <span className="text-red-500">❌</span>
+                            <span className="text-red-400">{lang === 'ru' ? 'Ошибка сохранения' : 'Хатоги'}</span>
+                        </>
+                    )}
+                </div>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
@@ -870,8 +1009,9 @@ const CreatorPage = ({ lang, t }) => {
                 <LessonContentEditor
                     lesson={editingLesson}
                     onSave={handleSaveLesson}
-                    onClose={() => { setEditingLesson(null); setEditingLessonContext(null); }}
+                    onClose={() => { if (!isLessonSaving) { setEditingLesson(null); setEditingLessonContext(null); } }}
                     lang={lang}
+                    isSaving={isLessonSaving}
                 />
             )}
 

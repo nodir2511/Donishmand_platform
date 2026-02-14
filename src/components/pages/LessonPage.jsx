@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Play, FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Clock, RotateCcw } from 'lucide-react';
-import { findLessonContext } from '../../utils/syllabusHelpers';
+import { Play, FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Clock, RotateCcw, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
 import SlidesViewer from '../viewer/SlidesViewer';
 import TestViewer from '../viewer/TestViewer';
 import TestTeacherView from '../viewer/TestTeacherView';
+import { syllabusService } from '../../services/syllabusService';
 
 // Ключи для отслеживания прогресса
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
@@ -15,11 +15,8 @@ const LessonPage = ({ lang, t, userRole }) => {
     const navigate = useNavigate();
     const PASS_THRESHOLD = 80;
 
-    const data = findLessonContext(lessonId);
-    const [activeTab, setActiveTab] = useState('video');
-    const [showSlidesViewer, setShowSlidesViewer] = useState(false);
-    const [showTestWarning, setShowTestWarning] = useState(false);
-    const [showTestViewer, setShowTestViewer] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [lessonData, setLessonData] = useState(null); // { lesson, topic, section, subjectKey, ... }
 
     // Состояние прогресса
     const [progress, setProgress] = useState(() => ({
@@ -29,32 +26,79 @@ const LessonPage = ({ lang, t, userRole }) => {
         testHistory: JSON.parse(localStorage.getItem(`test_history_${lessonId}`) || '[]')
     }));
 
+    const [activeTab, setActiveTab] = useState('video');
+    const [showSlidesViewer, setShowSlidesViewer] = useState(false);
+    const [showTestWarning, setShowTestWarning] = useState(false);
+    const [showTestViewer, setShowTestViewer] = useState(false);
+
     // Определяем режим учителя
     const isTeacher = userRole === 'teacher';
 
-    // Получение контента урока из localStorage (созданного через CreatorPage)
-    const lessonContent = useMemo(() => {
-        const stored = localStorage.getItem('donishmand_creator_syllabus');
-        if (stored && data) {
+    // ЗАГРУЗКА ДАННЫХ
+    useEffect(() => {
+        const fetchLessonData = async () => {
+            setLoading(true);
             try {
-                const syllabus = JSON.parse(stored);
-                const subjectData = syllabus[data.subjectKey];
-                if (subjectData) {
-                    for (const sec of subjectData.sections || []) {
-                        for (const top of sec.topics || []) {
-                            const les = top.lessons?.find(l => l.id === lessonId);
-                            if (les) return les.content || {};
+                // 1. Получаем сам урок
+                const lesson = await syllabusService.getLesson(lessonId);
+
+                if (!lesson) {
+                    setLessonData(null);
+                    setLoading(false);
+                    return;
+                }
+
+                // 2. Получаем структуру предмета, чтобы найти контекст (предыдущий/следующий урок, заголовки)
+                // Если subject есть в уроке - используем его. 
+                // Если нет (старые данные) - придется искать (но для MVP считаем что есть).
+                const subjectKey = lesson.subject;
+                let contextData = null;
+
+                if (subjectKey) {
+                    const structure = await syllabusService.getStructure(subjectKey);
+
+                    if (structure && structure.sections) {
+                        // Ищем наш урок в структуре
+                        for (let sIndex = 0; sIndex < structure.sections.length; sIndex++) {
+                            const sec = structure.sections[sIndex];
+                            for (let tIndex = 0; tIndex < sec.topics.length; tIndex++) {
+                                const top = sec.topics[tIndex];
+                                const lIndex = top.lessons.findIndex(l => l.id === lessonId);
+
+                                if (lIndex !== -1) {
+                                    contextData = {
+                                        lesson: { ...lesson, ...top.lessons[lIndex], content: lesson.content }, // Мержим данные из БД и структуры
+                                        topic: top,
+                                        section: sec,
+                                        subjectKey,
+                                        lessonIndex: lIndex,
+                                        topicIndex: tIndex,
+                                        sectionIndex: sIndex
+                                    };
+                                    break;
+                                }
+                            }
+                            if (contextData) break;
                         }
                     }
                 }
-            } catch (e) { }
-        }
-        return {};
-    }, [lessonId, data]);
+
+                setLessonData(contextData || { lesson, subjectKey }); // Если контекст не найден, хотя бы урок покажем
+            } catch (error) {
+                console.error('Error fetching lesson:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchLessonData();
+    }, [lessonId]);
+
 
     // Определение существующего контента
-    const hasVideo = lessonContent.video?.url;
-    const hasText = lessonContent.text?.bodyRu || lessonContent.text?.bodyTj;
+    const lessonContent = lessonData?.lesson?.content || {};
+    const hasVideo = !!lessonContent.video?.url;
+    const hasText = !!(lessonContent.text?.bodyRu || lessonContent.text?.bodyTj);
     const currentSlides = lang === 'tj' ? (lessonContent.slidesTj || []) : (lessonContent.slidesRu || []);
     const hasSlides = currentSlides.length > 0;
     const hasTest = lessonContent.test?.questions?.length > 0;
@@ -104,10 +148,12 @@ const LessonPage = ({ lang, t, userRole }) => {
 
     // Установка начальной активной вкладки на основе доступного контента
     useEffect(() => {
-        if (hasVideo) setActiveTab('video');
-        else if (hasText) setActiveTab('text');
-        else if (hasSlides) setActiveTab('slides');
-    }, [hasVideo, hasText, hasSlides]);
+        if (!loading && lessonData) {
+            if (hasVideo) setActiveTab('video');
+            else if (hasText) setActiveTab('text');
+            else if (hasSlides) setActiveTab('slides');
+        }
+    }, [loading, hasVideo, hasText, hasSlides]);
 
     // Пометить видео как просмотренное
     const handleVideoComplete = () => {
@@ -150,10 +196,17 @@ const LessonPage = ({ lang, t, userRole }) => {
         setProgress(prev => ({ ...prev, testHistory: newHistory }));
     };
 
-
-    if (!data) {
+    if (loading) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-white">
+            <div className="min-h-screen flex items-center justify-center bg-gaming-bg">
+                <Loader2 size={40} className="text-gaming-primary animate-spin" />
+            </div>
+        );
+    }
+
+    if (!lessonData) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center text-white bg-gaming-bg">
                 <h2 className="text-2xl mb-4">{lang === 'ru' ? 'Урок не найден' : 'Дарс ёфт нашуд'}</h2>
                 <button onClick={() => navigate(-1)} className="text-gaming-primary hover:underline">
                     {lang === 'ru' ? 'Назад' : 'Бозгашт'}
@@ -162,11 +215,11 @@ const LessonPage = ({ lang, t, userRole }) => {
         );
     }
 
-    const { lesson, topic, section, subjectKey, lessonIndex, sectionIndex, topicIndex } = data;
+    const { lesson, topic, section, subjectKey, lessonIndex, sectionIndex, topicIndex } = lessonData;
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
-    const prevLesson = topic.lessons[lessonIndex - 1];
-    const nextLesson = topic.lessons[lessonIndex + 1];
+    const prevLesson = topic?.lessons?.[lessonIndex - 1];
+    const nextLesson = topic?.lessons?.[lessonIndex + 1];
 
     // Доступные вкладки на основе контента
     const availableTabs = [];
@@ -377,9 +430,9 @@ const LessonPage = ({ lang, t, userRole }) => {
                                             if (scrollTop + clientHeight >= scrollHeight - 50) handleTextRead();
                                         }}
                                     >
-                                        <div className="whitespace-pre-wrap">
-                                            {lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu}
-                                        </div>
+                                        <div
+                                            dangerouslySetInnerHTML={{ __html: lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu }}
+                                        />
                                         {!progress.textRead && !isTeacher && (
                                             <button
                                                 onClick={handleTextRead}

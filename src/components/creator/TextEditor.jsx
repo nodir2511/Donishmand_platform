@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, FileText, Loader2 } from 'lucide-react';
 import { translateText } from '../../services/translationService';
+import RichTextEditor from './RichTextEditor';
 
 const TextEditor = ({ data, onChange, lang }) => {
     const [translating, setTranslating] = useState(false);
@@ -19,6 +20,16 @@ const TextEditor = ({ data, onChange, lang }) => {
         }
     };
 
+    const handleAutoTranslateRuToTj = async () => {
+        setTranslating(true);
+        try {
+            const translated = await translateText(data.bodyRu || '', 'ru', 'tj');
+            handleChange('bodyTj', translated);
+        } finally {
+            setTranslating(false);
+        }
+    };
+
     return (
         <div className="space-y-4">
             <h4 className="text-lg font-semibold text-gaming-accent flex items-center gap-2">
@@ -32,12 +43,10 @@ const TextEditor = ({ data, onChange, lang }) => {
                     <label className="block text-sm text-gaming-textMuted mb-2">
                         {lang === 'ru' ? 'Текст (RU)' : 'Матн (RU)'}
                     </label>
-                    <textarea
-                        value={data.bodyRu || ''}
-                        onChange={(e) => handleChange('bodyRu', e.target.value)}
+                    <RichTextEditor
+                        content={data.bodyRu || ''}
+                        onChange={(content) => handleChange('bodyRu', content)}
                         placeholder={lang === 'ru' ? 'Введите текст урока...' : 'Матни дарсро ворид кунед...'}
-                        rows={8}
-                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50 transition-colors resize-none"
                     />
                 </div>
                 <button
@@ -57,17 +66,15 @@ const TextEditor = ({ data, onChange, lang }) => {
                     <label className="block text-sm text-gaming-textMuted mb-2">
                         {lang === 'ru' ? 'Текст (TJ)' : 'Матн (TJ)'}
                     </label>
-                    <textarea
-                        value={data.bodyTj || ''}
-                        onChange={(e) => handleChange('bodyTj', e.target.value)}
+                    <RichTextEditor
+                        content={data.bodyTj || ''}
+                        onChange={(content) => handleChange('bodyTj', content)}
                         placeholder={lang === 'ru' ? 'Матни дарсро ворид кунед...' : 'Матни дарсро ворид кунед...'}
-                        rows={8}
-                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-accent/50 transition-colors resize-none"
                     />
                 </div>
                 <button
                     type="button"
-                    onClick={handleAutoTranslate}
+                    onClick={handleAutoTranslateRuToTj}
                     disabled={translating}
                     className="mt-7 flex items-center gap-1 px-3 py-3 h-fit bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
                     title="Перевести RU -> TJ"

@@ -1,22 +1,59 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Book, ArrowRight, FileText } from 'lucide-react';
-import { MOCK_SYLLABUS } from '../../constants/syllabus';
+import { Book, ArrowRight, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
+import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats } from '../../utils/progressHelpers';
+import { syllabusService } from '../../services/syllabusService';
 
 const SubjectPage = ({ lang, t, userRole }) => {
     const { subjectId } = useParams();
     const navigate = useNavigate();
 
-    const subjectData = MOCK_SYLLABUS[subjectId];
+    const [subjectData, setSubjectData] = useState(null);
+    const [loading, setLoading] = useState(true);
+
     const isTeacher = userRole === 'teacher';
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
 
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Пытаемся получить данные из Supabase
+                const data = await syllabusService.getStructure(subjectId);
+                if (data) {
+                    setSubjectData(data);
+                } else {
+                    // Если данных нет, используем локальный MOCK
+                    console.warn(`No structure found in Supabase for ${subjectId}, using Mock data`);
+                    const mock = MOCK_SYLLABUS[subjectId];
+                    if (mock) {
+                        setSubjectData(mock);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching subject data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+    }, [subjectId]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gaming-bg">
+                <Loader2 size={40} className="text-gaming-primary animate-spin" />
+            </div>
+        );
+    }
+
     if (!subjectData) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-white">
+            <div className="min-h-screen flex flex-col items-center justify-center text-white bg-gaming-bg">
                 <h2 className="text-2xl mb-4">{lang === 'ru' ? 'Предмет не найден' : 'Фан ёфт нашуд'}</h2>
                 <button onClick={() => navigate('/')} className="text-gaming-primary hover:underline">
                     {lang === 'ru' ? 'На главную' : 'Ба асосӣ'}

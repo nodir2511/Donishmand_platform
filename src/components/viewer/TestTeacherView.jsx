@@ -66,9 +66,15 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                         <span className="flex-shrink-0 w-8 h-8 bg-gaming-pink/10 text-gaming-pink rounded-lg flex items-center justify-center font-bold text-sm border border-gaming-pink/20">
                                             {idx + 1}
                                         </span>
-                                        <h3 className="text-lg font-medium text-white pt-1">
-                                            {getQuestionText(q)}
-                                        </h3>
+                                        <div
+                                            className="text-lg font-medium text-white pt-1 prose prose-invert max-w-none [&>p]:inline [&>p]:m-0"
+                                            dangerouslySetInnerHTML={{ __html: getQuestionText(q) }}
+                                        />
+                                        {q.image && (
+                                            <div className="mt-2 rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-md">
+                                                <img src={q.image} alt="Question" className="w-full h-auto object-cover" />
+                                            </div>
+                                        )}
                                     </div>
                                     <button
                                         onClick={() => toggleAnswer(q.id)}
@@ -101,8 +107,15 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                             }`}>
                                                             {String.fromCharCode(65 + oIdx)}
                                                         </span>
-                                                        <span>{getOptionText(opt)}</span>
-                                                        {showAsCorrect && <CheckCircle size={16} className="ml-auto animate-in zoom-in duration-300" />}
+                                                        <div className="flex flex-col gap-1 w-full">
+                                                            <span>{getOptionText(opt)}</span>
+                                                            {opt.image && (
+                                                                <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[150px]">
+                                                                    <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {showAsCorrect && <CheckCircle size={16} className="ml-auto animate-in zoom-in duration-300 shrink-0" />}
                                                     </div>
                                                 );
                                             })}
@@ -116,18 +129,28 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                 <div>
                                                     <p className="text-xs text-gaming-textMuted uppercase mb-2">{lang === 'ru' ? 'Элементы' : 'Элементҳо'}</p>
                                                     {q.leftItems.map((item, i) => (
-                                                        <div key={item.id} className="mb-2 text-sm flex gap-2">
-                                                            <span className="text-gaming-pink font-bold">{String.fromCharCode(65 + i)})</span>
-                                                            <span className="text-white/80">{getOptionText(item)}</span>
+                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
+                                                            <span className="text-gaming-pink font-bold mt-0.5">{String.fromCharCode(65 + i)})</span>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-white/80">{getOptionText(item)}</span>
+                                                                {item.image && (
+                                                                    <img src={item.image} alt="Item" className="w-16 h-16 object-cover rounded-md border border-white/10" />
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gaming-textMuted uppercase mb-2">{lang === 'ru' ? 'Определения' : 'Таърифҳо'}</p>
                                                     {q.rightItems.map((item, i) => (
-                                                        <div key={item.id} className="mb-2 text-sm flex gap-2">
-                                                            <span className="text-gaming-accent font-bold">{i + 1})</span>
-                                                            <span className="text-white/80">{getOptionText(item)}</span>
+                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
+                                                            <span className="text-gaming-accent font-bold mt-0.5">{i + 1})</span>
+                                                            <div className="flex flex-col gap-1">
+                                                                <span className="text-white/80">{getOptionText(item)}</span>
+                                                                {item.image && (
+                                                                    <img src={item.image} alt="Item" className="w-16 h-16 object-cover rounded-md border border-white/10" />
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>

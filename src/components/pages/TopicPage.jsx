@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { PlayCircle, FileText, ArrowRight } from 'lucide-react';
+import { PlayCircle, FileText, ArrowRight, ArrowLeft } from 'lucide-react';
 import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats, getLessonStats } from '../../utils/progressHelpers';
@@ -32,6 +32,13 @@ const TopicPage = ({ lang, t, userRole }) => {
     return (
         <CourseLayout subjectId={subjectId} lang={lang}>
             <div className="max-w-5xl">
+                <button
+                    onClick={() => navigate(`/subject/${subjectId}/section/${sectionId}`)}
+                    className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
+                >
+                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-sm font-medium">{lang === 'ru' ? 'К разделу' : 'Ба бахш'}</span>
+                </button>
                 <h1 className="text-3xl font-bold mb-2 text-gaming-accent">
                     {sectionIndex + 1}.{topicIndex + 1}. {getTitle(topicData)}
                 </h1>

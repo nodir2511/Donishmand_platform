@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Book, ArrowRight, Loader2 } from 'lucide-react';
+import { Book, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
 import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import CourseLayout from '../layout/CourseLayout';
@@ -67,6 +67,13 @@ const SubjectPage = ({ lang, t, userRole }) => {
     return (
         <CourseLayout subjectId={subjectId} lang={lang}>
             <div className="max-w-5xl">
+                <button
+                    onClick={() => navigate('/')}
+                    className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
+                >
+                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-sm font-medium">{lang === 'ru' ? 'На главную' : 'Ба асосӣ'}</span>
+                </button>
                 <h1 className="text-4xl font-bold mb-2 text-white">{subjectName}</h1>
                 <p className="text-gaming-textMuted text-lg mb-8">
                     {lang === 'ru' ? 'Выберите раздел для изучения' : 'Барои омӯзиш бахшро интихоб кунед'}

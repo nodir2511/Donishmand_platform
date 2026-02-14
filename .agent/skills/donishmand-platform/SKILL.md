@@ -110,3 +110,13 @@ Fullscreen modals should:
 - **Review Requirement**: The plan must be presented to the USER for review.
 - **Explicit Approval**: DO NOT start the implementation phase (EXECUTION) until the USER has explicitly reviewed the plan and given approval to proceed.
 
+## 11. Code-Splitting (Разделение кода)
+- **Принцип**: Тяжёлые компоненты должны загружаться **лениво** через `React.lazy()` и `Suspense`, чтобы уменьшить размер начальной загрузки.
+- **Правило для страниц**: Все страницы **кроме `HomePage`** должны быть lazy-импортированы в `App.jsx`:
+  ```javascript
+  const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
+  const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
+  ```
+- **Suspense обёртка**: `<Routes>` должен быть обёрнут в `<Suspense fallback={<PageLoader />}>`.
+- **Новые компоненты**: Если создаётся новая страница или тяжёлый компонент (>30 KB исходного кода), его **обязательно** подключать через `React.lazy()`.
+- **Не разделять**: Мелкие общие компоненты (Navbar, Footer, CourseLayout) оставлять как обычные импорты.

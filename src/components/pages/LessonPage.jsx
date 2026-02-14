@@ -233,6 +233,19 @@ const LessonPage = ({ lang, t, userRole }) => {
             <div className="max-w-4xl">
                 {/* Шапка */}
                 <header className="mb-6">
+                    <button
+                        onClick={() => {
+                            if (subjectKey && section?.id && topic?.id) {
+                                navigate(`/subject/${subjectKey}/section/${section.id}/topic/${topic.id}`);
+                            } else {
+                                navigate(-1);
+                            }
+                        }}
+                        className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
+                    >
+                        <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                        <span className="text-sm font-medium">{lang === 'ru' ? 'К теме' : 'Ба мавзӯъ'}</span>
+                    </button>
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-sm text-gaming-textMuted mb-1">

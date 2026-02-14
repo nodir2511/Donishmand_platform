@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { FileText, ArrowRight, PlayCircle } from 'lucide-react';
+import { FileText, ArrowRight, ArrowLeft, PlayCircle } from 'lucide-react';
 import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats } from '../../utils/progressHelpers';
@@ -30,6 +30,13 @@ const SectionPage = ({ lang, t, userRole }) => {
     return (
         <CourseLayout subjectId={subjectId} lang={lang}>
             <div className="max-w-5xl">
+                <button
+                    onClick={() => navigate(`/subject/${subjectId}`)}
+                    className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors mb-4 group"
+                >
+                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                    <span className="text-sm font-medium">{lang === 'ru' ? 'К предмету' : 'Ба фан'}</span>
+                </button>
                 <h1 className="text-3xl font-bold mb-2 text-gaming-primary">
                     {sectionIndex + 1}. {getTitle(sectionData)}
                 </h1>

@@ -1,4 +1,4 @@
-import{c as J,R as Pe,r as u,j as e,X as he,C as ye,u as Ke,a as Ue}from"./index-K8fDotvw.js";import{C as Xe}from"./CourseLayout-BuSbdwAU.js";import{C as Q,a as ge,k as Ae,V as He,P as me,b as Be}from"./katex-DRkDbVA-.js";import{A as Ze}from"./alert-triangle-CdCogvI1.js";import{L as Ge,s as Ve}from"./syllabusService-CyjC4DWS.js";import{F as Oe}from"./file-text-DkwDEKHF.js";import"./home-CoBiwIX1.js";/**
+import{c as J,R as Pe,r as u,j as e,X as he,C as ye,u as Ke,a as Ue}from"./index-BXdmU-vp.js";import{C as Xe}from"./CourseLayout-CFtQD9dl.js";import{C as Q,a as ge,k as Ae,V as He,P as me,b as Be}from"./katex-pg_K-x9u.js";import{A as Ze}from"./alert-triangle-BGXV4BYQ.js";import{L as Ge,s as Ve}from"./syllabusService-ZCJsE0Wq.js";import{F as Oe}from"./file-text-BoruQKcu.js";import"./home-BizFRa69.js";/**
  * @license lucide-react v0.344.0 - ISC
  *
  * This source code is licensed under the ISC license.

@@ -3,8 +3,21 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-gaming-bg text-gaming-text font-sans overflow-x-hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading;
   }
 }
 
@@ -12,9 +25,11 @@
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-gaming-primary to-gaming-pink;
   }
+
   .glass-panel {
     @apply bg-gaming-card/60 backdrop-blur-xl border border-white/5;
   }
+
   .flex-center {
     @apply flex items-center justify-center;
   }
@@ -25,13 +40,16 @@
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #0B0B15; 
+  background: #0B0B15;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #1E1E30; 
+  background: #1E1E30;
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #6C5DD3; 
+  background: #6C5DD3;
 }

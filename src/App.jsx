@@ -11,6 +11,7 @@ const SectionPage = React.lazy(() => import('./components/pages/SectionPage'));
 const TopicPage = React.lazy(() => import('./components/pages/TopicPage'));
 const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
 const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
+const AuthPage = React.lazy(() => import('./components/pages/AuthPage'));
 const NotFoundPage = React.lazy(() => import('./components/pages/NotFoundPage'));
 
 // Индикатор загрузки при переходах между страницами
@@ -46,7 +47,9 @@ function AppContent() {
                         <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
+                        <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/creator" element={<CreatorPage lang={lang} t={t} />} />
+                        <Route path="/login" element={<AuthPage lang={lang} t={t} />} />
                         <Route path="*" element={<NotFoundPage lang={lang} t={t} />} />
                     </Routes>
                 </Suspense>

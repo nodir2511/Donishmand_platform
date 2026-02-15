@@ -4,7 +4,7 @@ import { CLUSTERS_STRUCTURE } from '../../constants/data';
 
 const ClusterSelect = ({ activeClusterId, setActiveClusterId, lang, t }) => {
     return (
-        <div className="sticky top-20 z-30 transition-all mt-8">
+        <div id="courses-section" className="sticky top-20 z-30 transition-all mt-8">
             <div className="max-w-7xl mx-auto px-4">
                 <div className="glass-panel rounded-2xl p-2 overflow-x-auto no-scrollbar">
                     <div className="flex space-x-1 min-w-max">

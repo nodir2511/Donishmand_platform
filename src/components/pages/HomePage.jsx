@@ -27,13 +27,13 @@ const HomePage = ({ lang, t, setLang, userRole, setUserRole }) => {
                     onClick={() => setUserRole('student')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'student' ? 'bg-gaming-primary text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
                 >
-                    {lang === 'ru' ? 'Ученик' : 'Хонанда'}
+                    {t.studentRole}
                 </button>
                 <button
                     onClick={() => setUserRole('teacher')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'teacher' ? 'bg-gaming-pink text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
                 >
-                    {lang === 'ru' ? 'Учитель' : 'Омӯзгор'}
+                    {t.teacherRole}
                 </button>
             </div>
 

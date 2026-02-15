@@ -30,14 +30,20 @@ const HeroSection = ({ lang, t }) => {
                 {/* Кнопки */}
                 <div className="flex flex-col sm:flex-row gap-5 justify-center items-center w-full animate-fade-in-up delay-[300ms]">
                     {/* Основная кнопка */}
-                    <button className="group relative bg-gaming-primary hover:bg-gaming-primary/90 text-white px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-gaming-primary/25 flex items-center justify-center gap-2 text-lg overflow-hidden">
+                    <button
+                        onClick={() => document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="group relative bg-gaming-primary hover:bg-gaming-primary/90 text-white px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-gaming-primary/25 flex items-center justify-center gap-2 text-lg overflow-hidden"
+                    >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                         <span>{t.ctaStart}</span>
                         <ArrowRight size={20} className="text-gaming-gold group-hover:translate-x-1 transition-transform" />
                     </button>
 
                     {/* Вторичная кнопка */}
-                    <button className="group bg-transparent hover:bg-white/5 text-white border border-white/10 px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-lg backdrop-blur-sm">
+                    <button
+                        onClick={() => document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' })}
+                        className="group bg-transparent hover:bg-white/5 text-white border border-white/10 px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-lg backdrop-blur-sm"
+                    >
                         {t.ctaCatalog}
                     </button>
                 </div>

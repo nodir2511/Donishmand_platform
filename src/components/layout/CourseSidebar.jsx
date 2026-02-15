@@ -1,28 +1,28 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Book, FileText, PlayCircle, Home } from 'lucide-react';
-import { MOCK_SYLLABUS } from '../../constants/syllabus';
+import { ChevronDown, ChevronRight, Book, FileText, PlayCircle, Home, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
+import { useSyllabus } from '../../contexts/SyllabusContext';
 
 const CourseSidebar = ({ subjectId, lang }) => {
     const location = useLocation();
-    const subjectData = MOCK_SYLLABUS[subjectId];
+    const { subjectData, loading } = useSyllabus();
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
 
-    // Extract current IDs from the URL
+    // Извлечение текущих ID из URL
     const pathParts = location.pathname.split('/');
     const currentSectionId = pathParts[pathParts.indexOf('section') + 1];
     const currentTopicId = pathParts[pathParts.indexOf('topic') + 1];
     const currentLessonId = pathParts[pathParts.indexOf('lesson') + 1];
 
-    // State for expanded sections and topics
+    // Состояние раскрытых разделов и тем
     const [expandedSections, setExpandedSections] = useState(() => {
-        // Expand the current section by default
+        // Раскрыть текущий раздел по умолчанию
         if (currentSectionId) return { [currentSectionId]: true };
         return {};
     });
     const [expandedTopics, setExpandedTopics] = useState(() => {
-        // Expand the current topic by default
+        // Раскрыть текущую тему по умолчанию
         if (currentTopicId) return { [currentTopicId]: true };
         return {};
     });
@@ -37,13 +37,22 @@ const CourseSidebar = ({ subjectId, lang }) => {
         setExpandedTopics(prev => ({ ...prev, [topicId]: !prev[topicId] }));
     };
 
+    // Показываем спиннер загрузки, пока данные грузятся
+    if (loading) {
+        return (
+            <aside className="w-72 lg:w-80 h-full bg-gaming-card/50 backdrop-blur-xl border-r border-white/5 flex items-center justify-center">
+                <Loader2 size={24} className="text-gaming-primary animate-spin" />
+            </aside>
+        );
+    }
+
     if (!subjectData) return null;
 
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
     return (
         <aside className="w-72 lg:w-80 h-full bg-gaming-card/50 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden">
-            {/* Header */}
+            {/* Шапка */}
             <div className="p-4 border-b border-white/5">
                 <Link to="/" className="flex items-center gap-2 text-gaming-textMuted hover:text-white text-sm mb-3 transition-colors">
                     <Home size={14} />
@@ -57,7 +66,7 @@ const CourseSidebar = ({ subjectId, lang }) => {
                 </Link>
             </div>
 
-            {/* Navigation Tree */}
+            {/* Дерево навигации */}
             <nav className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
                 {subjectData.sections.map((section, sectionIdx) => {
                     const isSectionActive = currentSectionId === section.id;
@@ -65,7 +74,7 @@ const CourseSidebar = ({ subjectId, lang }) => {
 
                     return (
                         <div key={section.id} className="mb-1">
-                            {/* Section */}
+                            {/* Раздел */}
                             <button
                                 onClick={() => toggleSection(section.id)}
                                 className={`w-full flex items-center gap-2 p-2.5 rounded-xl text-left transition-all group ${isSectionActive ? 'bg-gaming-primary/20 text-white' : 'hover:bg-white/5 text-gaming-textMuted hover:text-white'}`}
@@ -78,7 +87,7 @@ const CourseSidebar = ({ subjectId, lang }) => {
                                 </span>
                             </button>
 
-                            {/* Topics */}
+                            {/* Темы */}
                             {isSectionExpanded && (
                                 <div className="ml-4 mt-1 space-y-0.5 border-l border-white/5 pl-3">
                                     {section.topics.map((topic, topicIdx) => {
@@ -87,7 +96,7 @@ const CourseSidebar = ({ subjectId, lang }) => {
 
                                         return (
                                             <div key={topic.id}>
-                                                {/* Topic */}
+                                                {/* Тема */}
                                                 <Link
                                                     to={`/subject/${subjectId}/section/${section.id}/topic/${topic.id}`}
                                                     className={`w-full flex items-center gap-2 p-2 rounded-lg text-left text-sm transition-all group ${isTopicActive && !currentLessonId ? 'bg-gaming-accent/20 text-gaming-accent' : 'hover:bg-white/5 text-gaming-textMuted hover:text-white'}`}
@@ -99,7 +108,7 @@ const CourseSidebar = ({ subjectId, lang }) => {
                                                     <span className="truncate">{sectionIdx + 1}.{topicIdx + 1}. {getTitle(topic)}</span>
                                                 </Link>
 
-                                                {/* Lessons */}
+                                                {/* Уроки */}
                                                 {isTopicExpanded && (
                                                     <div className="ml-5 mt-0.5 space-y-0.5 border-l border-white/5 pl-2">
                                                         {topic.lessons.map((lesson, lessonIdx) => {

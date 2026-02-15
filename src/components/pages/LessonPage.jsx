@@ -41,7 +41,7 @@ const LessonPage = ({ lang, t, userRole }) => {
             setLoading(true);
             try {
                 // 1. Получаем сам урок
-                const lesson = await syllabusService.getLesson(lessonId);
+                const lesson = await syllabusService.getLesson(lessonId, lang);
 
                 if (!lesson) {
                     setLessonData(null);
@@ -93,12 +93,13 @@ const LessonPage = ({ lang, t, userRole }) => {
         };
 
         fetchLessonData();
-    }, [lessonId]);
+    }, [lessonId, lang]);
 
 
     // Определение существующего контента
     const lessonContent = lessonData?.lesson?.content || {};
-    const hasVideo = !!lessonContent.video?.url;
+    const videoUrl = lang === 'tj' ? (lessonContent.video?.urlTj || lessonContent.video?.url) : (lessonContent.video?.url || lessonContent.video?.urlTj);
+    const hasVideo = !!videoUrl;
     const hasText = !!(lessonContent.text?.bodyRu || lessonContent.text?.bodyTj);
     const currentSlides = lang === 'tj' ? (lessonContent.slidesTj || []) : (lessonContent.slidesRu || []);
     const hasSlides = currentSlides.length > 0;
@@ -191,11 +192,24 @@ const LessonPage = ({ lang, t, userRole }) => {
 
     // Обработка завершения теста
     const handleTestComplete = (results) => {
-        console.log('Test completed:', results);
         // Обновляем историю в стейте, чтобы пересчитать статистику
         const newHistory = JSON.parse(localStorage.getItem(`test_history_${lessonId}`) || '[]');
         setProgress(prev => ({ ...prev, testHistory: newHistory }));
     };
+
+    // Закрытие модальных окон по ESC
+    useEffect(() => {
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                if (showTestWarning) setShowTestWarning(false);
+                if (showSlidesViewer) setShowSlidesViewer(false);
+                // TestViewer имеет свой обработчик, но можно добавить и сюда для надежности,
+                // если он не перехватывает фокус. Пока остановимся на warning и slides.
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [showTestWarning, showSlidesViewer]);
 
     if (loading) {
         return (
@@ -208,9 +222,9 @@ const LessonPage = ({ lang, t, userRole }) => {
     if (!lessonData) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center text-white bg-gaming-bg">
-                <h2 className="text-2xl mb-4">{lang === 'ru' ? 'Урок не найден' : 'Дарс ёфт нашуд'}</h2>
+                <h2 className="text-2xl mb-4">{t.lessonNotFound}</h2>
                 <button onClick={() => navigate(-1)} className="text-gaming-primary hover:underline">
-                    {lang === 'ru' ? 'Назад' : 'Бозгашт'}
+                    {t.errorBack}
                 </button>
             </div>
         );
@@ -244,7 +258,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all mb-4 group w-fit"
                     >
                         <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                        <span className="text-sm font-medium">{lang === 'ru' ? 'К теме' : 'Ба мавзӯъ'}</span>
+                        <span className="text-sm font-medium">{t.backToTopic}</span>
                     </button>
                     <div className="flex justify-between items-start">
                         <div>
@@ -260,7 +274,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                         </div>
                         {isTeacher && (
                             <div className="px-3 py-1 bg-gaming-pink text-white text-xs font-bold rounded-full uppercase tracking-wider animate-pulse">
-                                {lang === 'ru' ? 'Режим учителя' : 'Реҷаи омӯзгор'}
+                                {t.teacherMode}
                             </div>
                         )}
                     </div>
@@ -272,7 +286,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                         <div className="relative z-10">
                             <div className="flex justify-between items-end mb-4">
                                 <div>
-                                    <h4 className="font-bold text-lg mb-1">{lang === 'ru' ? 'Прогресс урока' : 'Пешрафти дарс'}</h4>
+                                    <h4 className="font-bold text-lg mb-1">{t.lessonProgress}</h4>
                                     <p className="text-gaming-textMuted text-sm">
                                         {completedSteps} / {totalSteps} {lang === 'ru' ? 'этапов завершено' : 'марҳила анҷом ёфт'}
                                     </p>
@@ -407,17 +421,32 @@ const LessonPage = ({ lang, t, userRole }) => {
                             <div className="relative z-10">
                                 {activeTab === 'video' && hasVideo && (
                                     <div className="aspect-video bg-black/60 rounded-xl flex flex-col items-center justify-center border border-white/10 shadow-inner overflow-hidden relative">
-                                        {lessonContent.video.url.includes('youtube') || lessonContent.video.url.includes('youtu.be') ? (
-                                            <iframe
-                                                src={lessonContent.video.url.replace('watch?v=', 'embed/')}
-                                                className="w-full h-full"
-                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                allowFullScreen
-                                                onLoad={handleVideoComplete}
-                                            />
-                                        ) : (
+                                        {videoUrl.includes('youtube') || videoUrl.includes('youtu.be') ? (() => {
+                                            // Извлекаем ID видео с поддержкой разных форматов (youtu.be, ?v=, &v=)
+                                            const videoIdMatch = videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/))([^&?]*)/);
+                                            const videoId = videoIdMatch ? videoIdMatch[1] : null;
+
+                                            return videoId ? (
+                                                <iframe
+                                                    src={`https://www.youtube.com/embed/${videoId}`}
+                                                    className="w-full h-full"
+                                                    title="YouTube video player"
+                                                    frameBorder="0"
+                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                    allowFullScreen
+                                                    onLoad={handleVideoComplete}
+                                                />
+                                            ) : (
+                                                <div className="text-white text-center p-4">
+                                                    <p>Не удалось загрузить видео</p>
+                                                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-gaming-primary hover:underline mt-2 inline-block">
+                                                        Открыть на YouTube
+                                                    </a>
+                                                </div>
+                                            );
+                                        })() : (
                                             <video
-                                                src={lessonContent.video.url}
+                                                src={videoUrl}
                                                 controls
                                                 className="w-full h-full"
                                                 onEnded={handleVideoComplete}

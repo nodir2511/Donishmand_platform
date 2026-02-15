@@ -21,11 +21,15 @@ The platform follows a premium "Gaming/Cyberpunk" educational aesthetic.
   - **Glassmorphism**: Use `backdrop-blur-xl` and `bg-white/5` for panels.
   - **Glows**: Interactive elements should have subtle outer glows (`shadow-gaming-primary/20`).
   - **Borders**: Thin, semi-transparent borders (`border-white/5`) for a sleek look.
-- **Typography**: Always use the **Outfit** font for headings and **Inter** for body text.
+- **Typography**:
+  - **Headings**: Always use **Outfit** font (`font-heading`).
+  - **Body Text**: Always use **Inter** font (`font-sans`).
 
 ## 2. Technical Architecture
 - **Framework**: React (Vite-based).
 - **Styling**: Tailwind CSS (Utility-first). Use custom theme tokens from `tailwind.config.js`.
+- **Native Inputs**: For date/time inputs in dark mode, always use `color-scheme: dark` or the utility class `[color-scheme:dark]`.
+- **Video Parsing**: Use regex for YouTube URLs to support `youtu.be`, `shorts`, and clean parameters.
 - **File Structure**:
   - `/src/components/layout`: Global layout parts (Navbar, Footer, CourseLayout).
   - `/src/components/features`: Feature-specific logic (Cards, Selectors).

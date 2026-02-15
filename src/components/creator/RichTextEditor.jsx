@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
@@ -216,7 +215,6 @@ const RichTextEditor = ({ content, onChange, placeholder, minHeight = '200px', m
     // especially in React Strict Mode or during hot-reloads.
     const extensions = React.useMemo(() => [
         StarterKit,
-        Underline,
         Subscript,
         Superscript,
         TextStyle,

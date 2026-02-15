@@ -7,7 +7,8 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Outfit', 'Inter', 'sans-serif'],
+                sans: ['Inter', 'sans-serif'],
+                heading: ['Outfit', 'sans-serif'],
             },
             colors: {
                 // Gaming Dark Theme Palette

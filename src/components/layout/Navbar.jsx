@@ -30,14 +30,32 @@ const Navbar = ({ lang, setLang, t }) => {
 
                     {/* Навигация для десктопа */}
                     <div className="hidden md:flex items-center bg-white/5 backdrop-blur-md rounded-full border border-white/5 p-1.5 shadow-sm">
-                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        <button
+                            onClick={() => {
+                                if (window.location.pathname !== '/') {
+                                    window.location.href = '/#courses-section';
+                                } else {
+                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
+                                }
+                            }}
+                            className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group"
+                        >
                             {t.navCourses}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </Link>
-                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (window.location.pathname !== '/') {
+                                    window.location.href = '/#courses-section';
+                                } else {
+                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
+                                }
+                            }}
+                            className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group"
+                        >
                             {t.navLibrary}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </Link>
+                        </button>
                         <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t.navAbout}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
@@ -58,9 +76,9 @@ const Navbar = ({ lang, setLang, t }) => {
                     {/* CTA и переключатель для мобильных */}
                     <div className="flex items-center gap-4">
                         <div className="hidden md:block">
-                            <button className="bg-gradient-to-r from-gaming-primary to-gaming-pink text-white px-6 py-2.5 rounded-full font-medium text-sm transition-all shadow-lg shadow-gaming-primary/25 hover:shadow-gaming-pink/25 hover:scale-105 active:scale-95">
+                            <Link to="/login" className="bg-gradient-to-r from-gaming-primary to-gaming-pink text-white px-6 py-2.5 rounded-full font-medium text-sm transition-all shadow-lg shadow-gaming-primary/25 hover:shadow-gaming-pink/25 hover:scale-105 active:scale-95 inline-block">
                                 {t.navLogin}
-                            </button>
+                            </Link>
                         </div>
 
                         <button onClick={() => setIsOpen(!isOpen)} className="md:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors">
@@ -74,13 +92,33 @@ const Navbar = ({ lang, setLang, t }) => {
             {isOpen && (
                 <div className="absolute top-full left-0 right-0 bg-gaming-card border-b border-white/5 p-4 shadow-xl md:hidden glass-panel">
                     <div className="flex flex-col gap-4">
-                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                if (window.location.pathname !== '/') {
+                                    window.location.href = '/#courses-section';
+                                } else {
+                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
+                                }
+                            }}
+                            className="text-left font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors"
+                        >
                             {t.navCourses}
-                        </Link>
-                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        </button>
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                if (window.location.pathname !== '/') {
+                                    window.location.href = '/#courses-section';
+                                } else {
+                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
+                                }
+                            }}
+                            className="text-left font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors"
+                        >
                             {t.navLibrary}
-                        </Link>
-                        <Link to="/" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        </button>
+                        <Link to="/" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t.navAbout}
                         </Link>
                         <Link to="/creator" className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
@@ -90,9 +128,9 @@ const Navbar = ({ lang, setLang, t }) => {
                             <button onClick={toggleLang} className="px-3 py-1 bg-white/5 text-white rounded-md text-xs font-bold uppercase ring-1 ring-white/10">
                                 {lang}
                             </button>
-                            <button className="text-sm font-medium text-gaming-primary">
+                            <Link to="/login" onClick={() => setIsOpen(false)} className="text-sm font-medium text-gaming-primary">
                                 {t.navLogin}
-                            </button>
+                            </Link>
                         </div>
                     </div>
                 </div>

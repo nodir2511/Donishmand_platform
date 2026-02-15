@@ -41,7 +41,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     }, []);
     // --- ФУНКЦИИ БЕЗОПАСНОСТИ КОНЕЦ ---
 
-    const progressKey = `test_progress_${lessonId}`;
+    const progressKey = `test_progress_v2_${lessonId}`; // v2 forces fresh start
 
     // Рандомизация вопросов с восстановлением прогресса
     const randomizedQuestions = useMemo(() => {
@@ -52,7 +52,19 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         if (savedRaw && testVersion === 0) {
             try {
                 const saved = JSON.parse(savedRaw);
-                if (saved.questions && saved.answers && saved.locked) {
+
+                // ВАЛИДАЦИЯ КЭША:
+                // 1. Проверяем наличие ключей textRu/textTj
+                // 2. Проверяем, что хотя бы в одном языке есть непустой текст
+                const isCacheValid = saved.questions && saved.questions.every(q =>
+                    (q.textRu && q.textRu.trim().length > 0) || (q.textTj && q.textTj.trim().length > 0)
+                );
+
+                if (!isCacheValid) {
+                    console.warn('Кэш теста содержит пустые вопросы. Очистка...');
+                    localStorage.removeItem(progressKey);
+                    // Пропускаем блок восстановления
+                } else if (saved.questions && saved.answers && saved.locked) {
                     // Восстанавливаем ответы и блокировки
                     setAnswers(saved.answers);
                     setLockedQuestions(new Set(saved.locked));
@@ -62,7 +74,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     const lockedIds = new Set(saved.locked);
                     const savedQuestions = saved.questions.filter(q => lockedIds.has(q.id));
 
-                    // Для оставшихся мест берём новые перемешанные вопросы
+                    // Для оставшихся мест берём новые перемешанные вопросы, исключая уже выбранные (по ID)
                     const usedIds = new Set(savedQuestions.map(q => q.id));
                     const remaining = shuffleArray(questions.filter(q => !usedIds.has(q.id)));
                     const neededCount = Math.min(10, questions.length) - savedQuestions.length;
@@ -77,6 +89,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 }
             } catch (e) {
                 console.warn('Ошибка восстановления прогресса теста:', e);
+                localStorage.removeItem(progressKey);
             }
         }
 
@@ -89,7 +102,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
             if (q.type === 'matching') return { ...q, leftItems: shuffleArray(q.leftItems), rightItems: shuffleArray(q.rightItems) };
             return q;
         });
-    }, [questions, testVersion]);
+    }, [questions, testVersion, progressKey]);
 
     const currentQuestion = randomizedQuestions[currentIndex];
     const totalQuestions = randomizedQuestions.length;

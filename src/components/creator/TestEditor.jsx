@@ -209,7 +209,7 @@ const TestEditor = ({ data, onChange, lang }) => {
         }
     };
 
-    const [showTypeMenu, setShowTypeMenu] = useState(false);
+    const [activeMenu, setActiveMenu] = useState(null); // 'top' or 'bottom'
 
     // Функция обработки вставки изображения
     const handlePaste = (e, callback) => {
@@ -321,21 +321,21 @@ const TestEditor = ({ data, onChange, lang }) => {
                 </h4>
                 <div className="relative">
                     <button
-                        onClick={() => setShowTypeMenu(!showTypeMenu)}
+                        onClick={() => setActiveMenu(activeMenu === 'top' ? null : 'top')}
                         className="flex items-center gap-2 px-3 py-2 bg-gaming-pink/20 text-gaming-pink rounded-xl hover:bg-gaming-pink/30 transition-colors text-sm"
                     >
                         <Plus size={16} />
                         {lang === 'ru' ? 'Добавить вопрос' : 'Илова кардани савол'}
                         <ChevronDown size={14} />
                     </button>
-                    {showTypeMenu && (
-                        <div className="absolute right-0 top-full mt-2 bg-gaming-card border border-white/10 rounded-xl shadow-xl z-10 min-w-[200px] overflow-hidden">
+                    {activeMenu === 'top' && (
+                        <div className="absolute right-0 top-full mt-2 bg-gaming-card border border-white/10 rounded-xl shadow-xl z-20 min-w-[200px] overflow-hidden">
                             {QUESTION_TYPES.map(type => {
                                 const Icon = type.icon;
                                 return (
                                     <button
                                         key={type.id}
-                                        onClick={() => { addQuestion(type.id); setShowTypeMenu(false); }}
+                                        onClick={() => { addQuestion(type.id); setActiveMenu(null); }}
                                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                                     >
                                         <Icon size={18} className="text-gaming-pink" />
@@ -704,6 +704,39 @@ const TestEditor = ({ data, onChange, lang }) => {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* Нижняя кнопка добавления (если есть вопросы) */}
+            {questions.length > 0 && (
+                <div className="flex justify-center pt-4 pb-2">
+                    <div className="relative">
+                        <button
+                            onClick={() => setActiveMenu(activeMenu === 'bottom' ? null : 'bottom')}
+                            className="flex items-center gap-2 px-4 py-2 bg-gaming-pink/20 text-gaming-pink rounded-xl hover:bg-gaming-pink/30 transition-colors text-sm border border-dashed border-gaming-pink/30"
+                        >
+                            <Plus size={16} />
+                            {lang === 'ru' ? 'Добавить вопрос' : 'Илова кардани савол'}
+                            <ChevronDown size={14} />
+                        </button>
+                        {activeMenu === 'bottom' && (
+                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gaming-card border border-white/10 rounded-xl shadow-xl z-20 min-w-[200px] overflow-hidden">
+                                {QUESTION_TYPES.map(type => {
+                                    const Icon = type.icon;
+                                    return (
+                                        <button
+                                            key={type.id}
+                                            onClick={() => { addQuestion(type.id); setActiveMenu(null); }}
+                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
+                                        >
+                                            <Icon size={18} className="text-gaming-pink" />
+                                            <span className="text-sm">{type.label[lang]}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

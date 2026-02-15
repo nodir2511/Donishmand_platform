@@ -1,20 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-    ChevronLeft, Plus, Trash2, Save, FolderPlus, FileText, Video, ClipboardList, Presentation,
-    ChevronDown, ChevronRight, Sparkles, Book, Layers, GraduationCap, GripVertical, Edit3, ArrowRightLeft, Loader2
+    ChevronLeft, Plus, Trash2, Save, FileText, Video, ClipboardList, Presentation,
+    ChevronDown, ChevronRight, GripVertical, Edit3, ArrowRightLeft, Loader2, GraduationCap,
+    FolderPlus, Book, Layers
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SUBJECT_NAMES, ALL_SUBJECTS_LIST } from '../../constants/data';
-import { MOCK_SYLLABUS } from '../../constants/syllabus';
 import LessonContentEditor from '../creator/LessonContentEditor';
 import { translateText } from '../../services/translationService';
 
 
 
+import { supabase } from '../../services/supabase';
 import { syllabusService } from '../../services/syllabusService';
+import { invalidateSyllabusCache } from '../../contexts/SyllabusContext';
 import useDebounce from '../../hooks/useDebounce';
 
 const LESSON_TYPES = [
@@ -72,8 +74,18 @@ const SortableTopic = ({ topic, topicIndex, sectionIndex, children }) => {
 
 // Компонент сортируемого урока
 const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, onDelete, onEdit, getLessonIcon }) => {
+    // Определяем все типы контента, которые есть в уроке
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
-    const LessonIcon = getLessonIcon(lesson.type);
+    const contentTypes = [];
+    if (lesson.content) {
+        if (lesson.content.video?.url || lesson.content.video?.urlTj) contentTypes.push('video');
+        if ((lesson.content.slidesRu?.length || 0) > 0 || (lesson.content.slidesTj?.length || 0) > 0) contentTypes.push('presentation');
+        if ((lesson.content.test?.questions?.length || 0) > 0) contentTypes.push('test');
+        // Текст есть почти всегда, если это не чистый тест/видео, но можно проверить наличие
+        if (lesson.content.textRu || lesson.content.textTj) contentTypes.push('text');
+    }
+    // Если ничего специфичного не нашли (новый урок), показываем тип по умолчанию
+    if (contentTypes.length === 0) contentTypes.push(lesson.type || 'text');
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -91,13 +103,27 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                 <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0" onClick={(e) => e.stopPropagation()}>
                     <GripVertical size={14} />
                 </div>
-                <LessonIcon size={14} className="text-gaming-pink shrink-0" />
-                <span className="text-sm truncate block group-hover:text-gaming-primary transition-colors">
-                    {sectionIndex + 1}.{topicIndex + 1}.{lessonIndex + 1}. {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
-                </span>
-                <span className="text-xs px-2 py-0.5 bg-gaming-card/50 rounded-full text-gaming-textMuted shrink-0 hidden xs:inline-block">
-                    {LESSON_TYPES.find(lt => lt.id === lesson.type)?.label[lang] || lesson.type}
-                </span>
+
+                {/* Иконки типов контента */}
+                <div className="flex gap-1 shrink-0">
+                    {contentTypes.map(type => {
+                        const Icon = getLessonIcon(type);
+                        return <Icon key={type} size={14} className="text-gaming-pink/70" title={LESSON_TYPES.find(lt => lt.id === type)?.label[lang]} />;
+                    })}
+                </div>
+
+                <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm truncate block group-hover:text-gaming-primary transition-colors">
+                        {sectionIndex + 1}.{topicIndex + 1}.{lessonIndex + 1}. {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
+                    </span>
+                    <button
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'rename'); }}
+                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors shrink-0 sm:opacity-0 group-hover:opacity-100"
+                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                    >
+                        <Edit3 size={12} />
+                    </button>
+                </div>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
@@ -215,14 +241,26 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
 
 const CreatorPage = ({ lang, t }) => {
     const navigate = useNavigate();
-    const [selectedSubject, setSelectedSubject] = useState(ALL_SUBJECTS_LIST[0]);
+
+    // Состояние выбранного предмета с персистенцией
+    const [selectedSubject, setSelectedSubject] = useState(() => {
+        const saved = localStorage.getItem('creator_selected_subject');
+        return (saved && ALL_SUBJECTS_LIST.includes(saved)) ? saved : ALL_SUBJECTS_LIST[0];
+    });
+
+    useEffect(() => {
+        localStorage.setItem('creator_selected_subject', selectedSubject);
+    }, [selectedSubject]);
 
     const [syllabus, setSyllabus] = useState(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
-            try { return JSON.parse(stored); } catch (e) { return { ...MOCK_SYLLABUS }; }
+            try { return JSON.parse(stored); } catch (e) { /* Ошибка парсинга */ }
         }
-        return { ...MOCK_SYLLABUS };
+        // Пустая структура для каждого предмета
+        const empty = {};
+        ALL_SUBJECTS_LIST.forEach(id => { empty[id] = { sections: [] }; });
+        return empty;
     });
 
     // --- ЛОГИКА АВТО-СОХРАНЕНИЯ НАЧАЛО ---
@@ -241,6 +279,8 @@ const CreatorPage = ({ lang, t }) => {
 
                 if (debouncedSyllabus[selectedSubject]) {
                     await syllabusService.saveStructure(selectedSubject, debouncedSyllabus[selectedSubject]);
+                    // Сбрасываем кеш, чтобы навигационные страницы загрузили свежие данные
+                    invalidateSyllabusCache(selectedSubject);
                 }
                 setSaveStatus('saved');
             } catch (error) {
@@ -253,8 +293,55 @@ const CreatorPage = ({ lang, t }) => {
     }, [debouncedSyllabus, selectedSubject]);
     // --- ЛОГИКА АВТО-СОХРАНЕНИЯ КОНЕЦ ---
 
-    const [expandedSections, setExpandedSections] = useState({});
-    const [expandedTopics, setExpandedTopics] = useState({});
+    const [newLessonType, setNewLessonType] = useState('text'); // Больше не используется явно, но оставим для совместимости
+    const [moveModal, setMoveModal] = useState(null);
+
+    // Состояние раскрытых элементов с персистенцией
+    const [expandedSections, setExpandedSections] = useState(() => {
+        try {
+            const saved = localStorage.getItem('creator_expanded_sections');
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+
+    const [expandedTopics, setExpandedTopics] = useState(() => {
+        try {
+            const saved = localStorage.getItem('creator_expanded_topics');
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            return {};
+        }
+    });
+
+    // Сохранение состояния раскрытых элементов
+    useEffect(() => {
+        localStorage.setItem('creator_expanded_sections', JSON.stringify(expandedSections));
+    }, [expandedSections]);
+
+    useEffect(() => {
+        localStorage.setItem('creator_expanded_topics', JSON.stringify(expandedTopics));
+    }, [expandedTopics]);
+
+    // Сохранение скролла
+    useEffect(() => {
+        const handleScroll = () => {
+            sessionStorage.setItem('creator_scroll_position', window.scrollY);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Восстановление скролла
+    useEffect(() => {
+        const savedScroll = sessionStorage.getItem('creator_scroll_position');
+        if (savedScroll) {
+            setTimeout(() => {
+                window.scrollTo(0, parseInt(savedScroll));
+            }, 100);
+        }
+    }, [syllabus]); // Пробуем восстановить когда загрузились данные
 
     const [showAddSection, setShowAddSection] = useState(false);
     const [showAddTopic, setShowAddTopic] = useState(null);
@@ -266,14 +353,10 @@ const CreatorPage = ({ lang, t }) => {
     const [newTopicTitleTj, setNewTopicTitleTj] = useState('');
     const [newLessonTitleRu, setNewLessonTitleRu] = useState('');
     const [newLessonTitleTj, setNewLessonTitleTj] = useState('');
-    const [newLessonType, setNewLessonType] = useState('video');
 
     // Состояние редактора контента
     const [editingLesson, setEditingLesson] = useState(null);
     const [editingLessonContext, setEditingLessonContext] = useState(null);
-
-    // Состояние модального окна перемещения
-    const [moveModal, setMoveModal] = useState(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -416,7 +499,7 @@ const CreatorPage = ({ lang, t }) => {
             id: `les_${Date.now()}`,
             title: newLessonTitleRu.trim(),
             titleTj: newLessonTitleTj.trim() || autoTranslate(newLessonTitleRu.trim(), 'ru', 'tj'),
-            type: newLessonType,
+            type: 'text', // Default type, will be updated based on content
             content: {}
         };
         setSyllabus(prev => ({
@@ -517,44 +600,63 @@ const CreatorPage = ({ lang, t }) => {
     const handleMoveLesson = (lessonId, fromSectionId, fromTopicId, toSectionId, toTopicId) => {
         setSyllabus(prev => {
             const newSyllabus = { ...prev };
-            const subjectSyllabus = { ...newSyllabus[selectedSubject] };
-            let sections = [...subjectSyllabus.sections];
+            const subjectData = newSyllabus[selectedSubject];
+            if (!subjectData) return prev;
 
-            let lessonToMove = null;
+            const fromSection = subjectData.sections.find(s => s.id === fromSectionId);
+            const toSection = subjectData.sections.find(s => s.id === toSectionId);
+            if (!fromSection || !toSection) return prev;
 
-            // Найти урок и удалить его из исходной темы
-            sections = sections.map(sec => ({
-                ...sec,
-                topics: sec.topics.map(top => {
-                    if (sec.id === fromSectionId && top.id === fromTopicId) {
-                        const lessonIndex = top.lessons.findIndex(l => l.id === lessonId);
-                        if (lessonIndex !== -1) {
-                            lessonToMove = top.lessons[lessonIndex];
-                            return { ...top, lessons: top.lessons.filter(l => l.id !== lessonId) };
-                        }
-                    }
-                    return top;
-                })
-            }));
+            const fromTopic = fromSection.topics.find(t => t.id === fromTopicId);
+            const toTopic = toSection.topics.find(t => t.id === toTopicId);
+            if (!fromTopic || !toTopic) return prev;
 
-            if (!lessonToMove) return prev; // Урок не найден
+            const lessonIndex = fromTopic.lessons.findIndex(l => l.id === lessonId);
+            if (lessonIndex === -1) return prev;
 
-            // Добавить урок в целевую тему
-            sections = sections.map(sec => ({
-                ...sec,
-                topics: sec.topics.map(top => {
-                    if (sec.id === toSectionId && top.id === toTopicId) {
-                        return { ...top, lessons: [...top.lessons, lessonToMove] };
-                    }
-                    return top;
-                })
-            }));
+            const [movedLesson] = fromTopic.lessons.splice(lessonIndex, 1);
+            toTopic.lessons.push(movedLesson);
 
-            subjectSyllabus.sections = sections;
-            newSyllabus[selectedSubject] = subjectSyllabus;
             return newSyllabus;
         });
         setMoveModal(null);
+    };
+
+    // ОБРАБОТЧИКИ ПЕРЕИМЕНОВАНИЯ
+    const [renameModal, setRenameModal] = useState(null);
+
+    const handleRename = (data) => {
+        setSyllabus(prev => {
+            const newSyllabus = { ...prev };
+            const subjectData = newSyllabus[selectedSubject];
+            if (!subjectData) return prev;
+
+            if (data.type === 'section') {
+                const section = subjectData.sections.find(s => s.id === data.id);
+                if (section) {
+                    section.title = data.titleRu;
+                    section.titleTj = data.titleTj;
+                }
+            } else if (data.type === 'topic') {
+                const section = subjectData.sections.find(s => s.id === data.sectionId);
+                const topic = section?.topics.find(t => t.id === data.id);
+                if (topic) {
+                    topic.title = data.titleRu;
+                    topic.titleTj = data.titleTj;
+                }
+            } else if (data.type === 'lesson') {
+                const section = subjectData.sections.find(s => s.id === data.sectionId);
+                const topic = section?.topics.find(t => t.id === data.topicId);
+                const lesson = topic?.lessons.find(l => l.id === data.id);
+                if (lesson) {
+                    lesson.title = data.titleRu;
+                    lesson.titleTj = data.titleTj;
+                }
+            }
+
+            return newSyllabus;
+        });
+        setRenameModal(null);
     };
 
     // --- СИНХРОНИЗАЦИЯ С ОБЛАКОМ (ЗАГРУЗКА) ---
@@ -640,8 +742,18 @@ const CreatorPage = ({ lang, t }) => {
         try {
             const { sectionId, topicId } = editingLessonContext;
 
-            // 1. Сохраняем контент в Supabase
-            await syllabusService.saveLesson(updatedLesson, selectedSubject);
+            // 1. Определяем тип урока на основе контента
+            let detectedType = 'text';
+            if ((updatedLesson.content.test?.questions?.length || 0) > 0) detectedType = 'test';
+            else if (updatedLesson.content.video?.url || updatedLesson.content.video?.urlTj) detectedType = 'video';
+            else if ((updatedLesson.content.slidesRu?.length || 0) > 0 || (updatedLesson.content.slidesTj?.length || 0) > 0) detectedType = 'presentation';
+
+            const lessonToSave = { ...updatedLesson, type: detectedType };
+
+            // 2. Сохраняем контент в Supabase
+            await syllabusService.saveLesson(lessonToSave, selectedSubject);
+            // Сбрасываем кеш структуры, чтобы обновлённый урок был виден на страницах навигации
+            invalidateSyllabusCache(selectedSubject);
 
             // 2. Обновляем локальный стейт (это также запустит авто-сохранение структуры, если поменялось название)
             setSyllabus(prev => ({
@@ -654,7 +766,7 @@ const CreatorPage = ({ lang, t }) => {
                             topics: sec.topics.map(top =>
                                 top.id === topicId ? {
                                     ...top,
-                                    lessons: top.lessons.map(les => les.id === updatedLesson.id ? updatedLesson : les)
+                                    lessons: top.lessons.map(les => les.id === updatedLesson.id ? lessonToSave : les)
                                 } : top
                             )
                         } : sec
@@ -799,6 +911,31 @@ const CreatorPage = ({ lang, t }) => {
                         </>
                     )}
                 </div>
+
+                {/* DB CLEAR BUTTON (Admin Only Logic - visible for now) */}
+                <button
+                    onClick={async () => {
+                        if (confirm(lang === 'ru'
+                            ? 'ВНИМАНИЕ! Это удалит ВСЕ уроки и тесты из базы данных. Вы уверены?'
+                            : 'ДИҚҚАТ! Ин ҳамаи дарсҳо ва тестҳоро нест мекунад. Шумо боварӣ доред?')) {
+
+                            const secondCheck = prompt(lang === 'ru' ? 'Введите "DELETE" для подтверждения:' : 'Барои тасдиқ "DELETE" нависед:');
+                            if (secondCheck !== 'DELETE') return;
+
+                            try {
+                                await supabase.from('lessons').delete().neq('id', 'placeholder');
+                                await supabase.from('subject_syllabus').delete().neq('subject', 'placeholder');
+                                localStorage.clear();
+                                window.location.reload();
+                            } catch (e) {
+                                alert('Error: ' + e.message);
+                            }
+                        }
+                    }}
+                    className="px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-xs hover:bg-red-500/20"
+                >
+                    {lang === 'ru' ? 'Сброс Базы' : 'Тоза кардани База'}
+                </button>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
@@ -866,15 +1003,32 @@ const CreatorPage = ({ lang, t }) => {
                                 {currentSubjectSyllabus.sections.map((section, sectionIndex) => (
                                     <SortableSection key={section.id} section={section} sectionIndex={sectionIndex} lang={lang} onDelete={handleDeleteSection}>
                                         <div className="flex-1">
-                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleSection(section.id)}>
-                                                <div className="flex items-center gap-3">
+                                            <div className="flex items-center justify-between group/row">
+                                                <div className="flex-1 flex items-center gap-3 cursor-pointer" onClick={() => toggleSection(section.id)}>
                                                     {expandedSections[section.id] ? <ChevronDown size={20} className="text-gaming-primary" /> : <ChevronRight size={20} className="text-gaming-textMuted" />}
                                                     <span className="text-lg font-semibold">{sectionIndex + 1}. {lang === 'tj' ? (section.titleTj || section.title) : section.title}</span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setRenameModal({
+                                                                type: 'section',
+                                                                id: section.id,
+                                                                titleRu: section.title,
+                                                                titleTj: section.titleTj || ''
+                                                            });
+                                                        }}
+                                                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
+                                                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                                                    >
+                                                        <Edit3 size={16} />
+                                                    </button>
                                                     <span className="text-sm text-gaming-textMuted">({section.topics?.length || 0} {lang === 'ru' ? 'тем' : 'мавзӯъ'})</span>
                                                 </div>
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }} className="p-2 text-gaming-textMuted hover:text-red-400 transition-colors">
-                                                    <Trash2 size={18} />
-                                                </button>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }} className="p-2 text-gaming-textMuted hover:text-red-400 transition-colors">
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {expandedSections[section.id] && (
@@ -906,10 +1060,26 @@ const CreatorPage = ({ lang, t }) => {
                                                                 {section.topics.map((topic, topicIndex) => (
                                                                     <SortableTopic key={topic.id} topic={topic} topicIndex={topicIndex} sectionIndex={sectionIndex}>
                                                                         <div className="flex-1">
-                                                                            <div className="flex items-center justify-between cursor-pointer" onClick={() => toggleTopic(topic.id)}>
-                                                                                <div className="flex items-center gap-2">
+                                                                            <div className="flex items-center justify-between group/row">
+                                                                                <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={() => toggleTopic(topic.id)}>
                                                                                     {expandedTopics[topic.id] ? <ChevronDown size={16} className="text-gaming-accent" /> : <ChevronRight size={16} className="text-gaming-textMuted" />}
                                                                                     <span className="font-medium">{sectionIndex + 1}.{topicIndex + 1}. {lang === 'tj' ? (topic.titleTj || topic.title) : topic.title}</span>
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setRenameModal({
+                                                                                                type: 'topic',
+                                                                                                id: topic.id,
+                                                                                                sectionId: section.id,
+                                                                                                titleRu: topic.title,
+                                                                                                titleTj: topic.titleTj || ''
+                                                                                            });
+                                                                                        }}
+                                                                                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
+                                                                                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                                                                                    >
+                                                                                        <Edit3 size={14} />
+                                                                                    </button>
                                                                                     <span className="text-xs text-gaming-textMuted">({topic.lessons?.length || 0} {lang === 'ru' ? 'уроков' : 'дарс'})</span>
                                                                                 </div>
                                                                                 <div className="flex items-center gap-1">
@@ -932,21 +1102,6 @@ const CreatorPage = ({ lang, t }) => {
                                                                                         <div className="mb-3 p-3 bg-gaming-bg/50 rounded-lg border border-gaming-pink/30">
                                                                                             <h5 className="text-sm font-semibold mb-3 text-gaming-pink">{lang === 'ru' ? 'Новый урок' : 'Дарси нав'}</h5>
                                                                                             {renderDualInput(newLessonTitleRu, setNewLessonTitleRu, newLessonTitleTj, setNewLessonTitleTj, handleAutoTranslateLessonRuToTj, handleAutoTranslateLessonTjToRu)}
-                                                                                            <div className="mt-3">
-                                                                                                <label className="block text-xs text-gaming-textMuted mb-2">{lang === 'ru' ? 'Тип урока' : 'Намуди дарс'}</label>
-                                                                                                <div className="flex flex-wrap gap-2">
-                                                                                                    {LESSON_TYPES.map(lt => {
-                                                                                                        const Icon = lt.icon;
-                                                                                                        const isActive = newLessonType === lt.id;
-                                                                                                        return (
-                                                                                                            <button key={lt.id} onClick={() => setNewLessonType(lt.id)}
-                                                                                                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors ${isActive ? 'bg-gaming-pink text-white' : 'bg-gaming-card/50 text-gaming-textMuted hover:text-white'}`}>
-                                                                                                                <Icon size={14} />{lt.label[lang]}
-                                                                                                            </button>
-                                                                                                        );
-                                                                                                    })}
-                                                                                                </div>
-                                                                                            </div>
                                                                                             <div className="flex gap-2 mt-4">
                                                                                                 <button onClick={() => handleAddLesson(section.id, topic.id)} className="flex items-center gap-2 px-3 py-2 bg-gaming-pink text-white rounded-lg hover:bg-gaming-pink/80 transition-colors active:scale-95 text-xs">
                                                                                                     <Save size={12} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
@@ -975,6 +1130,15 @@ const CreatorPage = ({ lang, t }) => {
                                                                                                         onEdit={(les, action) => {
                                                                                                             if (action === 'move') {
                                                                                                                 setMoveModal({ type: 'lesson', id: lesson.id, fromSectionId: section.id, fromTopicId: topic.id });
+                                                                                                            } else if (action === 'rename') {
+                                                                                                                setRenameModal({
+                                                                                                                    type: 'lesson',
+                                                                                                                    id: lesson.id,
+                                                                                                                    sectionId: section.id,
+                                                                                                                    topicId: topic.id,
+                                                                                                                    titleRu: lesson.title,
+                                                                                                                    titleTj: lesson.titleTj || ''
+                                                                                                                });
                                                                                                             } else {
                                                                                                                 handleEditLesson(les, section.id, topic.id);
                                                                                                             }
@@ -985,6 +1149,8 @@ const CreatorPage = ({ lang, t }) => {
                                                                                             </div>
                                                                                         </SortableContext>
                                                                                     )}
+
+
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -1028,7 +1194,51 @@ const CreatorPage = ({ lang, t }) => {
                     onClose={() => setMoveModal(null)}
                     lang={lang}
                 />
-            )}        </div >
+            )}
+
+            {/* Модальное окно переименования */}
+            {renameModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md bg-gaming-card/95 backdrop-blur-xl rounded-2xl border border-gaming-primary/30 p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <Edit3 className="text-gaming-primary" size={24} />
+                            {lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                        </h3>
+
+                        {renderDualInput(
+                            renameModal.titleRu,
+                            (val) => setRenameModal(prev => ({ ...prev, titleRu: val })),
+                            renameModal.titleTj,
+                            (val) => setRenameModal(prev => ({ ...prev, titleTj: val })),
+                            async () => {
+                                const translated = await translateText(renameModal.titleRu, 'ru', 'tj');
+                                setRenameModal(prev => ({ ...prev, titleTj: translated }));
+                            },
+                            async () => {
+                                const translated = await translateText(renameModal.titleTj, 'tj', 'ru');
+                                setRenameModal(prev => ({ ...prev, titleRu: translated }));
+                            }
+                        )}
+
+                        <div className="flex gap-3 mt-6">
+                            <button
+                                onClick={() => handleRename(renameModal)}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors font-medium shadow-lg shadow-gaming-primary/20"
+                            >
+                                <Save size={18} />
+                                {lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                            </button>
+                            <button
+                                onClick={() => setRenameModal(null)}
+                                className="px-4 py-3 bg-white/5 text-gaming-textMuted hover:text-white rounded-xl hover:bg-white/10 transition-colors"
+                            >
+                                {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 

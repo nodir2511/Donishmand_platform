@@ -14,7 +14,7 @@ import { translateText } from '../../services/translationService';
 
 
 
-import { supabase } from '../../services/supabase';
+
 import { syllabusService } from '../../services/syllabusService';
 import { invalidateSyllabusCache } from '../../contexts/SyllabusContext';
 import useDebounce from '../../hooks/useDebounce';
@@ -912,30 +912,7 @@ const CreatorPage = ({ lang, t }) => {
                     )}
                 </div>
 
-                {/* DB CLEAR BUTTON (Admin Only Logic - visible for now) */}
-                <button
-                    onClick={async () => {
-                        if (confirm(lang === 'ru'
-                            ? 'ВНИМАНИЕ! Это удалит ВСЕ уроки и тесты из базы данных. Вы уверены?'
-                            : 'ДИҚҚАТ! Ин ҳамаи дарсҳо ва тестҳоро нест мекунад. Шумо боварӣ доред?')) {
 
-                            const secondCheck = prompt(lang === 'ru' ? 'Введите "DELETE" для подтверждения:' : 'Барои тасдиқ "DELETE" нависед:');
-                            if (secondCheck !== 'DELETE') return;
-
-                            try {
-                                await supabase.from('lessons').delete().neq('id', 'placeholder');
-                                await supabase.from('subject_syllabus').delete().neq('subject', 'placeholder');
-                                localStorage.clear();
-                                window.location.reload();
-                            } catch (e) {
-                                alert('Error: ' + e.message);
-                            }
-                        }
-                    }}
-                    className="px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-xs hover:bg-red-500/20"
-                >
-                    {lang === 'ru' ? 'Сброс Базы' : 'Тоза кардани База'}
-                </button>
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">

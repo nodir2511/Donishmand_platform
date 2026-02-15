@@ -62,8 +62,10 @@ const LessonPage = ({ lang, t, userRole }) => {
                         // Ищем наш урок в структуре
                         for (let sIndex = 0; sIndex < structure.sections.length; sIndex++) {
                             const sec = structure.sections[sIndex];
+                            if (!sec.topics) continue;
                             for (let tIndex = 0; tIndex < sec.topics.length; tIndex++) {
                                 const top = sec.topics[tIndex];
+                                if (!top.lessons) continue;
                                 const lIndex = top.lessons.findIndex(l => l.id === lessonId);
 
                                 if (lIndex !== -1) {
@@ -263,14 +265,16 @@ const LessonPage = ({ lang, t, userRole }) => {
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-sm text-gaming-textMuted mb-1">
-                                {lang === 'ru' ? 'Урок' : 'Дарс'} {lessonIndex + 1} / {topic.lessons.length}
+                                {lang === 'ru' ? 'Урок' : 'Дарс'} {lessonIndex + 1} / {topic?.lessons?.length || 0}
                             </p>
                             <h1 className="text-3xl font-bold mb-2 text-gaming-pink">
                                 {lessonIndex + 1}. {getTitle(lesson)}
                             </h1>
-                            <p className="text-gaming-textMuted flex items-center gap-2 text-sm">
-                                <span>{sectionIndex + 1}.{topicIndex + 1}. {getTitle(topic)}</span>
-                            </p>
+                            {topic && (
+                                <p className="text-gaming-textMuted flex items-center gap-2 text-sm">
+                                    <span>{sectionIndex + 1}.{topicIndex + 1}. {getTitle(topic)}</span>
+                                </p>
+                            )}
                         </div>
                         {isTeacher && (
                             <div className="px-3 py-1 bg-gaming-pink text-white text-xs font-bold rounded-full uppercase tracking-wider animate-pulse">

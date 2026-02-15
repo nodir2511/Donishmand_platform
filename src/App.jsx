@@ -47,7 +47,6 @@ function AppContent() {
                         <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
-                        <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
                         <Route path="/creator" element={<CreatorPage lang={lang} t={t} />} />
                         <Route path="/login" element={<AuthPage lang={lang} t={t} />} />
                         <Route path="*" element={<NotFoundPage lang={lang} t={t} />} />

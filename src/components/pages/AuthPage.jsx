@@ -1,20 +1,130 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, UserPlus, LogIn } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, UserPlus, LogIn, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { supabase } from '../../services/supabase';
 
-const AuthPage = ({ lang, t }) => {
-    const isRu = lang === 'ru';
+const AuthPage = () => {
+    const { t, i18n } = useTranslation();
+    const isRu = i18n.resolvedLanguage === 'ru';
     const [isLogin, setIsLogin] = useState(true);
     const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const location = useLocation();
 
-    // Заглушка для отправки формы
-    const handleSubmit = (e) => {
+    // Данные формы
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        confirmPassword: '',
+        fullName: '',
+        birthDate: '',
+        phone: '',
+        role: 'student', // По умолчанию ученик
+        language: 'tj',
+        grade: '1',
+        school: '',
+        branch: '',
+        group: '',
+        subject: ''
+    });
+
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.type === 'checkbox' ? 'checked' : 'value']: e.target.value });
+        setError(null);
+    };
+
+    // Helper: Timeout promise
+    const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms));
+
+    // Отправка формы
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // В будущем здесь будет вызов Supabase Auth
-        console.log("Auth attempt:", isLogin ? "Login" : "Register");
-        // После успешного входа:
-        // navigate('/');
+        setLoading(true);
+        setError(null);
+
+        try {
+            // Race condition: Auth call vs 10s timeout
+            if (isLogin) {
+                // 1. Вход
+                const { data, error } = await Promise.race([
+                    supabase.auth.signInWithPassword({
+                        email: formData.email,
+                        password: formData.password,
+                    }),
+                    timeoutPromise(10000)
+                ]);
+
+                if (error) throw error;
+
+                // Перенаправление (если были где-то, иначе домой)
+                const from = location.state?.from?.pathname || '/';
+                navigate(from, { replace: true });
+            } else {
+                // 2. Регистрация
+                if (formData.password !== formData.confirmPassword) {
+                    throw new Error('Пароли не совпадают');
+                }
+
+                if (formData.password.length < 6) {
+                    throw new Error('Пароль должен быть не менее 6 символов');
+                }
+
+                // Создаем пользователя в Auth
+                const { data: authData, error: authError } = await Promise.race([
+                    supabase.auth.signUp({
+                        email: formData.email,
+                        password: formData.password,
+                    }),
+                    timeoutPromise(10000)
+                ]);
+
+                if (authError) throw authError;
+
+                if (authData.user) {
+                    // Создаем профиль в таблице profiles
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .insert([
+                            {
+                                id: authData.user.id,
+                                full_name: formData.fullName,
+                                role: formData.role,
+                                school: formData.role === 'student' ? formData.school : null,
+                                grade: formData.role === 'student' ? parseInt(formData.grade) : null,
+                                branch: formData.branch,
+                                group_name: formData.role === 'student' ? formData.group : null,
+                                subject: formData.role === 'teacher' ? formData.subject : null
+                            }
+                        ]);
+
+                    if (profileError) {
+                        console.error('Profile creation error:', profileError);
+                        // Не блокируем, если профиль не создался, пользователь все равно создан
+                    }
+
+                    // Сразу входим
+                    navigate('/');
+                }
+            }
+        } catch (err) {
+            console.error('Auth error:', err);
+            let message = err.message;
+            if (message === 'Invalid login credentials') {
+                message = isRu ? 'Неверный email или пароль' : 'Email ё парол нодуруст';
+            } else if (message === 'Request timed out') {
+                message = isRu ? 'Превышено время ожидания. Проверьте интернет.' : 'Вақти интизорӣ гузашт. Интернетро санҷед.';
+            } else if (message.includes('rate limit')) {
+                message = isRu
+                    ? 'Слишком много попыток. Подождите 10-15 минут и попробуйте снова.'
+                    : 'Кӯшишҳо аз ҳад зиёд. 10-15 дақиқа интизор шавед ва боз кӯшиш кунед.';
+            }
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -43,7 +153,7 @@ const AuthPage = ({ lang, t }) => {
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gaming-primary via-gaming-accent to-gaming-pink opacity-50"></div>
 
                     <h2 className="text-2xl font-bold text-white mb-2 text-center">
-                        {isLogin ? t.authLoginTitle : t.authRegisterTitle}
+                        {isLogin ? t('authLoginTitle') : t('authRegisterTitle')}
                     </h2>
                     <p className="text-white/60 text-center mb-8 text-sm">
                         {isLogin
@@ -52,12 +162,44 @@ const AuthPage = ({ lang, t }) => {
                         }
                     </p>
 
+                    {error && (
+                        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center animate-shake">
+                            {error}
+                        </div>
+                    )}
+
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Role Selection Hook */}
+                        {!isLogin && (
+                            <div className="flex bg-gaming-bg/50 p-1 rounded-xl mb-6 border border-white/10">
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, role: 'student' })}
+                                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'student'
+                                        ? 'bg-gaming-card shadow-lg text-white border border-white/10'
+                                        : 'text-gaming-textMuted hover:text-white'
+                                        }`}
+                                >
+                                    {t('authRoleStudent')}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setFormData({ ...formData, role: 'teacher' })}
+                                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'teacher'
+                                        ? 'bg-gaming-card shadow-lg text-white border border-white/10'
+                                        : 'text-gaming-textMuted hover:text-white'
+                                        }`}
+                                >
+                                    {t('authRoleTeacher')}
+                                </button>
+                            </div>
+                        )}
+
                         {/* ФИО (Только регистрация) */}
                         {!isLogin && (
                             <div className="space-y-1.5 animate-fade-in-up">
                                 <label className="text-sm font-medium text-white/60 ml-1">
-                                    {t.authFullName}
+                                    {t('authFullName')}
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
@@ -65,11 +207,13 @@ const AuthPage = ({ lang, t }) => {
                                     </div>
                                     <input
                                         type="text"
+                                        value={formData.fullName}
+                                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                         className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                         placeholder={isRu ? "Эшматов Тошмат" : "Алиев Вали"}
                                         required
                                         pattern="^[А-Яа-яЁё\s]+$"
-                                        title={t.authErrCyrillic}
+                                        title={t('authErrCyrillic')}
                                     />
                                 </div>
                             </div>
@@ -80,20 +224,24 @@ const AuthPage = ({ lang, t }) => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[50ms]">
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t.authBirthDate}
+                                        {t('authBirthDate')}
                                     </label>
                                     <input
                                         type="date"
+                                        value={formData.birthDate}
+                                        onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
                                         className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans [color-scheme:dark]"
                                         required
                                     />
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t.authPhone}
+                                        {t('authPhone')}
                                     </label>
                                     <input
                                         type="tel"
+                                        value={formData.phone}
+                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                         className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                         placeholder="+992 00 000 0000"
                                         required
@@ -105,7 +253,7 @@ const AuthPage = ({ lang, t }) => {
                         {/* Email */}
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-white/60 ml-1">
-                                {t.authEmail}
+                                {t('authEmail')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
@@ -113,6 +261,8 @@ const AuthPage = ({ lang, t }) => {
                                 </div>
                                 <input
                                     type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                     placeholder="name@example.com"
                                     required
@@ -120,63 +270,118 @@ const AuthPage = ({ lang, t }) => {
                             </div>
                         </div>
 
-                        {/* Язык и Класс (Только регистрация) */}
-                        {!isLogin && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t.authLanguage}
-                                    </label>
-                                    <select className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer">
-                                        <option value="tj">{t.authLangTj}</option>
-                                        <option value="ru">{t.authLangRu}</option>
-                                    </select>
+                        {/* STUDENT FIELDS */}
+                        {!isLogin && formData.role === 'student' && (
+                            <>
+                                {/* Язык и Класс */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium text-white/60 ml-1">
+                                            {t('authLanguage')}
+                                        </label>
+                                        <select
+                                            value={formData.language}
+                                            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
+                                        >
+                                            <option value="tj">{t('authLangTj')}</option>
+                                            <option value="ru">{t('authLangRu')}</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium text-white/60 ml-1">
+                                            {t('authGrade')}
+                                        </label>
+                                        <select
+                                            value={formData.grade}
+                                            onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
+                                        >
+                                            {[...Array(11)].map((_, i) => (
+                                                <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t.authGrade}
-                                    </label>
-                                    <select className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer">
-                                        {[...Array(11)].map((_, i) => (
-                                            <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                        ))}
-                                    </select>
+
+                                {/* Школа, Филиал, Группа */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up delay-[150ms]">
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium text-white/60 ml-1">
+                                            {t('authSchool')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.school}
+                                            onChange={(e) => setFormData({ ...formData, school: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            placeholder={isRu ? "№1" : "№1"}
+                                            required={formData.role === 'student'}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                            {t('authBranch')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.branch}
+                                            onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            required={formData.role === 'student'}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                            {t('authGroup')}
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.group}
+                                            onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            required={formData.role === 'student'}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            </>
                         )}
 
-                        {/* Школа, Филиал, Группа (Только регистрация) */}
-                        {!isLogin && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up delay-[150ms]">
+                        {/* TEACHER FIELDS */}
+                        {!isLogin && formData.role === 'teacher' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
+                                {/* Предмет */}
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t.authSchool}
+                                        {t('authSubject')}
+                                    </label>
+                                    <select
+                                        value={formData.subject || 'tj-lang'}
+                                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
+                                    >
+                                        <option value="tj-lang">Таджикский язык</option>
+                                        <option value="math">Математика</option>
+                                        <option value="phys">Физика</option>
+                                        <option value="chem">Химия</option>
+                                        <option value="bio">Биология</option>
+                                        <option value="geo">География</option>
+                                        <option value="hist">История</option>
+                                        <option value="eng">Английский</option>
+                                        <option value="lit">Литература</option>
+                                    </select>
+                                </div>
+                                {/* Филиал */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-white/60 ml-1">
+                                        {t('authBranch')}
                                     </label>
                                     <input
                                         type="text"
+                                        value={formData.branch}
+                                        onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
                                         className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        placeholder={isRu ? "№1" : "№1"}
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                        {t.authBranch}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                        {t.authGroup}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        required
+                                        required={formData.role === 'teacher'}
                                     />
                                 </div>
                             </div>
@@ -185,7 +390,7 @@ const AuthPage = ({ lang, t }) => {
                         {/* Password */}
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                {t.authPassword}
+                                {t('authPassword')}
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
@@ -193,6 +398,8 @@ const AuthPage = ({ lang, t }) => {
                                 </div>
                                 <input
                                     type={showPassword ? "text" : "password"}
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                     className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                     placeholder="••••••••"
                                     required
@@ -211,7 +418,7 @@ const AuthPage = ({ lang, t }) => {
                         {!isLogin && (
                             <div className="space-y-1.5 animate-fade-in-up delay-[200ms]">
                                 <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                    {t.authConfirmPassword}
+                                    {t('authConfirmPassword')}
                                 </label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
@@ -219,6 +426,8 @@ const AuthPage = ({ lang, t }) => {
                                     </div>
                                     <input
                                         type="password"
+                                        value={formData.confirmPassword}
+                                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                         placeholder="••••••••"
                                         required
@@ -231,7 +440,7 @@ const AuthPage = ({ lang, t }) => {
                         {isLogin && (
                             <div className="flex justify-end">
                                 <button type="button" className="text-xs text-gaming-primary hover:text-gaming-accent transition-colors font-medium">
-                                    {t.authForgotPass}
+                                    {t('authForgotPass')}
                                 </button>
                             </div>
                         )}
@@ -239,24 +448,31 @@ const AuthPage = ({ lang, t }) => {
                         {/* Button */}
                         <button
                             type="submit"
-                            className="w-full bg-gradient-to-r from-gaming-primary to-gaming-pink hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gaming-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group mt-2"
+                            disabled={loading}
+                            className="w-full bg-gradient-to-r from-gaming-primary to-gaming-pink hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gaming-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {isLogin ? <LogIn size={20} /> : <UserPlus size={20} />}
-                            {isLogin ? t.authLoginBtn : t.authRegisterBtn}
-                            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            {loading ? <Loader2 size={20} className="animate-spin" /> : (isLogin ? <LogIn size={20} /> : <UserPlus size={20} />)}
+                            {loading
+                                ? (isRu ? 'Обработка...' : ' коркард...')
+                                : (isLogin ? t('authLoginBtn') : t('authRegisterBtn'))
+                            }
+                            {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
                         </button>
                     </form>
 
                     {/* Switcher */}
                     <div className="mt-8 pt-6 border-t border-white/5 text-center">
                         <p className="text-gaming-textMuted text-sm mb-3">
-                            {isLogin ? t.authNoAccount : t.authHasAccount}
+                            {isLogin ? t('authNoAccount') : t('authHasAccount')}
                         </p>
                         <button
-                            onClick={() => setIsLogin(!isLogin)}
+                            onClick={() => {
+                                setIsLogin(!isLogin);
+                                setError(null);
+                            }}
                             className="text-white font-semibold hover:text-gaming-accent transition-colors text-sm px-4 py-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10"
                         >
-                            {isLogin ? t.authSwitchToRegister : t.authSwitchToLogin}
+                            {isLogin ? t('authSwitchToRegister') : t('authSwitchToLogin')}
                         </button>
                     </div>
                 </div>

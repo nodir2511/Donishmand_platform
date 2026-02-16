@@ -1,8 +1,12 @@
 import React from 'react';
 import { LayoutGrid } from 'lucide-react';
 import { CLUSTERS_STRUCTURE } from '../../constants/data';
+import { useTranslation } from 'react-i18next';
 
-const ClusterSelect = ({ activeClusterId, setActiveClusterId, lang, t }) => {
+const ClusterSelect = ({ activeClusterId, setActiveClusterId }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
+
     return (
         <div id="courses-section" className="sticky top-20 z-30 transition-all mt-8">
             <div className="max-w-7xl mx-auto px-4">
@@ -19,7 +23,7 @@ const ClusterSelect = ({ activeClusterId, setActiveClusterId, lang, t }) => {
               `}
                         >
                             <LayoutGrid size={18} className={activeClusterId === 0 ? "text-gaming-accent" : ""} />
-                            {t.allSubjects}
+                            {t('allSubjects')}
                         </button>
 
                         <div className="w-px h-8 bg-white/10 mx-2 self-center"></div>

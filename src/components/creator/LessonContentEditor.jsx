@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Save, Video, FileText, ClipboardList, Presentation, Loader2 } from 'lucide-react';
 import VideoEditor from './VideoEditor';
 import TextEditor from './TextEditor';
@@ -6,13 +7,15 @@ import TestEditor from './TestEditor';
 import SlidesEditor from './SlidesEditor';
 
 const TABS = [
-    { id: 'video', icon: Video, label: { ru: 'Видео', tj: 'Видео' } },
-    { id: 'text', icon: FileText, label: { ru: 'Текст', tj: 'Матн' } },
-    { id: 'test', icon: ClipboardList, label: { ru: 'Тест', tj: 'Тест' } },
-    { id: 'slides', icon: Presentation, label: { ru: 'Слайды', tj: 'Слайдҳо' } },
+    { id: 'video', icon: Video, label: 'creator.video' },
+    { id: 'text', icon: FileText, label: 'creator.text' },
+    { id: 'test', icon: ClipboardList, label: 'creator.test' },
+    { id: 'slides', icon: Presentation, label: 'creator.presentation' },
 ];
 
-const LessonContentEditor = ({ lesson, onSave, onClose, lang, isSaving }) => {
+const LessonContentEditor = ({ lesson, onSave, onClose, isSaving }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const [activeTab, setActiveTab] = useState('video');
     const [content, setContent] = useState(lesson.content || {
         video: { url: '', descriptionRu: '', descriptionTj: '' },
@@ -45,7 +48,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang, isSaving }) => {
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 shrink-0">
                     <div>
                         <h2 className="text-xl sm:text-2xl font-bold">
-                            {lang === 'ru' ? 'Редактирование' : 'Таҳрир'}
+                            {t('creator.editing')}
                         </h2>
                         <p className="text-gaming-textMuted mt-1 text-sm sm:text-base truncate max-w-[200px] sm:max-w-md">
                             {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
@@ -76,7 +79,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang, isSaving }) => {
                                     } ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 <Icon size={16} className="sm:w-[18px] sm:h-[18px]" />
-                                {tab.label[lang]}
+                                {t(tab.label)}
                             </button>
                         );
                     })}
@@ -123,7 +126,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang, isSaving }) => {
                         disabled={isSaving}
                         className="px-4 sm:px-6 py-2 sm:py-3 text-sm sm:text-base text-gaming-textMuted hover:text-white transition-colors disabled:opacity-50"
                     >
-                        {lang === 'ru' ? 'Отмена' : 'Бекор'}
+                        {t('creator.cancel')}
                     </button>
                     <button
                         onClick={handleSave}
@@ -131,7 +134,7 @@ const LessonContentEditor = ({ lesson, onSave, onClose, lang, isSaving }) => {
                         className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95 text-sm sm:text-base disabled:opacity-70 disabled:active:scale-100"
                     >
                         {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                        {lang === 'ru' ? (isSaving ? 'Сохранение...' : 'Сохранить') : (isSaving ? 'Сабт мешавад...' : 'Нигоҳ доштан')}
+                        {isSaving ? t('creator.saving') : t('creator.save')}
                     </button>
                 </div>
             </div>

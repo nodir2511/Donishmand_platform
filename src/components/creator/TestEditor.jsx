@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Sparkles, ClipboardList, Plus, Trash2, Check, List, ArrowLeftRight, Hash, ChevronDown, Loader2, Image as ImageIcon, X } from 'lucide-react';
 import { translateText } from '../../services/translationService';
 import RichTextEditor from './RichTextEditor';
 import { supabase } from '../../services/supabase';
 
 const QUESTION_TYPES = [
-    { id: 'multiple_choice', icon: List, label: { ru: '4 варианта ответа', tj: '4 вариант ҷавоб' } },
-    { id: 'matching', icon: ArrowLeftRight, label: { ru: 'Соответствия', tj: 'Мувофиқат' } },
-    { id: 'numeric', icon: Hash, label: { ru: 'Числовой ответ', tj: 'Ҷавоби рақамӣ' } },
+    { id: 'multiple_choice', icon: List, label: 'creator.singleChoice' },
+    { id: 'matching', icon: ArrowLeftRight, label: 'creator.matching' },
+    { id: 'numeric', icon: Hash, label: 'creator.numeric' },
 ];
 
 const UNITS = ['', 'м', 'см', 'мм', 'км', 'м²', 'см²', 'м³', 'кг', 'г', 'л', 'мл', 'с', 'мин', 'ч', '°', '°C', '%', 'Н', 'Дж', 'Вт'];
 
-const TestEditor = ({ data, onChange, lang }) => {
+const TestEditor = ({ data, onChange }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const questions = data.questions || [];
     const [translating, setTranslating] = useState({});
 
@@ -250,7 +253,7 @@ const TestEditor = ({ data, onChange, lang }) => {
 
                 if (uploadError) {
                     console.error('Ошибка загрузки:', uploadError);
-                    alert(lang === 'ru' ? 'Ошибка загрузки изображения' : 'Хатоги ҳангоми боргузории расм');
+                    alert(t('creator.uploadError'));
                     return;
                 }
 
@@ -277,7 +280,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                     <button
                         onClick={onRemove}
                         className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Удалить"
+                        title={t('creator.delete')}
                     >
                         <X size={12} />
                     </button>
@@ -299,14 +302,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className={`flex items-center justify-center ${size === 'sm' ? 'w-10 h-10' : 'w-full h-10'} bg-gaming-bg/30 border border-white/10 rounded-lg hover:bg-gaming-bg/50 hover:border-gaming-primary/50 transition-all text-gaming-textMuted hover:text-gaming-primary relative`}
-                    title="Добавить изображение"
+                    title={t('creator.addImage')}
                 >
                     {uploading ? (
                         <Loader2 size={size === 'sm' ? 14 : 16} className="animate-spin text-gaming-primary" />
                     ) : (
                         <ImageIcon size={size === 'sm' ? 16 : 18} />
                     )}
-                    {size !== 'sm' && !uploading && <span className="ml-2 text-sm">{lang === 'ru' ? 'Добавить фото' : 'Сурат илова кунед'}</span>}
+                    {size !== 'sm' && !uploading && <span className="ml-2 text-sm">{t('creator.addPhoto')}</span>}
                 </button>
             </>
         );
@@ -317,7 +320,7 @@ const TestEditor = ({ data, onChange, lang }) => {
             <div className="flex items-center justify-between">
                 <h4 className="text-lg font-semibold text-gaming-pink flex items-center gap-2">
                     <ClipboardList size={20} />
-                    {lang === 'ru' ? 'Вопросы теста' : 'Саволҳои тест'}
+                    {t('creator.testQuestions')}
                 </h4>
                 <div className="relative">
                     <button
@@ -325,7 +328,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                         className="flex items-center gap-2 px-3 py-2 bg-gaming-pink/20 text-gaming-pink rounded-xl hover:bg-gaming-pink/30 transition-colors text-sm"
                     >
                         <Plus size={16} />
-                        {lang === 'ru' ? 'Добавить вопрос' : 'Илова кардани савол'}
+                        {t('creator.addQuestion')}
                         <ChevronDown size={14} />
                     </button>
                     {activeMenu === 'top' && (
@@ -339,7 +342,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                                     >
                                         <Icon size={18} className="text-gaming-pink" />
-                                        <span className="text-sm">{type.label[lang]}</span>
+                                        <span className="text-sm">{t(type.label)}</span>
                                     </button>
                                 );
                             })}
@@ -351,7 +354,7 @@ const TestEditor = ({ data, onChange, lang }) => {
             {questions.length === 0 ? (
                 <div className="text-center py-8 text-gaming-textMuted">
                     <ClipboardList size={32} className="mx-auto mb-2 opacity-30" />
-                    <p>{lang === 'ru' ? 'Нет вопросов. Добавьте первый!' : 'Саволе нест. Аввалинро илова кунед!'}</p>
+                    <p>{t('creator.noQuestions')}</p>
                 </div>
             ) : (
                 <div className="space-y-6">
@@ -361,10 +364,10 @@ const TestEditor = ({ data, onChange, lang }) => {
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-3">
                                     <span className="text-sm text-gaming-textMuted">
-                                        {lang === 'ru' ? 'Вопрос' : 'Савол'} #{qIndex + 1}
+                                        {t('creator.question')} #{qIndex + 1}
                                     </span>
                                     <span className="text-xs px-2 py-1 bg-gaming-pink/20 text-gaming-pink rounded-full">
-                                        {QUESTION_TYPES.find(t => t.id === q.type)?.label[lang] || q.type}
+                                        {t(QUESTION_TYPES.find(t => t.id === q.type)?.label) || q.type}
                                     </span>
                                 </div>
                                 <button
@@ -388,14 +391,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                             {/* Текст вопроса RU */}
                             <div className="mb-3">
                                 <label className="text-xs text-gaming-textMuted mb-1 block ml-1">
-                                    {lang === 'ru' ? 'Текст вопроса (RU)' : 'Матни савол (RU)'}
+                                    {t('creator.questionTextRu')}
                                 </label>
                                 <div className="flex gap-2 items-start">
                                     <div className="flex-1">
                                         <RichTextEditor
                                             content={q.textRu}
                                             onChange={(html) => updateQuestion(qIndex, 'textRu', html)}
-                                            placeholder={lang === 'ru' ? 'Введите текст вопроса...' : 'Матни саволро ворид кунед...'}
+                                            placeholder={t('creator.enterQuestionText')}
                                             minimal={true}
                                             minHeight="100px"
                                         />
@@ -404,7 +407,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         onClick={() => autoTranslateQuestionTjToRu(qIndex)}
                                         disabled={translating[`q_${qIndex}`]}
                                         className="mt-2 px-2 py-2 bg-gaming-primary/20 text-gaming-primary rounded-lg hover:bg-gaming-primary/30 transition-colors disabled:opacity-50"
-                                        title="Перевести TJ -> RU"
+                                        title={t('creator.translateTjToRu')}
                                     >
                                         {translating[`q_${qIndex}`] ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} className="rotate-180" />}
                                     </button>
@@ -414,14 +417,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                             {/* Текст вопроса TJ */}
                             <div className="mb-4">
                                 <label className="text-xs text-gaming-textMuted mb-1 block ml-1">
-                                    {lang === 'ru' ? 'Текст вопроса (TJ)' : 'Матни савол (TJ)'}
+                                    {t('creator.questionTextTj')}
                                 </label>
                                 <div className="flex gap-2 items-start">
                                     <div className="flex-1">
                                         <RichTextEditor
                                             content={q.textTj}
                                             onChange={(html) => updateQuestion(qIndex, 'textTj', html)}
-                                            placeholder={lang === 'ru' ? 'Введите текст вопроса...' : 'Матни саволро ворид кунед...'}
+                                            placeholder={t('creator.enterQuestionText')}
                                             minimal={true}
                                             minHeight="100px"
                                         />
@@ -430,7 +433,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         onClick={() => autoTranslateQuestion(qIndex)}
                                         disabled={translating[`q_${qIndex}`]}
                                         className="mt-2 px-2 py-2 bg-gaming-accent/20 text-gaming-accent rounded-lg hover:bg-gaming-accent/30 transition-colors disabled:opacity-50"
-                                        title="Перевести RU -> TJ"
+                                        title={t('creator.translateRuToTj')}
                                     >
                                         {translating[`q_${qIndex}`] ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                                     </button>
@@ -441,7 +444,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                             {q.type === 'multiple_choice' && (
                                 <div className="space-y-2 ml-4">
                                     <span className="text-xs text-gaming-textMuted">
-                                        {lang === 'ru' ? 'Варианты ответов (нажмите ✓ для правильного)' : 'Ҷавобҳо (✓ барои дуруст)'}
+                                        {t('creator.answerOptions')}
                                     </span>
                                     {q.options.map((opt, optIndex) => (
                                         <div key={opt.id} className="flex items-center gap-2">
@@ -503,7 +506,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         {/* Левая колонка (A, B, C, D) */}
                                         <div className="space-y-2">
                                             <span className="text-xs text-gaming-textMuted block mb-2">
-                                                {lang === 'ru' ? 'Левая колонка (A, B, C, D)' : 'Сутуну чап'}
+                                                {t('creator.leftColumn')}
                                             </span>
                                             {q.leftItems.map((item, idx) => (
                                                 <div key={item.id} className="p-2 sm:p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
@@ -554,7 +557,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         {/* Правая колонка (1, 2, 3, 4, 5) */}
                                         <div className="space-y-2">
                                             <span className="text-xs text-gaming-textMuted block mb-2">
-                                                {lang === 'ru' ? 'Правая колонка (1-5)' : 'Сутуну рост'}
+                                                {t('creator.rightColumn')}
                                             </span>
                                             {q.rightItems.map((item, idx) => (
                                                 <div key={item.id} className="p-2 sm:p-3 bg-white/5 rounded-xl border border-white/5 space-y-2">
@@ -606,7 +609,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                     {/* Правильные соответствия */}
                                     <div className="bg-gaming-card/30 rounded-xl p-4 border border-white/10">
                                         <span className="text-sm font-semibold text-white block mb-4">
-                                            {lang === 'ru' ? 'Сетка правильных ответов:' : 'Ҷадвали ҷавобҳои дуруст:'}
+                                            {t('creator.correctMatchesGrid')}
                                         </span>
 
                                         <div className="overflow-x-auto">
@@ -649,9 +652,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                             </table>
                                         </div>
                                         <p className="text-[10px] text-gaming-textMuted mt-4 text-center">
-                                            {lang === 'ru'
-                                                ? '* Нажимайте на пересечения для установки верного соответствия'
-                                                : '* Барои муайян кардани мувофиқати дуруст ба буришҳо пахш кунед'}
+                                            {t('creator.matchHint')}
                                         </p>
                                     </div>
                                 </div>
@@ -661,7 +662,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                             {q.type === 'numeric' && (
                                 <div className="space-y-4 ml-4">
                                     <span className="text-xs text-gaming-textMuted">
-                                        {lang === 'ru' ? 'Введите правильный ответ (до 4 цифр):' : 'Ҷавоби дуруст (то 4 рақам):'}
+                                        {t('creator.enterCorrectAnswer')}
                                     </span>
                                     <div className="flex items-center gap-3">
                                         <div className="flex gap-2">
@@ -679,7 +680,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <span className="text-gaming-textMuted text-sm">
-                                                {lang === 'ru' ? 'Величина:' : 'Воҳид:'}
+                                                {t('creator.unit')}
                                             </span>
                                             <select
                                                 value={q.unit || ''}
@@ -687,14 +688,14 @@ const TestEditor = ({ data, onChange, lang }) => {
                                                 className="bg-gaming-bg/50 border border-white/10 rounded-lg px-3 py-2 text-white"
                                             >
                                                 {UNITS.map(u => (
-                                                    <option key={u} value={u}>{u || (lang === 'ru' ? '(без величины)' : '(бе воҳид)')}</option>
+                                                    <option key={u} value={u}>{u || t('creator.noUnit')}</option>
                                                 ))}
                                             </select>
                                         </div>
                                     </div>
                                     <div className="bg-gaming-card/30 rounded-lg p-3 text-sm">
                                         <span className="text-gaming-textMuted">
-                                            {lang === 'ru' ? 'Ответ: ' : 'Ҷавоб: '}
+                                            {t('creator.answerPrefix')}
                                         </span>
                                         <span className="text-gaming-primary font-bold">
                                             {q.digits.filter(d => d).join('') || '—'} {q.unit}
@@ -716,7 +717,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                             className="flex items-center gap-2 px-4 py-2 bg-gaming-pink/20 text-gaming-pink rounded-xl hover:bg-gaming-pink/30 transition-colors text-sm border border-dashed border-gaming-pink/30"
                         >
                             <Plus size={16} />
-                            {lang === 'ru' ? 'Добавить вопрос' : 'Илова кардани савол'}
+                            {t('creator.addQuestion')}
                             <ChevronDown size={14} />
                         </button>
                         {activeMenu === 'bottom' && (
@@ -730,7 +731,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                                             className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left"
                                         >
                                             <Icon size={18} className="text-gaming-pink" />
-                                            <span className="text-sm">{type.label[lang]}</span>
+                                            <span className="text-sm">{t(type.label)}</span>
                                         </button>
                                     );
                                 })}

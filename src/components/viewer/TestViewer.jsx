@@ -517,8 +517,8 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         {lang === 'ru' ? 'Группа 1' : 'Гурӯҳи 1'}
                                     </p>
                                     {currentQuestion.leftItems.map((left, idx) => (
-                                        <div key={left.id} className="text-sm flex gap-2 items-start">
-                                            <span className="font-bold text-gaming-pink min-w-[20px] pt-1">{String.fromCharCode(65 + idx)})</span>
+                                        <div key={left.id} className="text-sm flex gap-2 items-baseline">
+                                            <span className="font-bold text-gaming-pink min-w-[20px]">{String.fromCharCode(65 + idx)})</span>
                                             <div className="flex flex-col gap-1">
                                                 <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(left) }} />
                                                 {left.image && (
@@ -533,8 +533,8 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                         {lang === 'ru' ? 'Группа 2' : 'Гурӯҳи 2'}
                                     </p>
                                     {currentQuestion.rightItems.map((right, idx) => (
-                                        <div key={right.id} className="text-sm flex gap-2 items-start">
-                                            <span className="font-bold text-gaming-accent min-w-[20px] pt-1">{idx + 1})</span>
+                                        <div key={right.id} className="text-sm flex gap-2 items-baseline">
+                                            <span className="font-bold text-gaming-accent min-w-[20px]">{idx + 1})</span>
                                             <div className="flex flex-col gap-1">
                                                 <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(right) }} />
                                                 {right.image && (

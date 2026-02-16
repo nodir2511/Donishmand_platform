@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { SUBJECT_CONFIG, SUBJECT_NAMES } from '../../constants/data';
+import { useTranslation } from 'react-i18next';
 
-const CourseCard = ({ subjectId, lang, t }) => {
+const CourseCard = ({ subjectId }) => {
+    const { i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const config = SUBJECT_CONFIG[subjectId];
     const title = SUBJECT_NAMES[subjectId][lang];
     const Icon = config.icon;
@@ -38,4 +41,3 @@ const CourseCard = ({ subjectId, lang, t }) => {
 };
 
 export default CourseCard;
-

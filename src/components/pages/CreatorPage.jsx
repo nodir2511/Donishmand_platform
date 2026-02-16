@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, Plus, Trash2, Save, FileText, Video, ClipboardList, Presentation,
@@ -20,16 +21,16 @@ import { invalidateSyllabusCache } from '../../contexts/SyllabusContext';
 import useDebounce from '../../hooks/useDebounce';
 
 const LESSON_TYPES = [
-    { id: 'video', icon: Video, label: { ru: 'Видео', tj: 'Видео' } },
-    { id: 'text', icon: FileText, label: { ru: 'Текст', tj: 'Матн' } },
-    { id: 'test', icon: ClipboardList, label: { ru: 'Тест', tj: 'Тест' } },
-    { id: 'presentation', icon: Presentation, label: { ru: 'Презентация', tj: 'Презентатсия' } },
+    { id: 'video', icon: Video, label: 'creator.video' },
+    { id: 'text', icon: FileText, label: 'creator.text' },
+    { id: 'test', icon: ClipboardList, label: 'creator.test' },
+    { id: 'presentation', icon: Presentation, label: 'creator.presentation' },
 ];
 
 const STORAGE_KEY = 'donishmand_creator_syllabus';
 
 // Компонент сортируемого раздела
-const SortableSection = ({ section, sectionIndex, children, lang, onDelete }) => {
+const SortableSection = ({ section, sectionIndex, children, onDelete }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
 
     const style = {
@@ -73,7 +74,9 @@ const SortableTopic = ({ topic, topicIndex, sectionIndex, children }) => {
 };
 
 // Компонент сортируемого урока
-const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, onDelete, onEdit, getLessonIcon }) => {
+const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, onDelete, onEdit, getLessonIcon }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     // Определяем все типы контента, которые есть в уроке
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
     const contentTypes = [];
@@ -98,7 +101,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
             <div
                 className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer group hover:bg-white/5 p-1 rounded-md transition-colors"
                 onClick={() => onEdit(lesson)}
-                title={lang === 'ru' ? 'Нажмите для редактирования' : 'Барои таҳрир зер кунед'}
+                title={t('creator.clickToEdit')}
             >
                 <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0" onClick={(e) => e.stopPropagation()}>
                     <GripVertical size={14} />
@@ -108,7 +111,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                 <div className="flex gap-1 shrink-0">
                     {contentTypes.map(type => {
                         const Icon = getLessonIcon(type);
-                        return <Icon key={type} size={14} className="text-gaming-pink/70" title={LESSON_TYPES.find(lt => lt.id === type)?.label[lang]} />;
+                        return <Icon key={type} size={14} className="text-gaming-pink/70" title={t(LESSON_TYPES.find(lt => lt.id === type)?.label)} />;
                     })}
                 </div>
 
@@ -119,7 +122,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                     <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'rename'); }}
                         className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors shrink-0 sm:opacity-0 group-hover:opacity-100"
-                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                        title={t('creator.editTitle')}
                     >
                         <Edit3 size={12} />
                     </button>
@@ -131,7 +134,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                 <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'move'); }}
                     className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors"
-                    title={lang === 'ru' ? 'Переместить' : 'Кӯчонидан'}
+                    title={t('creator.move')}
                 >
                     <ArrowRightLeft size={14} />
                 </button>
@@ -139,7 +142,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
                 <button
                     onClick={(e) => { e.stopPropagation(); onDelete(lesson.id); }}
                     className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
-                    title={lang === 'ru' ? 'Удалить' : 'Ҳазф кардан'}
+                    title={t('creator.delete')}
                 >
                     <Trash2 size={14} />
                 </button>
@@ -149,7 +152,9 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, lang, o
 };
 
 // Компонент модального окна перемещения
-const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
+const MoveModal = ({ item, itemType, syllabus, onMove, onClose }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const [selectedSectionId, setSelectedSectionId] = useState(item.fromSectionId || '');
     const [selectedTopicId, setSelectedTopicId] = useState(item.fromTopicId || '');
 
@@ -182,20 +187,20 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
             <div className="w-full max-w-md bg-gaming-card/95 backdrop-blur-xl rounded-2xl border border-white/10 p-6">
                 <h3 className="text-lg font-semibold mb-4">
-                    {lang === 'ru' ? 'Переместить в' : 'Кӯчонидан ба'}
+                    {t('creator.moveTo')}
                 </h3>
 
                 {/* Select Section */}
                 <div className="mb-4">
                     <label className="block text-sm text-gaming-textMuted mb-2">
-                        {lang === 'ru' ? 'Раздел' : 'Бахш'}
+                        {t('creator.section')}
                     </label>
                     <select
                         value={selectedSectionId}
                         onChange={(e) => { setSelectedSectionId(e.target.value); setSelectedTopicId(''); }}
                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white appearance-none"
                     >
-                        <option value="">{lang === 'ru' ? 'Выберите раздел...' : 'Бахшро интихоб кунед...'}</option>
+                        <option value="">{t('creator.selectSection')}</option>
                         {sections.map(s => (
                             <option key={s.id} value={s.id}>{lang === 'tj' ? (s.titleTj || s.title) : s.title}</option>
                         ))}
@@ -206,7 +211,7 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
                 {itemType === 'lesson' && (
                     <div className="mb-4">
                         <label className="block text-sm text-gaming-textMuted mb-2">
-                            {lang === 'ru' ? 'Тема' : 'Мавзӯъ'}
+                            {t('creator.topic')}
                         </label>
                         <select
                             value={selectedTopicId}
@@ -214,7 +219,7 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
                             disabled={!selectedSectionId}
                             className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white appearance-none disabled:opacity-50"
                         >
-                            <option value="">{lang === 'ru' ? 'Выберите тему...' : 'Мавзӯъро интихоб кунед...'}</option>
+                            <option value="">{t('creator.selectTopic')}</option>
                             {availableTopics.map(t => (
                                 <option key={t.id} value={t.id}>{lang === 'tj' ? (t.titleTj || t.title) : t.title}</option>
                             ))}
@@ -228,10 +233,10 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
                         className="flex-1 px-4 py-2 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80"
                         disabled={itemType === 'topic' ? !selectedSectionId : (!selectedSectionId || !selectedTopicId)}
                     >
-                        {lang === 'ru' ? 'Переместить' : 'Кӯчонидан'}
+                        {t('creator.move')}
                     </button>
                     <button onClick={onClose} className="px-4 py-2 text-gaming-textMuted hover:text-white">
-                        {lang === 'ru' ? 'Отмена' : 'Бекор'}
+                        {t('creator.cancel')}
                     </button>
                 </div>
             </div>
@@ -239,7 +244,9 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose, lang }) => {
     );
 };
 
-const CreatorPage = ({ lang, t }) => {
+const CreatorPage = () => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const navigate = useNavigate();
 
     // Состояние выбранного предмета с персистенцией
@@ -779,7 +786,7 @@ const CreatorPage = ({ lang, t }) => {
             setEditingLessonContext(null);
         } catch (error) {
             console.error('Ошибка сохранения урока:', error);
-            alert(lang === 'ru' ? 'Ошибка сохранения урока' : 'Хатоги ҳангоми сабти дарс');
+            alert(t('creator.errorSaveLesson'));
         } finally {
             setIsLessonSaving(false);
         }
@@ -848,7 +855,7 @@ const CreatorPage = ({ lang, t }) => {
         }
     };
 
-    const renderDualInput = (valueRu, setValueRu, valueTj, setValueTj, onAutoTranslateRuToTj, onAutoTranslateTjToRu, placeholderRu = 'Название (RU)', placeholderTj = 'Номи (TJ)') => (
+    const renderDualInput = (valueRu, setValueRu, valueTj, setValueTj, onAutoTranslateRuToTj, onAutoTranslateTjToRu, placeholderRu = t('creator.nameRu'), placeholderTj = t('creator.nameTj')) => (
         <div className="space-y-3">
             <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
@@ -856,7 +863,7 @@ const CreatorPage = ({ lang, t }) => {
                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-primary/50 transition-colors" />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 font-medium">RU</span>
                 </div>
-                <button type="button" onClick={onAutoTranslateTjToRu} className="flex items-center gap-1 px-3 py-3 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors text-sm" title="Перевести TJ -> RU">
+                <button type="button" onClick={onAutoTranslateTjToRu} className="flex items-center gap-1 px-3 py-3 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors text-sm" title={t('creator.translateTjToRu')}>
                     <Sparkles size={16} className="rotate-180" />
                 </button>
             </div>
@@ -866,7 +873,7 @@ const CreatorPage = ({ lang, t }) => {
                         className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-gaming-accent/50 transition-colors" />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/30 font-medium">TJ</span>
                 </div>
-                <button type="button" onClick={onAutoTranslateRuToTj} className="flex items-center gap-1 px-3 py-3 bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors text-sm" title="Перевести RU -> TJ">
+                <button type="button" onClick={onAutoTranslateRuToTj} className="flex items-center gap-1 px-3 py-3 bg-gaming-accent/20 text-gaming-accent rounded-xl hover:bg-gaming-accent/30 transition-colors text-sm" title={t('creator.translateRuToTj')}>
                     <Sparkles size={16} />
                 </button>
             </div>
@@ -887,7 +894,7 @@ const CreatorPage = ({ lang, t }) => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors self-start">
                     <ChevronLeft size={20} />
-                    {lang === 'ru' ? 'Назад' : 'Бозгашт'}
+                    {t('creator.back')}
                 </button>
 
                 {/* Индикатор синхронизации */}
@@ -895,19 +902,19 @@ const CreatorPage = ({ lang, t }) => {
                     {saveStatus === 'saved' && (
                         <>
                             <span className="text-gaming-accent">☁️</span>
-                            <span className="text-gaming-textMuted">{lang === 'ru' ? 'Все сохранено' : 'Ҳамааш сабт шуд'}</span>
+                            <span className="text-gaming-textMuted">{t('creator.allSaved')}</span>
                         </>
                     )}
                     {saveStatus === 'saving' && (
                         <>
                             <Loader2 size={16} className="text-gaming-primary animate-spin" />
-                            <span className="text-white">{lang === 'ru' ? 'Сохранение...' : 'Сабт мешавад...'}</span>
+                            <span className="text-white">{t('creator.saving')}</span>
                         </>
                     )}
                     {saveStatus === 'error' && (
                         <>
                             <span className="text-red-500">❌</span>
-                            <span className="text-red-400">{lang === 'ru' ? 'Ошибка сохранения' : 'Хатоги'}</span>
+                            <span className="text-red-400">{t('creator.saveError')}</span>
                         </>
                     )}
                 </div>
@@ -917,15 +924,15 @@ const CreatorPage = ({ lang, t }) => {
 
             <h1 className="text-3xl sm:text-4xl font-bold mb-2 flex items-center gap-3">
                 <GraduationCap className="text-gaming-primary" size={32} />
-                {lang === 'ru' ? 'Панель Создателя' : 'Панели Эҷодкор'}
+                {t('creator.panelTitle')}
             </h1>
             <p className="text-gaming-textMuted text-base sm:text-lg mb-6 sm:mb-8">
-                {lang === 'ru' ? 'Добавляйте разделы, темы и уроки. Перетаскивайте для сортировки.' : 'Бахшҳо, мавзӯъҳо ва дарсҳоро илова кунед. Барои мураттаб кардан кашед.'}
+                {t('creator.panelSubtitle')}
             </p>
 
             {/* Селектор предмета */}
             <div className="mb-6 sm:mb-8">
-                <label className="block text-sm text-gaming-textMuted mb-2">{lang === 'ru' ? 'Выберите предмет' : 'Фанро интихоб кунед'}</label>
+                <label className="block text-sm text-gaming-textMuted mb-2">{t('creator.selectSubject')}</label>
                 <div className="relative">
                     <select value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}
                         className="w-full sm:max-w-md bg-gaming-card/60 backdrop-blur-xl border border-white/10 rounded-xl px-4 py-3 text-white appearance-none cursor-pointer focus:outline-none focus:border-gaming-primary/50 transition-colors">
@@ -942,25 +949,25 @@ const CreatorPage = ({ lang, t }) => {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Layers className="text-gaming-primary" size={24} />
-                        {lang === 'ru' ? 'Разделы' : 'Бахшҳо'}
+                        {t('creator.sections')}
                     </h2>
                     <button onClick={() => setShowAddSection(true)} className="flex items-center justify-center gap-2 px-4 py-2 bg-gaming-primary/20 text-gaming-primary rounded-xl hover:bg-gaming-primary/30 transition-colors active:scale-95 w-full sm:w-auto">
                         <FolderPlus size={18} />
-                        {lang === 'ru' ? 'Добавить раздел' : 'Илова кардани бахш'}
+                        {t('creator.addSection')}
                     </button>
                 </div>
 
                 {/* Форма добавления раздела */}
                 {showAddSection && (
                     <div className="mb-6 p-4 bg-gaming-bg/50 rounded-2xl border border-gaming-primary/30">
-                        <h3 className="text-lg font-semibold mb-4 text-gaming-primary">{lang === 'ru' ? 'Новый раздел' : 'Бахши нав'}</h3>
+                        <h3 className="text-lg font-semibold mb-4 text-gaming-primary">{t('creator.newSection')}</h3>
                         {renderDualInput(newSectionTitleRu, setNewSectionTitleRu, newSectionTitleTj, setNewSectionTitleTj, handleAutoTranslateSectionRuToTj, handleAutoTranslateSectionTjToRu)}
                         <div className="flex gap-3 mt-4">
                             <button onClick={handleAddSection} className="flex items-center gap-2 px-4 py-2 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors active:scale-95">
-                                <Save size={16} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                                <Save size={16} />{t('creator.save')}
                             </button>
                             <button onClick={() => { setShowAddSection(false); setNewSectionTitleRu(''); setNewSectionTitleTj(''); }} className="px-4 py-2 text-gaming-textMuted hover:text-white transition-colors">
-                                {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                                {t('creator.cancel')}
                             </button>
                         </div>
                     </div>
@@ -970,7 +977,7 @@ const CreatorPage = ({ lang, t }) => {
                 {currentSubjectSyllabus.sections.length === 0 ? (
                     <div className="text-center py-12 text-gaming-textMuted">
                         <Book size={48} className="mx-auto mb-4 opacity-30" />
-                        <p>{lang === 'ru' ? 'Пока нет разделов. Добавьте первый!' : 'Ҳанӯз бахше нест. Аввалинро илова кунед!'}</p>
+                        <p>{t('creator.noSections')}</p>
                     </div>
                 ) : (
                     /* DND CONTEXT - SIMPLE SORTING ONLY */
@@ -995,11 +1002,11 @@ const CreatorPage = ({ lang, t }) => {
                                                             });
                                                         }}
                                                         className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
-                                                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                                                        title={t('creator.editTitle')}
                                                     >
                                                         <Edit3 size={16} />
                                                     </button>
-                                                    <span className="text-sm text-gaming-textMuted">({section.topics?.length || 0} {lang === 'ru' ? 'тем' : 'мавзӯъ'})</span>
+                                                    <span className="text-sm text-gaming-textMuted">({section.topics?.length || 0} {t('creator.themes')})</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }} className="p-2 text-gaming-textMuted hover:text-red-400 transition-colors">
@@ -1011,26 +1018,26 @@ const CreatorPage = ({ lang, t }) => {
                                             {expandedSections[section.id] && (
                                                 <div className="mt-4 ml-8">
                                                     <button onClick={() => setShowAddTopic(section.id)} className="flex items-center gap-2 px-3 py-2 mb-4 text-sm text-gaming-accent hover:bg-gaming-accent/10 rounded-lg transition-colors">
-                                                        <Plus size={16} />{lang === 'ru' ? 'Добавить тему' : 'Илова кардани мавзӯъ'}
+                                                        <Plus size={16} />{t('creator.addTopic')}
                                                     </button>
 
                                                     {showAddTopic === section.id && (
                                                         <div className="mb-4 p-4 bg-gaming-card/50 rounded-xl border border-gaming-accent/30">
-                                                            <h4 className="text-md font-semibold mb-3 text-gaming-accent">{lang === 'ru' ? 'Новая тема' : 'Мавзӯи нав'}</h4>
+                                                            <h4 className="text-md font-semibold mb-3 text-gaming-accent">{t('creator.newTopic')}</h4>
                                                             {renderDualInput(newTopicTitleRu, setNewTopicTitleRu, newTopicTitleTj, setNewTopicTitleTj, handleAutoTranslateTopicRuToTj, handleAutoTranslateTopicTjToRu)}
                                                             <div className="flex gap-3 mt-4">
                                                                 <button onClick={() => handleAddTopic(section.id)} className="flex items-center gap-2 px-3 py-2 bg-gaming-accent text-white rounded-lg hover:bg-gaming-accent/80 transition-colors active:scale-95 text-sm">
-                                                                    <Save size={14} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                                                                    <Save size={14} />{t('creator.save')}
                                                                 </button>
                                                                 <button onClick={() => { setShowAddTopic(null); setNewTopicTitleRu(''); setNewTopicTitleTj(''); }} className="px-3 py-2 text-gaming-textMuted hover:text-white transition-colors text-sm">
-                                                                    {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                                                                    {t('creator.cancel')}
                                                                 </button>
                                                             </div>
                                                         </div>
                                                     )}
 
                                                     {section.topics?.length === 0 ? (
-                                                        <p className="text-sm text-gaming-textMuted">{lang === 'ru' ? 'Нет тем' : 'Мавзӯе нест'}</p>
+                                                        <p className="text-sm text-gaming-textMuted">{t('creator.noTopics')}</p>
                                                     ) : (
                                                         <SortableContext items={section.topics.map(t => t.id)} strategy={verticalListSortingStrategy}>
                                                             <div className="space-y-3">
@@ -1053,14 +1060,14 @@ const CreatorPage = ({ lang, t }) => {
                                                                                             });
                                                                                         }}
                                                                                         className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
-                                                                                        title={lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                                                                                        title={t('creator.editTitle')}
                                                                                     >
                                                                                         <Edit3 size={14} />
                                                                                     </button>
-                                                                                    <span className="text-xs text-gaming-textMuted">({topic.lessons?.length || 0} {lang === 'ru' ? 'уроков' : 'дарс'})</span>
+                                                                                    <span className="text-xs text-gaming-textMuted">({topic.lessons?.length || 0} {t('creator.lessons')})</span>
                                                                                 </div>
                                                                                 <div className="flex items-center gap-1">
-                                                                                    <button onClick={(e) => { e.stopPropagation(); setMoveModal({ type: 'topic', id: topic.id, fromSectionId: section.id }); }} className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors" title={lang === 'ru' ? 'Переместить' : 'Кӯчонидан'}>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); setMoveModal({ type: 'topic', id: topic.id, fromSectionId: section.id }); }} className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors" title={t('creator.move')}>
                                                                                         <ArrowRightLeft size={14} />
                                                                                     </button>
                                                                                     <button onClick={(e) => { e.stopPropagation(); handleDeleteTopic(section.id, topic.id); }} className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors">
@@ -1072,26 +1079,26 @@ const CreatorPage = ({ lang, t }) => {
                                                                             {expandedTopics[topic.id] && (
                                                                                 <div className="mt-3 ml-6">
                                                                                     <button onClick={() => setShowAddLesson({ sectionId: section.id, topicId: topic.id })} className="flex items-center gap-2 px-2 py-1 mb-3 text-xs text-gaming-pink hover:bg-gaming-pink/10 rounded-lg transition-colors">
-                                                                                        <Plus size={14} />{lang === 'ru' ? 'Добавить урок' : 'Илова кардани дарс'}
+                                                                                        <Plus size={14} />{t('creator.addLesson')}
                                                                                     </button>
 
                                                                                     {showAddLesson?.sectionId === section.id && showAddLesson?.topicId === topic.id && (
                                                                                         <div className="mb-3 p-3 bg-gaming-bg/50 rounded-lg border border-gaming-pink/30">
-                                                                                            <h5 className="text-sm font-semibold mb-3 text-gaming-pink">{lang === 'ru' ? 'Новый урок' : 'Дарси нав'}</h5>
+                                                                                            <h5 className="text-sm font-semibold mb-3 text-gaming-pink">{t('creator.newLesson')}</h5>
                                                                                             {renderDualInput(newLessonTitleRu, setNewLessonTitleRu, newLessonTitleTj, setNewLessonTitleTj, handleAutoTranslateLessonRuToTj, handleAutoTranslateLessonTjToRu)}
                                                                                             <div className="flex gap-2 mt-4">
                                                                                                 <button onClick={() => handleAddLesson(section.id, topic.id)} className="flex items-center gap-2 px-3 py-2 bg-gaming-pink text-white rounded-lg hover:bg-gaming-pink/80 transition-colors active:scale-95 text-xs">
-                                                                                                    <Save size={12} />{lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                                                                                                    <Save size={12} />{t('creator.save')}
                                                                                                 </button>
                                                                                                 <button onClick={() => { setShowAddLesson(null); setNewLessonTitleRu(''); setNewLessonTitleTj(''); }} className="px-3 py-2 text-gaming-textMuted hover:text-white transition-colors text-xs">
-                                                                                                    {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                                                                                                    {t('creator.cancel')}
                                                                                                 </button>
                                                                                             </div>
                                                                                         </div>
                                                                                     )}
 
                                                                                     {topic.lessons?.length === 0 ? (
-                                                                                        <p className="text-xs text-gaming-textMuted">{lang === 'ru' ? 'Нет уроков' : 'Дарсе нест'}</p>
+                                                                                        <p className="text-xs text-gaming-textMuted">{t('creator.noLessons')}</p>
                                                                                     ) : (
                                                                                         <SortableContext items={topic.lessons.map(l => l.id)} strategy={verticalListSortingStrategy}>
                                                                                             <div className="space-y-2">
@@ -1179,7 +1186,7 @@ const CreatorPage = ({ lang, t }) => {
                     <div className="w-full max-w-md bg-gaming-card/95 backdrop-blur-xl rounded-2xl border border-gaming-primary/30 p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
                         <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                             <Edit3 className="text-gaming-primary" size={24} />
-                            {lang === 'ru' ? 'Редактировать название' : 'Таҳрири ном'}
+                            {t('creator.editTitle')}
                         </h3>
 
                         {renderDualInput(
@@ -1203,13 +1210,13 @@ const CreatorPage = ({ lang, t }) => {
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors font-medium shadow-lg shadow-gaming-primary/20"
                             >
                                 <Save size={18} />
-                                {lang === 'ru' ? 'Сохранить' : 'Нигоҳ доштан'}
+                                {t('creator.save')}
                             </button>
                             <button
                                 onClick={() => setRenameModal(null)}
                                 className="px-4 py-3 bg-white/5 text-gaming-textMuted hover:text-white rounded-xl hover:bg-white/10 transition-colors"
                             >
-                                {lang === 'ru' ? 'Отмена' : 'Бекор кардан'}
+                                {t('creator.cancel')}
                             </button>
                         </div>
                     </div>

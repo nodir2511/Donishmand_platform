@@ -3,8 +3,13 @@ import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Book, FileText, PlayCircle, Home, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
 import { useSyllabus } from '../../contexts/SyllabusContext';
+import { useTranslation } from 'react-i18next';
 
-const CourseSidebar = ({ subjectId, lang }) => {
+
+
+const CourseSidebar = ({ subjectId }) => {
+    const { i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const location = useLocation();
     const { subjectData, loading } = useSyllabus();
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;

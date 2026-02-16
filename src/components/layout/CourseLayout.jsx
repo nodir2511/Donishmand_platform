@@ -3,7 +3,7 @@ import { Menu, X } from 'lucide-react';
 import CourseSidebar from './CourseSidebar';
 import { SyllabusProvider } from '../../contexts/SyllabusContext';
 
-const CourseLayout = ({ subjectId, lang, children }) => {
+const CourseLayout = ({ subjectId, children }) => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     return (
@@ -11,7 +11,7 @@ const CourseLayout = ({ subjectId, lang, children }) => {
             <div className="flex min-h-[calc(100vh-6rem)]">
                 {/* Боковая панель (десктоп) */}
                 <div className="hidden lg:block sticky top-24 h-[calc(100vh-6rem)]">
-                    <CourseSidebar subjectId={subjectId} lang={lang} />
+                    <CourseSidebar subjectId={subjectId} />
                 </div>
 
                 {/* Оверлей боковой панели (мобильный) */}
@@ -21,7 +21,7 @@ const CourseLayout = ({ subjectId, lang, children }) => {
 
                 {/* Выдвижная боковая панель (мобильный) */}
                 <div className={`lg:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                    <CourseSidebar subjectId={subjectId} lang={lang} />
+                    <CourseSidebar subjectId={subjectId} />
                 </div>
 
                 {/* Основной контент */}

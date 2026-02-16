@@ -3,10 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PlayCircle, FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats, getLessonStats } from '../../utils/progressHelpers';
+import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const TopicContent = ({ lang, t, subjectId, sectionId, topicId, isTeacher, navigate }) => {
+const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
     if (loading) {
@@ -25,9 +28,9 @@ const TopicContent = ({ lang, t, subjectId, sectionId, topicId, isTeacher, navig
     if (!topicData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[40vh] text-white">
-                <h2 className="text-2xl mb-4">{t.topicNotFound}</h2>
+                <h2 className="text-2xl mb-4">{t('topicNotFound')}</h2>
                 <button onClick={() => navigate(`/subject/${subjectId}/section/${sectionId}`)} className="text-gaming-primary hover:underline">
-                    {t.backToSection}
+                    {t('backToSection')}
                 </button>
             </div>
         );
@@ -47,10 +50,10 @@ const TopicContent = ({ lang, t, subjectId, sectionId, topicId, isTeacher, navig
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all group w-fit"
                 >
                     <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">{t.backToSection}</span>
+                    <span className="text-sm font-medium">{t('backToSection')}</span>
                 </button>
                 <p className="text-gaming-textMuted">
-                    {topicData.lessons.length} {t.lessonsCount}
+                    {topicData.lessons.length} {t('lessonsCount')}
                 </p>
             </div>
 
@@ -120,16 +123,18 @@ const TopicContent = ({ lang, t, subjectId, sectionId, topicId, isTeacher, navig
     );
 };
 
-const TopicPage = ({ lang, t, userRole }) => {
+import { useAuth } from '../../contexts/AuthContext';
+
+// ...
+
+const TopicPage = () => {
     const { subjectId, sectionId, topicId } = useParams();
     const navigate = useNavigate();
-    const isTeacher = userRole === 'teacher';
+    const { isTeacher } = useAuth();
 
     return (
-        <CourseLayout subjectId={subjectId} lang={lang}>
+        <CourseLayout subjectId={subjectId}>
             <TopicContent
-                lang={lang}
-                t={t}
                 subjectId={subjectId}
                 sectionId={sectionId}
                 topicId={topicId}

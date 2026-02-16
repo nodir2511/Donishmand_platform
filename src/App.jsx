@@ -1,9 +1,9 @@
 import React, { useState, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './components/pages/HomePage';
-import { TRANSLATIONS } from './constants/data';
 
 // Ленивая загрузка тяжёлых страниц (code-splitting)
 const SubjectPage = React.lazy(() => import('./components/pages/SubjectPage'));
@@ -11,6 +11,7 @@ const SectionPage = React.lazy(() => import('./components/pages/SectionPage'));
 const TopicPage = React.lazy(() => import('./components/pages/TopicPage'));
 const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
 const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
+const AdminPage = React.lazy(() => import('./components/pages/AdminPage'));
 const AuthPage = React.lazy(() => import('./components/pages/AuthPage'));
 const NotFoundPage = React.lazy(() => import('./components/pages/NotFoundPage'));
 
@@ -24,10 +25,13 @@ const PageLoader = () => (
     </div>
 );
 
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+
+// ... (existing imports)
+
 function AppContent() {
-    const [lang, setLang] = useState('tj');
-    const [userRole, setUserRole] = useState('student'); // 'student' | 'teacher'
-    const t = TRANSLATIONS[lang];
+    const { i18n } = useTranslation();
     const location = useLocation();
 
     // Прокрутка наверх при смене маршрута
@@ -37,33 +41,54 @@ function AppContent() {
 
     return (
         <div className="min-h-screen bg-gaming-bg font-sans text-white selection:bg-gaming-pink/30 selection:text-white overflow-hidden flex flex-col">
-            <Navbar lang={lang} setLang={setLang} t={t} />
+            <Navbar />
 
             <main className="flex-grow pt-24">
                 <Suspense fallback={<PageLoader />}>
                     <Routes>
-                        <Route path="/" element={<HomePage lang={lang} t={t} setLang={setLang} userRole={userRole} setUserRole={setUserRole} />} />
-                        <Route path="/subject/:subjectId" element={<SubjectPage lang={lang} t={t} userRole={userRole} />} />
-                        <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage lang={lang} t={t} userRole={userRole} />} />
-                        <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage lang={lang} t={t} userRole={userRole} />} />
-                        <Route path="/lesson/:lessonId" element={<LessonPage lang={lang} t={t} userRole={userRole} />} />
-                        <Route path="/creator" element={<CreatorPage lang={lang} t={t} />} />
-                        <Route path="/login" element={<AuthPage lang={lang} t={t} />} />
-                        <Route path="*" element={<NotFoundPage lang={lang} t={t} />} />
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/subject/:subjectId" element={<SubjectPage />} />
+                        <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage />} />
+                        <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage />} />
+                        <Route path="/lesson/:lessonId" element={<LessonPage />} />
+
+                        {/* Protected Route for Creator */}
+                        <Route
+                            path="/creator"
+                            element={
+                                <ProtectedRoute requireTeacher={true}>
+                                    <CreatorPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/admin"
+                            element={
+                                <ProtectedRoute requireSuperAdmin={true}>
+                                    <AdminPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route path="/login" element={<AuthPage />} />
+                        <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                 </Suspense>
             </main>
 
-            <Footer t={t} />
+            <Footer />
         </div>
     );
 }
 
 function App() {
     return (
-        <Router basename={import.meta.env.BASE_URL}>
-            <AppContent />
-        </Router>
+        <AuthProvider>
+            <Router basename={import.meta.env.BASE_URL}>
+                <AppContent />
+            </Router>
+        </AuthProvider>
     );
 }
 

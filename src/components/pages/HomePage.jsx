@@ -1,50 +1,37 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import HeroSection from '../sections/HeroSection';
 import ClusterSelect from '../features/ClusterSelect';
 import CourseCard from '../features/CourseCard';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
+import { useAuth } from '../../contexts/AuthContext';
 
-const HomePage = ({ lang, t, setLang, userRole, setUserRole }) => {
+const HomePage = () => {
+    const { t, i18n } = useTranslation();
     const [activeClusterId, setActiveClusterId] = useState(0);
+    const lang = i18n.resolvedLanguage || 'ru';
+    // const { isTeacher } = useAuth(); // Можно использовать если нужно
 
     let subjectsToDisplay = [];
     let sectionTitle = "";
 
     if (activeClusterId === 0) {
         subjectsToDisplay = ALL_SUBJECTS_LIST;
-        sectionTitle = t.allSubjects;
+        sectionTitle = t('allSubjects');
     } else {
         const cluster = CLUSTERS_STRUCTURE.find(c => c.id === activeClusterId);
         subjectsToDisplay = cluster ? cluster.subjects : [];
-        sectionTitle = `${t.cluster} ${activeClusterId}: ${lang === 'ru' ? cluster.titleRu : cluster.titleTj}`;
+        sectionTitle = `${t('cluster')} ${activeClusterId}: ${lang === 'ru' ? cluster.titleRu : cluster.titleTj}`;
     }
 
     return (
         <main className="relative">
-            {/* Переключатель роли (Временный) */}
-            <div className="absolute top-24 right-4 z-40 bg-black/60 backdrop-blur-md p-1.5 rounded-xl border border-white/10 flex gap-1 shadow-2xl">
-                <button
-                    onClick={() => setUserRole('student')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'student' ? 'bg-gaming-primary text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
-                >
-                    {t.studentRole}
-                </button>
-                <button
-                    onClick={() => setUserRole('teacher')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${userRole === 'teacher' ? 'bg-gaming-pink text-white shadow-lg' : 'text-gaming-textMuted hover:text-white hover:bg-white/5'}`}
-                >
-                    {t.teacherRole}
-                </button>
-            </div>
-
-            <HeroSection lang={lang} t={t} />
+            <HeroSection />
 
             {/* КОНТЕЙНЕР ВКЛАДОК */}
             <ClusterSelect
                 activeClusterId={activeClusterId}
                 setActiveClusterId={setActiveClusterId}
-                lang={lang}
-                t={t}
             />
 
             {/* СЕТКА ПРЕДМЕТОВ */}
@@ -54,20 +41,24 @@ const HomePage = ({ lang, t, setLang, userRole, setUserRole }) => {
                         <h2 className="text-3xl font-bold text-white tracking-tight drop-shadow-lg">
                             {sectionTitle}
                         </h2>
-                        <p className="text-gaming-textMuted mt-2 text-lg">{t.popularSubtitle}</p>
+                        <p className="text-gaming-textMuted mt-2 text-lg">{t('popularSubtitle')}</p>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
-                    {subjectsToDisplay.map((subjectId, index) => (
-                        <CourseCard
-                            key={`${activeClusterId}-${subjectId}-${index}`}
-                            subjectId={subjectId}
-                            lang={lang}
-                            t={t}
-                        />
-                    ))}
-                </div>
+                {subjectsToDisplay.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
+                        {subjectsToDisplay.map((subjectId, index) => (
+                            <CourseCard
+                                key={`${activeClusterId}-${subjectId}-${index}`}
+                                subjectId={subjectId}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
+                        <p className="text-white/60 text-lg">Нет доступных предметов</p>
+                    </div>
+                )}
             </div>
         </main>
     );

@@ -136,8 +136,8 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                 <div>
                                                     <p className="text-xs text-gaming-textMuted uppercase mb-2">{lang === 'ru' ? 'Элементы' : 'Элементҳо'}</p>
                                                     {q.leftItems.map((item, i) => (
-                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
-                                                            <span className="text-gaming-pink font-bold mt-0.5">{String.fromCharCode(65 + i)})</span>
+                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-baseline">
+                                                            <span className="text-gaming-pink font-bold">{String.fromCharCode(65 + i)})</span>
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-white/80" dangerouslySetInnerHTML={{ __html: getOptionText(item) }} />
                                                                 {item.image && (
@@ -150,8 +150,8 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                                 <div>
                                                     <p className="text-xs text-gaming-textMuted uppercase mb-2">{lang === 'ru' ? 'Определения' : 'Таърифҳо'}</p>
                                                     {q.rightItems.map((item, i) => (
-                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-start">
-                                                            <span className="text-gaming-accent font-bold mt-0.5">{i + 1})</span>
+                                                        <div key={item.id} className="mb-2 text-sm flex gap-2 items-baseline">
+                                                            <span className="text-gaming-accent font-bold">{i + 1})</span>
                                                             <div className="flex flex-col gap-1">
                                                                 <span className="text-white/80" dangerouslySetInnerHTML={{ __html: getOptionText(item) }} />
                                                                 {item.image && (

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Play, FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Clock, RotateCcw, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
 import SlidesViewer from '../viewer/SlidesViewer';
@@ -11,7 +12,13 @@ import { renderKatex } from '../../utils/katexRenderer';
 // Ключи для отслеживания прогресса
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
 
-const LessonPage = ({ lang, t, userRole }) => {
+import { useAuth } from '../../contexts/AuthContext';
+
+//...
+
+const LessonPage = () => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const { lessonId } = useParams();
     const navigate = useNavigate();
     const PASS_THRESHOLD = 80;
@@ -33,7 +40,7 @@ const LessonPage = ({ lang, t, userRole }) => {
     const [showTestViewer, setShowTestViewer] = useState(false);
 
     // Определяем режим учителя
-    const isTeacher = userRole === 'teacher';
+    const { isTeacher } = useAuth();
 
     // ЗАГРУЗКА ДАННЫХ
     useEffect(() => {
@@ -224,9 +231,9 @@ const LessonPage = ({ lang, t, userRole }) => {
     if (!lessonData) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center text-white bg-gaming-bg">
-                <h2 className="text-2xl mb-4">{t.lessonNotFound}</h2>
+                <h2 className="text-2xl mb-4">{t('lesson.notFound')}</h2>
                 <button onClick={() => navigate(-1)} className="text-gaming-primary hover:underline">
-                    {t.errorBack}
+                    {t('lesson.back')}
                 </button>
             </div>
         );
@@ -240,12 +247,12 @@ const LessonPage = ({ lang, t, userRole }) => {
 
     // Доступные вкладки на основе контента
     const availableTabs = [];
-    if (hasVideo) availableTabs.push({ id: 'video', icon: Video, label: { ru: 'Видео', tj: 'Видео' }, complete: progress.videoWatched });
-    if (hasText) availableTabs.push({ id: 'text', icon: FileText, label: { ru: 'Конспект', tj: 'Матн' }, complete: progress.textRead });
-    if (hasSlides) availableTabs.push({ id: 'slides', icon: Presentation, label: { ru: 'Слайды', tj: 'Слайдҳо' }, complete: allSlidesViewed });
+    if (hasVideo) availableTabs.push({ id: 'video', icon: Video, label: 'lesson.video', complete: progress.videoWatched });
+    if (hasText) availableTabs.push({ id: 'text', icon: FileText, label: 'lesson.text', complete: progress.textRead });
+    if (hasSlides) availableTabs.push({ id: 'slides', icon: Presentation, label: 'lesson.slides', complete: allSlidesViewed });
 
     return (
-        <CourseLayout subjectId={subjectKey} lang={lang}>
+        <CourseLayout subjectId={subjectKey}>
             <div className="max-w-4xl">
                 {/* Шапка */}
                 <header className="mb-6">
@@ -260,12 +267,12 @@ const LessonPage = ({ lang, t, userRole }) => {
                         className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all mb-4 group w-fit"
                     >
                         <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                        <span className="text-sm font-medium">{t.backToTopic}</span>
+                        <span className="text-sm font-medium">{t('lesson.backToTopic')}</span>
                     </button>
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-sm text-gaming-textMuted mb-1">
-                                {lang === 'ru' ? 'Урок' : 'Дарс'} {lessonIndex + 1} / {topic?.lessons?.length || 0}
+                                {t('lesson.lesson')} {lessonIndex + 1} / {topic?.lessons?.length || 0}
                             </p>
                             <h1 className="text-3xl font-bold mb-2 text-gaming-pink">
                                 {lessonIndex + 1}. {getTitle(lesson)}
@@ -278,7 +285,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                         </div>
                         {isTeacher && (
                             <div className="px-3 py-1 bg-gaming-pink text-white text-xs font-bold rounded-full uppercase tracking-wider animate-pulse">
-                                {t.teacherMode}
+                                {t('lesson.teacherMode')}
                             </div>
                         )}
                     </div>
@@ -290,9 +297,9 @@ const LessonPage = ({ lang, t, userRole }) => {
                         <div className="relative z-10">
                             <div className="flex justify-between items-end mb-4">
                                 <div>
-                                    <h4 className="font-bold text-lg mb-1">{t.lessonProgress}</h4>
+                                    <h4 className="font-bold text-lg mb-1">{t('lesson.progress')}</h4>
                                     <p className="text-gaming-textMuted text-sm">
-                                        {completedSteps} / {totalSteps} {lang === 'ru' ? 'этапов завершено' : 'марҳила анҷом ёфт'}
+                                        {completedSteps} / {totalSteps} {t('lesson.stepsCompleted')}
                                     </p>
                                 </div>
                                 <div className="text-right">
@@ -316,7 +323,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.videoWatched ? 'bg-green-500/20' : 'bg-white/10'}`}>
                                             {progress.videoWatched ? <Check size={20} /> : <Video size={20} />}
                                         </div>
-                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Видео' : 'Видео'}</span>
+                                        <span className="font-medium text-sm">{t('lesson.video')}</span>
                                     </div>
                                 )}
 
@@ -327,7 +334,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.textRead ? 'bg-green-500/20' : 'bg-white/10'}`}>
                                             {progress.textRead ? <Check size={20} /> : <FileText size={20} />}
                                         </div>
-                                        <span className="font-medium text-sm">{lang === 'ru' ? 'Текст' : 'Матн'}</span>
+                                        <span className="font-medium text-sm">{t('lesson.text')}</span>
                                     </div>
                                 )}
 
@@ -339,7 +346,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                             {allSlidesViewed ? <Check size={20} /> : <Presentation size={20} />}
                                         </div>
                                         <div className="flex flex-col items-center">
-                                            <span className="font-medium text-sm">{lang === 'ru' ? 'Слайды' : 'Слайдҳо'}</span>
+                                            <span className="font-medium text-sm">{t('lesson.slides')}</span>
                                             <span className="text-xs opacity-70">{viewedSlidesCount}/{totalSlides}</span>
                                         </div>
                                     </div>
@@ -353,7 +360,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                             {testStats?.isPassed ? <Check size={20} /> : <CheckCircle size={20} />}
                                         </div>
                                         <div className="flex flex-col items-center">
-                                            <span className="font-medium text-sm">{lang === 'ru' ? 'Тест' : 'Тест'}</span>
+                                            <span className="font-medium text-sm">{t('lesson.test')}</span>
                                             {testStats && <span className="text-xs font-bold">{testStats.bestScore}%</span>}
                                         </div>
                                     </div>
@@ -367,14 +374,14 @@ const LessonPage = ({ lang, t, userRole }) => {
                                 <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
                                     <RotateCcw size={18} className="text-gaming-gold" />
                                     <div>
-                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Попыток' : 'Кӯшишҳо'}</div>
+                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{t('lesson.attempts')}</div>
                                         <div className="font-bold text-white">{testStats.totalAttempts}</div>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
                                     <Clock size={18} className="text-gaming-primary" />
                                     <div>
-                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{lang === 'ru' ? 'Последняя' : 'Охирин'}</div>
+                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{t('lesson.lastAttempt')}</div>
                                         <div className="font-bold text-white">
                                             {testStats.lastAttemptAt ? new Intl.DateTimeFormat(lang === 'tj' ? 'tg-TJ' : 'ru-RU', {
                                                 day: 'numeric',
@@ -405,7 +412,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                             className={`pb-3 px-2 text-base font-semibold transition-all relative flex items-center gap-2 whitespace-nowrap ${activeTab === tab.id ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}
                                         >
                                             <Icon size={18} />
-                                            {tab.label[lang]}
+                                            {t(tab.label)}
                                             {tab.complete && !isTeacher && (
                                                 <Check size={14} className="text-green-400" />
                                             )}
@@ -463,7 +470,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                                 className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
                                             >
                                                 <Eye size={16} />
-                                                {lang === 'ru' ? 'Отметить как просмотренное' : 'Ҳамчун дидашуда қайд кунед'}
+                                                {t('lesson.markAsWatched')}
                                             </button>
                                         )}
                                     </div>
@@ -486,7 +493,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                                 className="mt-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
                                             >
                                                 <Eye size={16} />
-                                                {lang === 'ru' ? 'Отметить как прочитанное' : 'Ҳамчун хондашуда қайд кунед'}
+                                                {t('lesson.markAsRead')}
                                             </button>
                                         )}
                                     </div>
@@ -496,14 +503,14 @@ const LessonPage = ({ lang, t, userRole }) => {
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
                                             <p className="text-gaming-textMuted">
-                                                {viewedSlidesCount} / {totalSlides} {lang === 'ru' ? 'слайдов просмотрено' : 'слайд дида шуд'}
+                                                {viewedSlidesCount} / {totalSlides} {t('lesson.slidesCount')}
                                             </p>
                                             <button
                                                 onClick={() => setShowSlidesViewer(true)}
                                                 className="flex items-center gap-2 px-4 py-2 bg-gaming-gold/20 text-gaming-gold rounded-xl hover:bg-gaming-gold/30 transition-colors"
                                             >
                                                 <Presentation size={18} />
-                                                {lang === 'ru' ? 'Открыть презентацию' : 'Кушодани презентатсия'}
+                                                {t('lesson.openPresentation')}
                                             </button>
                                         </div>
                                         <div className="flex flex-col gap-6">
@@ -549,10 +556,10 @@ const LessonPage = ({ lang, t, userRole }) => {
                     <div className="bg-gaming-card/40 backdrop-blur-xl rounded-2xl border border-white/5 p-8 mb-6 text-center">
                         <ClipboardList size={48} className="mx-auto mb-4 text-gaming-primary opacity-50" />
                         <h3 className="text-xl font-semibold mb-2">
-                            {lang === 'ru' ? 'Тестирование' : 'Санҷиш'}
+                            {t('lesson.testing')}
                         </h3>
                         <p className="text-gaming-textMuted mb-4">
-                            {lang === 'ru' ? 'Этот урок содержит только тест.' : 'Ин дарс танҳо тест дорад.'}
+                            {t('lesson.onlyTest')}
                         </p>
                     </div>
                 )}
@@ -564,31 +571,29 @@ const LessonPage = ({ lang, t, userRole }) => {
                             <div className="flex items-center gap-3 text-red-400 mb-4">
                                 <AlertCircle size={24} />
                                 <h3 className="text-lg font-semibold">
-                                    {lang === 'ru' ? 'Просмотрите материалы' : 'Маводҳоро бинед'}
+                                    {t('lesson.reviewMaterialsTitle')}
                                 </h3>
                             </div>
                             <p className="text-gaming-textMuted mb-4">
-                                {lang === 'ru'
-                                    ? 'Перед началом теста необходимо просмотреть все материалы урока:'
-                                    : 'Пеш аз оғози тест бояд ҳамаи маводҳои дарсро бинед:'}
+                                {t('lesson.reviewMaterialsText')}
                             </p>
                             <ul className="space-y-2 mb-6">
                                 {hasVideo && (
                                     <li className={`flex items-center gap-2 ${progress.videoWatched ? 'text-green-400' : 'text-red-400'}`}>
                                         {progress.videoWatched ? <Check size={16} /> : <AlertCircle size={16} />}
-                                        {lang === 'ru' ? 'Видео' : 'Видео'}
+                                        {t('lesson.video')}
                                     </li>
                                 )}
                                 {hasText && (
                                     <li className={`flex items-center gap-2 ${progress.textRead ? 'text-green-400' : 'text-red-400'}`}>
                                         {progress.textRead ? <Check size={16} /> : <AlertCircle size={16} />}
-                                        {lang === 'ru' ? 'Текст' : 'Матн'}
+                                        {t('lesson.text')}
                                     </li>
                                 )}
                                 {hasSlides && (
                                     <li className={`flex items-center gap-2 ${allSlidesViewed ? 'text-green-400' : 'text-red-400'}`}>
                                         {allSlidesViewed ? <Check size={16} /> : <AlertCircle size={16} />}
-                                        {lang === 'ru' ? `Слайды (${viewedSlidesCount}/${totalSlides})` : `Слайдҳо (${viewedSlidesCount}/${totalSlides})`}
+                                        {t('lesson.slides')} ({viewedSlidesCount}/{totalSlides})
                                     </li>
                                 )}
                             </ul>
@@ -596,7 +601,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                 onClick={() => setShowTestWarning(false)}
                                 className="w-full px-4 py-3 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80 transition-colors"
                             >
-                                {lang === 'ru' ? 'Понятно' : 'Фаҳмидам'}
+                                {t('lesson.understood')}
                             </button>
                         </div>
                     </div>
@@ -611,7 +616,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gaming-textMuted hover:text-white transition-colors text-sm"
                             >
                                 <ChevronLeft size={16} />
-                                <span className="hidden sm:inline">{lang === 'ru' ? 'Предыдущий' : 'Пешина'}</span>
+                                <span className="hidden sm:inline">{t('lesson.prev')}</span>
                             </button>
                         )}
                         {nextLesson && (
@@ -619,7 +624,7 @@ const LessonPage = ({ lang, t, userRole }) => {
                                 onClick={() => navigate(`/lesson/${nextLesson.id}`)}
                                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-gaming-textMuted hover:text-white transition-colors text-sm"
                             >
-                                <span className="hidden sm:inline">{lang === 'ru' ? 'Следующий' : 'Оянда'}</span>
+                                <span className="hidden sm:inline">{t('lesson.next')}</span>
                                 <ChevronRight size={16} />
                             </button>
                         )}
@@ -634,8 +639,8 @@ const LessonPage = ({ lang, t, userRole }) => {
                         {isTeacher ? <Eye size={20} /> : <CheckCircle size={20} />}
                         <span>
                             {isTeacher
-                                ? (lang === 'ru' ? 'Просмотреть тест' : 'Дидани тест')
-                                : (lang === 'ru' ? 'Пройти тест' : 'Супоридани тест')
+                                ? t('lesson.viewTest')
+                                : t('lesson.takeTest')
                             }
                         </span>
                         {!canTakeTest && <AlertCircle size={16} className="text-yellow-400" />}
@@ -649,7 +654,6 @@ const LessonPage = ({ lang, t, userRole }) => {
                 <SlidesViewer
                     slides={currentSlides}
                     lessonId={lessonId}
-                    lang={lang}
                     onClose={() => setShowSlidesViewer(false)}
                     onSlideView={handleSlideView}
                 />

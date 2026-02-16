@@ -4,10 +4,13 @@ import { Book, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats } from '../../utils/progressHelpers';
+import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }) => {
+const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
     if (loading) {
@@ -21,9 +24,9 @@ const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }
     if (!subjectData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[40vh] text-white">
-                <h2 className="text-2xl mb-4">{t.subjectNotFound}</h2>
+                <h2 className="text-2xl mb-4">{t('subjectNotFound')}</h2>
                 <button onClick={() => navigate('/')} className="text-gaming-primary hover:underline">
-                    {t.backToMain}
+                    {t('backToMain')}
                 </button>
             </div>
         );
@@ -41,10 +44,10 @@ const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all group w-fit"
                 >
                     <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">{t.backToMain}</span>
+                    <span className="text-sm font-medium">{t('backToMain')}</span>
                 </button>
                 <p className="text-gaming-textMuted text-lg">
-                    {t.selectSection}
+                    {t('selectSection')}
                 </p>
             </div>
 
@@ -55,10 +58,10 @@ const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }
                             <Book size={36} className="text-gaming-primary" />
                         </div>
                         <h3 className="text-xl font-bold text-white mb-2">
-                            {t.contentDeveloping}
+                            {t('contentDeveloping')}
                         </h3>
                         <p className="text-gaming-textMuted max-w-md">
-                            {t.contentComingSoon}
+                            {t('contentComingSoon')}
                         </p>
                     </div>
                 ) : subjectData.sections.map((section, index) => {
@@ -80,7 +83,7 @@ const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }
                                     {index + 1}. {getTitle(section)}
                                 </h3>
                                 <p className="text-sm text-gaming-textMuted">
-                                    {section.topics.length} {t.themesCount} • {section.topics.reduce((acc, t) => acc + t.lessons.length, 0)} {t.lessonsCount}
+                                    {section.topics.length} {t('themesCount')} • {section.topics.reduce((acc, t) => acc + t.lessons.length, 0)} {t('lessonsCount')}
                                 </p>
                             </div>
 
@@ -102,18 +105,21 @@ const SubjectContent = ({ lang, t, subjectId, subjectName, isTeacher, navigate }
     );
 };
 
-const SubjectPage = ({ lang, t, userRole }) => {
+import { useAuth } from '../../contexts/AuthContext';
+
+// ...
+
+const SubjectPage = () => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const { subjectId } = useParams();
     const navigate = useNavigate();
-
-    const isTeacher = userRole === 'teacher';
+    const { isTeacher } = useAuth(); // Используем хук вместо пропса
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
 
     return (
-        <CourseLayout subjectId={subjectId} lang={lang}>
+        <CourseLayout subjectId={subjectId}>
             <SubjectContent
-                lang={lang}
-                t={t}
                 subjectId={subjectId}
                 subjectName={subjectName}
                 isTeacher={isTeacher}

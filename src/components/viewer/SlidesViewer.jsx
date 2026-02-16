@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Maximize2, Check } from 'lucide-react';
 
-const SlidesViewer = ({ slides, lessonId, lang, onClose, onSlideView }) => {
+const SlidesViewer = ({ slides, lessonId, onClose, onSlideView }) => {
+    const { i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const containerRef = React.useRef(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isFullscreen, setIsFullscreen] = useState(false);

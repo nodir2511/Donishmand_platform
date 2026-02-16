@@ -40,40 +40,26 @@ The platform follows a premium "Gaming/Cyberpunk" educational aesthetic.
   - `/src/services`: API and utility services (translationService).
   - `/src/constants`: Global data and translations (`data.jsx`).
   - `/src/utils`: Helper functions (syllabusHelpers).
+  - `/src/contexts`: React Contexts (AuthContext, SyllabusContext).
 - **JSX Extension**: All files containing JSX **must** use the `.jsx` extension to avoid Vite parsing errors.
 
 ## 3. Localization Strategy
-- All UI text must be stored in `src/constants/data.jsx`.
+- All UI text must be stored in `src/constants/data.jsx` or specialized JSON files (via i18next).
 - Supports `tj` (Tajik) and `ru` (Russian).
-- Use the `t` object passed through props for dynamic text switching.
-- **Auto-Translation**: Use `translationService.js` for RU→TJ translation:
-  ```javascript
-  import { translateText } from '../../services/translationService';
-  
-  const translated = await translateText(text, 'ru', 'tj');
-  ```
-- Service uses Google Translate API with dictionary fallback for educational terms.
+- **Library**: Use `react-i18next` (`useTranslation` hook).
+- **Auto-Translation**: Use `translationService.js` for RU→TJ translation helper.
 
 ## 4. Interaction Design
 - **Animations**: Use `animate-fade-in-up` for new content and `animate-float` or `animate-pulse-slow` for decorative background elements.
 - **Micro-interactions**: Every button must have a scale-down effect on active state (`active:scale-95`) and a smooth transition (`transition-all duration-300`).
 - **Responsive**: Mobile-first approach. Use horizontal scrolling for tabs/categories on mobile.
-- **Drag-and-Drop**: Use `@dnd-kit` library for sortable lists:
-  ```javascript
-  import { DndContext, closestCenter } from '@dnd-kit/core';
-  import { SortableContext, useSortable } from '@dnd-kit/sortable';
-  ```
+- **Drag-and-Drop**: Use `@dnd-kit` library for sortable lists.
 
 ## 5. Content Editor Patterns
 When creating content editors for dual-language input:
 - Always include RU and TJ input fields
-- Add Sparkles button for auto-translation with loading indicator:
-  ```jsx
-  <button onClick={handleTranslate} disabled={translating}>
-    {translating ? <Loader2 className="animate-spin" /> : <Sparkles />}
-  </button>
-  ```
-- Use async/await pattern with try/finally for translation state
+- Add Sparkles button for auto-translation with loading indicator.
+- Use async/await pattern with try/finally for translation state.
 
 ## 6. Test Question Types
 The platform supports 3 test question types:
@@ -95,19 +81,12 @@ Fullscreen modals should:
 - Include `bg-black/80 backdrop-blur-sm` overlay
 - Have close button in header
 - Support keyboard navigation (ESC to close)
-```jsx
-<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-  <div className="w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10">
-    {/* Content */}
-  </div>
-</div>
-```
 
 ## 9. Language and Documentation Policy
 - **Implementation Plans**: Always provide implementation plans, design documents, and explanations in Russian.
-- **Code Comments**: All future comments within the code files must be written in Russian to ensure consistency for the development team.
+- **Code Comments**: All future comments within the code files must be written in Russian.
 - **Task Tracking**: Maintain `task.md`, `walkthrough.md`, and other development artifacts in Russian.
-- **Change Log**: Documentation updates (especially `walkthrough.md`) must written in **Russian** and include the **date** of the modification (e.g., `(12.02.2026)`).
+- **Change Log**: Documentation updates must be written in **Russian** and include the **date**.
 
 ## 10. Implementation Plans and Approval
 - **Mandatory Planning**: Before starting any non-trivial implementation or refactoring, always create an `implementation_plan.md`.
@@ -115,12 +94,13 @@ Fullscreen modals should:
 - **Explicit Approval**: DO NOT start the implementation phase (EXECUTION) until the USER has explicitly reviewed the plan and given approval to proceed.
 
 ## 11. Code-Splitting (Разделение кода)
-- **Принцип**: Тяжёлые компоненты должны загружаться **лениво** через `React.lazy()` и `Suspense`, чтобы уменьшить размер начальной загрузки.
-- **Правило для страниц**: Все страницы **кроме `HomePage`** должны быть lazy-импортированы в `App.jsx`:
-  ```javascript
-  const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
-  const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
-  ```
+- **Принцип**: Тяжёлые компоненты должны загружаться **лениво** через `React.lazy()` и `Suspense`.
+- **Правило для страниц**: Все страницы **кроме `HomePage`** должны быть lazy-импортированы в `App.jsx`.
 - **Suspense обёртка**: `<Routes>` должен быть обёрнут в `<Suspense fallback={<PageLoader />}>`.
-- **Новые компоненты**: Если создаётся новая страница или тяжёлый компонент (>30 KB исходного кода), его **обязательно** подключать через `React.lazy()`.
-- **Не разделять**: Мелкие общие компоненты (Navbar, Footer, CourseLayout) оставлять как обычные импорты.
+
+## 12. Authentication & Data (Supabase)
+- **Service**: Use Supabase for Authentication and Database.
+- **Client**: Initialize in `src/services/supabase.js`.
+- **Context**: Use `AuthContext` to manage user session globally.
+- **Profiles**: User data (role, school, grade) must be stored in a `profiles` table, linked to `auth.users` by ID.
+- **Hooks**: Use custom hooks `useAuth()` to access user state.

@@ -3,10 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
 import { getContainerStats } from '../../utils/progressHelpers';
+import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SectionContent = ({ lang, t, subjectId, sectionId, isTeacher, navigate }) => {
+const SectionContent = ({ subjectId, sectionId, isTeacher, navigate }) => {
+    const { t, i18n } = useTranslation();
+    const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
     if (loading) {
@@ -23,9 +26,9 @@ const SectionContent = ({ lang, t, subjectId, sectionId, isTeacher, navigate }) 
     if (!sectionData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[40vh] text-white">
-                <h2 className="text-2xl mb-4">{t.sectionNotFound}</h2>
+                <h2 className="text-2xl mb-4">{t('sectionNotFound')}</h2>
                 <button onClick={() => navigate(`/subject/${subjectId}`)} className="text-gaming-primary hover:underline">
-                    {t.backToSubject}
+                    {t('backToSubject')}
                 </button>
             </div>
         );
@@ -45,10 +48,10 @@ const SectionContent = ({ lang, t, subjectId, sectionId, isTeacher, navigate }) 
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-gaming-textMuted hover:text-white transition-all group w-fit"
                 >
                     <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-sm font-medium">{t.backToSubject}</span>
+                    <span className="text-sm font-medium">{t('backToSubject')}</span>
                 </button>
                 <p className="text-gaming-textMuted">
-                    {sectionData.topics.length} {t.themesCount}
+                    {sectionData.topics.length} {t('themesCount')}
                 </p>
             </div>
 
@@ -101,7 +104,7 @@ const SectionContent = ({ lang, t, subjectId, sectionId, isTeacher, navigate }) 
                                     {sectionIndex + 1}.{index + 1}. {getTitle(topic)}
                                 </h3>
                                 <p className="text-sm text-gaming-textMuted">
-                                    {topic.lessons.length} {t.lessonsCount}
+                                    {topic.lessons.length} {t('lessonsCount')}
                                 </p>
                             </div>
 
@@ -123,16 +126,18 @@ const SectionContent = ({ lang, t, subjectId, sectionId, isTeacher, navigate }) 
     );
 };
 
-const SectionPage = ({ lang, t, userRole }) => {
+import { useAuth } from '../../contexts/AuthContext';
+
+// ...
+
+const SectionPage = () => {
     const { subjectId, sectionId } = useParams();
     const navigate = useNavigate();
-    const isTeacher = userRole === 'teacher';
+    const { isTeacher } = useAuth(); // Используем хук
 
     return (
-        <CourseLayout subjectId={subjectId} lang={lang}>
+        <CourseLayout subjectId={subjectId}>
             <SectionContent
-                lang={lang}
-                t={t}
                 subjectId={subjectId}
                 sectionId={sectionId}
                 isTeacher={isTeacher}

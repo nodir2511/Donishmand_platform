@@ -1,7 +1,10 @@
 import React from 'react';
 import { ArrowRight, Sparkles, Calculator, Atom } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
-const HeroSection = ({ lang, t }) => {
+const HeroSection = () => {
+    const { t } = useTranslation();
+
     return (
         <div className="relative w-full overflow-hidden pt-36 pb-20 lg:pt-48 lg:pb-32">
 
@@ -14,17 +17,17 @@ const HeroSection = ({ lang, t }) => {
                 {/* Бейдж */}
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 backdrop-blur-md shadow-sm text-gaming-accent text-sm font-medium mb-8 animate-fade-in-up">
                     <Sparkles size={16} className="text-gaming-gold" />
-                    <span className="tracking-wide uppercase text-[11px] font-bold">{t.badge}</span>
+                    <span className="tracking-wide uppercase text-[11px] font-bold">{t('badge')}</span>
                 </div>
 
                 {/* Заголовок */}
                 <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 tracking-tight leading-[1.1] animate-fade-in-up delay-[100ms] drop-shadow-2xl">
-                    {t.heroTitle}
+                    <span dangerouslySetInnerHTML={{ __html: t('heroTitle') }} />
                 </h1>
 
                 {/* Подзаголовок */}
                 <p className="text-lg md:text-xl text-gaming-textMuted mb-12 max-w-2xl mx-auto leading-relaxed animate-fade-in-up delay-[200ms]">
-                    {t.heroSubtitle}
+                    {t('heroSubtitle')}
                 </p>
 
                 {/* Кнопки */}
@@ -35,7 +38,7 @@ const HeroSection = ({ lang, t }) => {
                         className="group relative bg-gaming-primary hover:bg-gaming-primary/90 text-white px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-gaming-primary/25 flex items-center justify-center gap-2 text-lg overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-                        <span>{t.ctaStart}</span>
+                        <span>{t('ctaStart')}</span>
                         <ArrowRight size={20} className="text-gaming-gold group-hover:translate-x-1 transition-transform" />
                     </button>
 
@@ -44,7 +47,7 @@ const HeroSection = ({ lang, t }) => {
                         onClick={() => document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' })}
                         className="group bg-transparent hover:bg-white/5 text-white border border-white/10 px-8 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 text-lg backdrop-blur-sm"
                     >
-                        {t.ctaCatalog}
+                        {t('ctaCatalog')}
                     </button>
                 </div>
 

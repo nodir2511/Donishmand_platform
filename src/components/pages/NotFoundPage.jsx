@@ -2,7 +2,10 @@ import React from 'react';
 import { Home, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const NotFoundPage = ({ lang, t }) => {
+import { useTranslation } from 'react-i18next';
+
+const NotFoundPage = () => {
+    const { t } = useTranslation();
     return (
         <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 relative overflow-hidden">
 
@@ -20,11 +23,11 @@ const NotFoundPage = ({ lang, t }) => {
                 </h1>
 
                 <h2 className="text-2xl md:text-3xl font-bold text-white mb-6">
-                    {t.errorTitle}
+                    {t('errorTitle')}
                 </h2>
 
                 <p className="text-lg text-gaming-textMuted mb-10 leading-relaxed">
-                    {t.errorSubtitle}
+                    {t('errorSubtitle')}
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -34,7 +37,7 @@ const NotFoundPage = ({ lang, t }) => {
                     >
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
                         <Home size={20} />
-                        <span>{t.errorHome}</span>
+                        <span>{t('errorHome')}</span>
                     </Link>
 
                     <button
@@ -42,7 +45,7 @@ const NotFoundPage = ({ lang, t }) => {
                         className="group bg-transparent hover:bg-white/5 text-white border border-white/10 px-8 py-3 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 backdrop-blur-sm"
                     >
                         <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-                        <span>{t.errorBack}</span>
+                        <span>{t('errorBack')}</span>
                     </button>
                 </div>
             </div>

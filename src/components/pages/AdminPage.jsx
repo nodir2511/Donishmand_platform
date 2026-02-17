@@ -5,8 +5,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ALL_SUBJECTS_LIST, SUBJECT_NAMES } from '../../constants/data';
 import {
     Loader2, Search, Shield, ShieldCheck, ShieldAlert, User, UserPlus,
-    X, Eye, EyeOff, BookOpen, Settings
+    X, Eye, EyeOff, BookOpen, Settings, ChevronLeft, ChevronRight
 } from 'lucide-react';
+import useDebounce from '../../hooks/useDebounce';
 
 const AdminPage = () => {
     const { t, i18n } = useTranslation();
@@ -16,6 +17,10 @@ const AdminPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const PAGE_SIZE = 10;
+    const debouncedSearchTerm = useDebounce(searchTerm, 500); // Задержка поиска
     const [updating, setUpdating] = useState(null);
 
     // Состояния модального окна добавления пользователя
@@ -29,6 +34,9 @@ const AdminPage = () => {
         email: '',
         password: '',
         role: 'student',
+        subject: '',
+        grade: '',
+        language: 'tj'
     });
 
     // Состояния модального окна прав на предметы
@@ -37,17 +45,36 @@ const AdminPage = () => {
     const [teacherPerms, setTeacherPerms] = useState([]);
     const [savingPerms, setSavingPerms] = useState(false);
 
+    // Сброс страницы при поиске
+    useEffect(() => {
+        setPage(1);
+    }, [debouncedSearchTerm]);
+
     useEffect(() => {
         fetchUsers();
-    }, []);
+    }, [page, debouncedSearchTerm]);
 
     const fetchUsers = async () => {
+        setLoading(true);
         try {
-            // Используем RPC-функцию (SECURITY DEFINER) — обходит RLS
-            const { data, error } = await supabase.rpc('get_all_profiles');
+            // Используем новую RPC-функцию с пагинацией
+            const { data, error } = await supabase.rpc('get_users_paginated', {
+                page_number: page,
+                items_per_page: PAGE_SIZE,
+                search_query: debouncedSearchTerm
+            });
 
             if (error) throw error;
-            setUsers(data || []);
+
+            if (data && data.length > 0) {
+                setUsers(data);
+                // total_count приходит в каждой строке (одинаковое для всех)
+                const count = data[0].total_count;
+                setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+            } else {
+                setUsers([]);
+                setTotalPages(1);
+            }
         } catch (error) {
             console.error('Ошибка загрузки пользователей:', error);
         } finally {
@@ -121,6 +148,9 @@ const AdminPage = () => {
                     target_id: signUpData.user.id,
                     target_full_name: newUser.full_name,
                     target_role: newUser.role,
+                    target_subject: newUser.role === 'teacher' ? newUser.subject : null,
+                    target_grade: newUser.role === 'student' ? (parseInt(newUser.grade) || null) : null,
+                    target_language: newUser.role === 'student' ? newUser.language : 'tj'
                 });
 
                 if (profileError) {
@@ -129,7 +159,10 @@ const AdminPage = () => {
             }
 
             setAddSuccess(`Пользователь ${newUser.email} успешно создан!`);
-            setNewUser({ full_name: '', email: '', password: '', role: 'student' });
+            setNewUser({
+                full_name: '', email: '', password: '', role: 'student',
+                subject: '', grade: '', language: 'tj'
+            });
 
             // Перезагружаем список пользователей
             await fetchUsers();
@@ -263,10 +296,8 @@ const AdminPage = () => {
         ];
     };
 
-    const filteredUsers = users.filter(user =>
-        user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    // Фильтрация теперь на сервере, здесь просто отображаем users
+    const filteredUsers = users; // Имя переменной оставил для совместимости с рендером
 
     if (loading) {
         return (
@@ -393,6 +424,29 @@ const AdminPage = () => {
                 )}
             </div>
 
+            {/* Пагинация */}
+            {totalPages > 1 && (
+                <div className="flex justify-center items-center gap-4 mt-6">
+                    <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1 || loading}
+                        className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <span className="text-gaming-textMuted">
+                        Страница <span className="text-white font-bold">{page}</span> из {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages || loading}
+                        className="p-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+            )}
+
             {/* ========== МОДАЛКА: Добавление пользователя ========== */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -487,6 +541,55 @@ const AdminPage = () => {
                                     ))}
                                 </select>
                             </div>
+
+                            {/* Дополнительные поля для Учителя */}
+                            {newUser.role === 'teacher' && (
+                                <div className="animate-fade-in-up">
+                                    <label className="block text-sm text-gaming-textMuted mb-1.5">Предмет</label>
+                                    <select
+                                        value={newUser.subject}
+                                        onChange={(e) => setNewUser({ ...newUser, subject: e.target.value })}
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                    >
+                                        <option value="">Выберите предмет</option>
+                                        {ALL_SUBJECTS_LIST.map(slug => (
+                                            <option key={slug} value={slug}>
+                                                {SUBJECT_NAMES[slug]?.[lang] || slug}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {/* Дополнительные поля для Ученика */}
+                            {newUser.role === 'student' && (
+                                <div className="grid grid-cols-2 gap-4 animate-fade-in-up">
+                                    <div>
+                                        <label className="block text-sm text-gaming-textMuted mb-1.5">Класс</label>
+                                        <select
+                                            value={newUser.grade}
+                                            onChange={(e) => setNewUser({ ...newUser, grade: e.target.value })}
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                        >
+                                            <option value="">Выберите...</option>
+                                            {[11, 10, 9, 8, 7, 6, 5].map(g => (
+                                                <option key={g} value={g}>{g} класс</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gaming-textMuted mb-1.5">Язык</label>
+                                        <select
+                                            value={newUser.language}
+                                            onChange={(e) => setNewUser({ ...newUser, language: e.target.value })}
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                        >
+                                            <option value="tj">Тоҷикӣ</option>
+                                            <option value="ru">Русский</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Кнопки */}
                             <div className="flex gap-3 pt-2">

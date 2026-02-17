@@ -10,7 +10,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SUBJECT_NAMES, ALL_SUBJECTS_LIST } from '../../constants/data';
-import LessonContentEditor from '../creator/LessonContentEditor';
+// import LessonContentEditor from '../creator/LessonContentEditor'; // Lazy load instead
+const LessonContentEditor = React.lazy(() => import('../creator/LessonContentEditor'));
 import { translateText } from '../../services/translationService';
 
 

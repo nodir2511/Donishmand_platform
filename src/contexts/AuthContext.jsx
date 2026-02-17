@@ -22,127 +22,223 @@ const forceCleanup = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [profile, setProfile] = useState(null);
-    const [permissions, setPermissions] = useState([]);
-    const [loading, setLoading] = useState(true);
+    // --- SWR: Синхронная инициализация из localStorage ---
+    const getInitialState = () => {
+        try {
+            const cached = localStorage.getItem('sb-profile-cache');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                // Простая валидация (время жизни кеша, например 24 часа)
+                if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+                    return {
+                        user: { id: parsed.userId }, // Минимальный объект юзера
+                        profile: parsed.profile,
+                        permissions: parsed.permissions || [],
+                        loading: false
+                    };
+                }
+            }
+        } catch (e) {
+            console.error('Error reading initial cache', e);
+        }
+        return { user: null, profile: null, permissions: [], loading: true };
+    };
+
+    const initialState = getInitialState();
+
+    const [user, setUser] = useState(initialState.user);
+    const [profile, setProfile] = useState(initialState.profile);
+    const [permissions, setPermissions] = useState(initialState.permissions);
+
+    // Если данные были в кеше, то loading сразу false
+    const [loading, setLoading] = useState(initialState.loading);
 
     // Флаг для блокировки onAuthStateChange при создании пользователей
     const skipAuthChangeRef = useRef(false);
+    // Ref для хранения актуального ID (инициализируем тем, что достали из кеша)
+    const userIdRef = useRef(initialState.user?.id || null);
+
+    // Функция загрузки профиля (вынесена, чтобы вызывать её явно)
+    const loadProfile = async (sessionUser) => {
+        if (!sessionUser) return null;
+
+        // Хелпер для таймаута запроса ( секунд)
+        const requestWithTimeout = (promise, ms = 5000) => {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+            ]);
+        };
+
+        const finishLoad = async (data) => {
+            let perms = [];
+            // 3. Если учитель — грузим права
+            if (data?.role === 'teacher') {
+                const { data: p } = await supabase
+                    .from('subject_permissions')
+                    .select('subject_id, can_edit')
+                    .eq('user_id', sessionUser.id);
+                perms = p || [];
+            }
+
+            setPermissions(perms);
+
+            // Сохраняем в кеш (SWR)
+            try {
+                if (data) {
+                    localStorage.setItem('sb-profile-cache', JSON.stringify({
+                        profile: data,
+                        permissions: perms,
+                        userId: sessionUser.id,
+                        timestamp: Date.now()
+                    }));
+                    // // console.log('✅ Профиль обновлен в кеше');
+                }
+            } catch (e) {
+                console.error('Ошибка сохранения кеша:', e);
+            }
+
+            return data;
+        };
+
+        try {
+            // 1. Пробуем RPC (обходит RLS) с таймаутом
+            try {
+                let { data, error } = await requestWithTimeout(
+                    supabase.rpc('get_my_profile'),
+                    5000
+                );
+
+                // RPC возвращает массив
+                if (data && data.length > 0) data = data[0];
+                else if (!error && (!data || data.length === 0)) data = null;
+
+                if (data && !error) {
+                    return await finishLoad(data);
+                }
+            } catch (e) {
+                // Ignore RPC timeout/error and proceed to fallback
+            }
+
+            // 2. Fallback: Прямой запрос (Direct Select)
+            try {
+                const { data, error } = await requestWithTimeout(
+                    supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', sessionUser.id)
+                        .maybeSingle(),
+                    10000
+                );
+
+                if (data && !error) {
+                    return await finishLoad(data);
+                }
+                if (error) console.error('Direct Select Error:', error);
+
+            } catch (e) {
+                console.error('Direct select timed out:', e);
+            }
+
+        } catch (err) {
+            console.error('Ошибка загрузки профиля (Global):', err);
+        }
+        return null;
+    };
 
     useEffect(() => {
         let isMounted = true;
+        let initAuthDone = false; // Флаг для предотвращения повторной загрузки
 
-        // Функция загрузки профиля
-        const loadProfile = async (sessionUser) => {
-            if (!sessionUser) return null;
-
-            // Хелпер для таймаута запроса (3 секунды)
-            const requestWithTimeout = (promise, ms = 3000) => {
-                return Promise.race([
-                    promise,
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
-                ]);
-            };
-
-            const finishLoad = async (data) => {
-                // 3. Если учитель — грузим права
-                if (data.role === 'teacher') {
-                    const { data: perms } = await supabase
-                        .from('subject_permissions')
-                        .select('subject_id, can_edit')
-                        .eq('user_id', sessionUser.id);
-                    if (isMounted) setPermissions(perms || []);
-                } else {
-                    if (isMounted) setPermissions([]);
-                }
-                return data;
-            };
-
+        // Инициализация авторизации: проверка сессии и загрузка профиля
+        const initAuth = async () => {
             try {
-                // 1. Пробуем RPC (обходит RLS) с таймаутом
-                try {
-                    let { data, error } = await requestWithTimeout(
-                        supabase.rpc('get_my_profile'),
-                        3000
-                    );
+                const { data: { session } } = await supabase.auth.getSession();
 
-                    // RPC возвращает массив
-                    if (data && data.length > 0) data = data[0];
-                    else if (!error && (!data || data.length === 0)) data = null;
+                if (session?.user) {
+                    // Если пользователь совпадает с кешем, мы НЕ ставим loading=true
+                    const isSameUser = userIdRef.current === session.user.id;
 
-                    if (data && !error) {
-                        return await finishLoad(data);
+                    if (!isSameUser) {
+                        // Только если юзер другой, включаем загрузку
+                        if (isMounted) setLoading(true);
                     }
-                } catch (e) {
-                    // Ignore RPC timeout/error and proceed to fallback
-                }
 
-                // 2. Fallback: Прямой запрос (Direct Select)
-                // Если RPC завис или упал, пробуем обычный select (он работает через RLS)
-                try {
-                    const { data, error } = await requestWithTimeout(
-                        supabase
-                            .from('profiles')
-                            .select('*')
-                            .eq('id', sessionUser.id)
-                            .maybeSingle(),
-                        3000
-                    );
 
-                    if (data && !error) {
-                        return await finishLoad(data);
+                    // Актуализируем стейт юзера (вдруг в кеше был неполный объект)
+                    if (isMounted) {
+                        setUser(session.user);
+                        userIdRef.current = session.user.id;
                     }
-                    if (error) console.error('Direct Select Error:', error);
 
-                } catch (e) {
-                    console.error('Direct select timed out:', e);
+                    // Грузим свежие данные (в фоне или явно)
+                    const profileData = await loadProfile(session.user);
+                    if (isMounted) {
+                        setProfile(profileData);
+                    }
+                } else {
+                    // Нет сессии
+                    if (isMounted) {
+                        setUser(null);
+                        userIdRef.current = null;
+                        setProfile(null);
+                        setPermissions([]);
+                    }
                 }
-
-            } catch (err) {
-                console.error('Ошибка загрузки профиля (Global):', err);
+            } catch (error) {
+                console.error("Ошибка при инициализации auth:", error);
+            } finally {
+                if (isMounted) {
+                    initAuthDone = true;
+                    setLoading(false);
+                }
             }
-            return null;
         };
 
-        // ЕДИНАЯ точка входа для состояния авторизации
+        initAuth();
+
+        // Подписка на изменения (login, logout, refresh)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (skipAuthChangeRef.current) return;
-
             if (!isMounted) return;
+
+            // Логируем событие для отладки
+            // console.log(`Auth Event: ${event}`, session?.user?.email);
 
             if (event === 'SIGNED_OUT') {
                 setUser(null);
+                userIdRef.current = null;
                 setProfile(null);
                 setPermissions([]);
                 setLoading(false);
             }
-            else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-                if (session?.user) {
-                    // Если пользователь поменялся или это первая загрузка
-                    if (session.user.id !== user?.id) {
-                        setUser(session.user);
-                    }
+            else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                const isUserChanged = session?.user && session.user.id !== userIdRef.current;
 
-                    // Важно: не убираем loading, пока не загрузим профиль!
+                // Если юзер сменился - грузим.
+                // Если тот же самый - ничего не делаем (initAuth или предыдущий стейт уже всё сделали)
+                if (isUserChanged) {
+                    // Если initAuth ещё идет, он сам всё сделает, но на всякий случай проверяем
+                    if (initAuthDone && userIdRef.current === session.user.id) return;
+
+                    setLoading(true);
+                    setUser(session.user);
+                    userIdRef.current = session.user.id;
                     const profileData = await loadProfile(session.user);
-
                     if (isMounted) {
                         setProfile(profileData);
-                        setLoading(false); // Только теперь снимаем экран загрузки
+                        setLoading(false);
                     }
-                } else {
-                    // Странный кейс: событие входа есть, а юзера нет
-                    setLoading(false);
                 }
             }
         });
 
-        // Таймаут безопасности 10 сек (по просьбе пользователя)
+        // Таймаут безопасности 10 сек (на случай если initAuth зависнет)
         const timeoutId = setTimeout(() => {
             if (isMounted) {
                 setLoading(prev => {
                     if (prev) {
+                        console.warn('⚠️ Safety timeout logic triggered');
                         return false;
                     }
                     return prev;
@@ -157,24 +253,18 @@ export const AuthProvider = ({ children }) => {
         };
     }, []);
 
-    // Выход из системы — жёстко и надёжно
     const signOut = async () => {
-        // 1. Сначала чистим ВСЕ локальные данные
         forceCleanup();
         setUser(null);
         setProfile(null);
-
-        // 2. Пробуем выйти на сервере (но не ждём долго)
         try {
             await Promise.race([
                 supabase.auth.signOut(),
-                new Promise(resolve => setTimeout(resolve, 2000)) // Не ждём больше 2 сек
+                new Promise(resolve => setTimeout(resolve, 2000))
             ]);
         } catch (e) {
             console.error("SignOut error (ignored):", e);
         }
-
-        // 3. Жёсткая перезагрузка — гарантирует полный сброс
         window.location.href = '/';
     };
 
@@ -188,9 +278,7 @@ export const AuthProvider = ({ children }) => {
         isTeacher: profile?.role === 'teacher',
         isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
         isSuperAdmin: profile?.role === 'super_admin',
-        // Управление блокировкой onAuthStateChange
         setSkipAuthChange: (value) => { skipAuthChangeRef.current = value; },
-        // Проверка: может ли текущий пользователь редактировать предмет
         canEditSubject: (subjectId) => {
             if (profile?.role === 'super_admin') return true;
             if (profile?.role === 'teacher') {
@@ -198,12 +286,10 @@ export const AuthProvider = ({ children }) => {
             }
             return false;
         },
-        // Проверка: может ли пользователь просматривать предмет
         canViewSubject: (subjectId) => {
             if (profile?.role === 'super_admin' || profile?.role === 'admin') return true;
             if (profile?.role === 'teacher') return profile?.subject === subjectId;
-            // Ученик — по кластеру
-            return true; // Фильтрация на уровне HomePage
+            return true;
         },
     };
 
@@ -213,7 +299,7 @@ export const AuthProvider = ({ children }) => {
                 <div className="flex items-center justify-center min-h-screen bg-gaming-bg">
                     <div className="flex flex-col items-center gap-4">
                         <div className="w-12 h-12 border-4 border-gaming-primary/30 border-t-gaming-primary rounded-full animate-spin" />
-                        <span className="text-gaming-textMuted text-sm">Инициализация...</span>
+                        <span className="text-gaming-textMuted text-sm">Загрузка...</span>
                     </div>
                 </div>
             ) : children}

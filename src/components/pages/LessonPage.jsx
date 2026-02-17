@@ -3,9 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Play, FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Clock, RotateCcw, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
-import SlidesViewer from '../viewer/SlidesViewer';
-import TestViewer from '../viewer/TestViewer';
-import TestTeacherView from '../viewer/TestTeacherView';
+// import SlidesViewer from '../viewer/SlidesViewer';
+// import TestViewer from '../viewer/TestViewer';
+// import TestTeacherView from '../viewer/TestTeacherView';
+const SlidesViewer = React.lazy(() => import('../viewer/SlidesViewer'));
+const TestViewer = React.lazy(() => import('../viewer/TestViewer'));
+const TestTeacherView = React.lazy(() => import('../viewer/TestTeacherView'));
 import { syllabusService } from '../../services/syllabusService';
 import { renderKatex } from '../../utils/katexRenderer';
 
@@ -650,19 +653,22 @@ const LessonPage = () => {
 
             </div>
 
-            {/* Окно просмотра слайдов */}
-            {showSlidesViewer && hasSlides && (
-                <SlidesViewer
-                    slides={currentSlides}
-                    lessonId={lessonId}
-                    onClose={() => setShowSlidesViewer(false)}
-                    onSlideView={handleSlideView}
-                />
-            )}
+            {/* Окна просмотра (слайды, тесты) - Lazy Loaded */}
+            <React.Suspense fallback={
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md">
+                    <Loader2 size={40} className="text-gaming-primary animate-spin" />
+                </div>
+            }>
+                {showSlidesViewer && hasSlides && (
+                    <SlidesViewer
+                        slides={currentSlides}
+                        lessonId={lessonId}
+                        onClose={() => setShowSlidesViewer(false)}
+                        onSlideView={handleSlideView}
+                    />
+                )}
 
-            {/* Окно тестирования (Ученик) или Просмотра (Учитель) */}
-            {
-                showTestViewer && (
+                {showTestViewer && (
                     isTeacher ? (
                         <TestTeacherView
                             questions={testQuestions}
@@ -678,8 +684,8 @@ const LessonPage = () => {
                             onComplete={handleTestComplete}
                         />
                     )
-                )
-            }
+                )}
+            </React.Suspense>
         </CourseLayout >
     );
 };

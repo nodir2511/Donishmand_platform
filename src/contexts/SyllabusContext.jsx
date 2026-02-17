@@ -4,65 +4,38 @@ import { syllabusService } from '../services/syllabusService';
 // Контекст для хранения структуры предмета (разделы → темы → уроки)
 const SyllabusContext = createContext(null);
 
-// Кеш на уровне модуля — сохраняется между перемонтированиями компонентов
-// Это позволяет избежать повторных запросов при навигации внутри одного предмета
-const cache = {};
-
-/**
- * Сброс кеша для указанного предмета.
- * Вызывать после сохранения данных в Supabase (например, из CreatorPage).
- * @param {string} subjectId — ID предмета для сброса кеша. Если не указан — сбрасывает весь кеш.
- */
+// Re-export invalidation from service for backward compatibility
 export const invalidateSyllabusCache = (subjectId) => {
-    if (subjectId) {
-        delete cache[subjectId];
-    } else {
-        // Сброс всего кеша
-        Object.keys(cache).forEach(key => delete cache[key]);
-    }
+    syllabusService.invalidateCache(subjectId);
 };
 
 /**
  * Провайдер для загрузки структуры предмета.
- * Стратегия: кеш → Supabase → пустая структура.
+ * Стратегия: кеш (внутри сервиса) → Supabase → пустая структура.
  * @param {string} subjectId — ID предмета (например, 'math', 'chem')
  */
 export const SyllabusProvider = ({ subjectId, children }) => {
-    // Если данные уже закешированы — используем сразу, без состояния загрузки
-    const [subjectData, setSubjectData] = useState(cache[subjectId] || null);
-    const [loading, setLoading] = useState(!cache[subjectId]);
+    const [subjectData, setSubjectData] = useState(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Если данные уже в кеше — не нужно загружать
-        if (cache[subjectId]) {
-            setSubjectData(cache[subjectId]);
-            setLoading(false);
-            return;
-        }
+        let mounted = true;
 
         const fetchStructure = async () => {
             setLoading(true);
-            setSubjectData(null);
             try {
-                // Загружаем из Supabase
+                // Service handles caching now
                 const data = await syllabusService.getStructure(subjectId);
-                if (data) {
-                    cache[subjectId] = data;
-                    setSubjectData(data);
-                } else {
-                    // Предмет ещё не заполнен — пустая структура
-                    const empty = { sections: [] };
-                    cache[subjectId] = empty;
-                    setSubjectData(empty);
+                if (mounted) {
+                    setSubjectData(data || { sections: [] });
                 }
             } catch (error) {
                 console.error(`Ошибка загрузки структуры предмета "${subjectId}":`, error);
-                // При ошибке сети тоже показываем пустую структуру
-                const empty = { sections: [] };
-                cache[subjectId] = empty;
-                setSubjectData(empty);
+                if (mounted) {
+                    setSubjectData({ sections: [] });
+                }
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         };
 
@@ -71,6 +44,8 @@ export const SyllabusProvider = ({ subjectId, children }) => {
         } else {
             setLoading(false);
         }
+
+        return () => { mounted = false; };
     }, [subjectId]);
 
     return (

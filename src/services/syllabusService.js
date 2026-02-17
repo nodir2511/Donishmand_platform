@@ -169,7 +169,20 @@ const mergeContent = (contentRu, contentTj) => {
     };
 };
 
+const cache = {
+    structures: {},
+    lessons: {}
+};
+
 export const syllabusService = {
+    invalidateCache(subject) {
+        if (subject) {
+            delete cache.structures[subject];
+        } else {
+            cache.structures = {};
+            cache.lessons = {};
+        }
+    },
 
     /**
      * Сохранить всю структуру предмета (Разделы -> Темы -> Списки уроков).
@@ -217,6 +230,10 @@ export const syllabusService = {
      * @param {string} subject - ID предмета
      */
     async getStructure(subject) {
+        if (cache.structures[subject]) {
+            return cache.structures[subject];
+        }
+
         const { data, error } = await supabase
             .from('subject_syllabus')
             .select('data')
@@ -227,6 +244,8 @@ export const syllabusService = {
             if (error.code === 'PGRST116') return null; // Запись не найдена (пусто)
             throw error;
         }
+
+        cache.structures[subject] = data.data;
         return data.data; // Возвращает { sections: [...] }
     },
 

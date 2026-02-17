@@ -72,11 +72,17 @@ const AuthPage = () => {
                     throw new Error('Пароль должен быть не менее 6 символов');
                 }
 
-                // Создаем пользователя в Auth
+                // Создаем пользователя в Auth с metadata (триггер создаст базовый профиль)
                 const { data: authData, error: authError } = await Promise.race([
                     supabase.auth.signUp({
                         email: formData.email,
                         password: formData.password,
+                        options: {
+                            data: {
+                                full_name: formData.fullName,
+                                role: formData.role,
+                            }
+                        }
                     }),
                     timeoutPromise(10000)
                 ]);
@@ -84,28 +90,52 @@ const AuthPage = () => {
                 if (authError) throw authError;
 
                 if (authData.user) {
-                    // Создаем профиль в таблице profiles
+                    // Базовый профиль уже создан триггером в БД (public.handle_new_user)
+                    // Мы просто обновляем его дополнительными данными из формы
+
+                    const profileUpdates = {
+                        birth_date: formData.birthDate || null,
+                        phone: formData.phone || null,
+                        branch: formData.branch || null,
+                        updated_at: new Date().toISOString(),
+                    };
+
+                    // Поля для ученика
+                    if (formData.role === 'student') {
+                        profileUpdates.school = formData.school || null;
+                        profileUpdates.grade = formData.grade ? parseInt(formData.grade) : null;
+                        profileUpdates.group_name = formData.group || null;
+                        profileUpdates.language = formData.language || 'tj';
+                    }
+
+                    // Поля для учителя
+                    if (formData.role === 'teacher') {
+                        profileUpdates.subject = formData.subject || null;
+                    }
+
+                    // Обновляем существующий профиль (который только что создал триггер)
+                    // Используем update вместо upsert, чтобы подтвердить существование записи
                     const { error: profileError } = await supabase
                         .from('profiles')
-                        .insert([
-                            {
+                        .update(profileUpdates)
+                        .eq('id', authData.user.id);
+
+                    if (profileError) {
+                        console.error('Ошибка обновления профиля:', profileError);
+                        // Если профиль вдруг не найден (триггер не сработал), пробуем создать вручную (fallback)
+                        if (profileError.code === 'PGRST116' || profileError.details?.includes('0 rows')) {
+                            console.warn('Профиль не найден, создаем вручную (fallback)...');
+                            await supabase.from('profiles').insert({
                                 id: authData.user.id,
                                 full_name: formData.fullName,
                                 role: formData.role,
-                                school: formData.role === 'student' ? formData.school : null,
-                                grade: formData.role === 'student' ? parseInt(formData.grade) : null,
-                                branch: formData.branch,
-                                group_name: formData.role === 'student' ? formData.group : null,
-                                subject: formData.role === 'teacher' ? formData.subject : null
-                            }
-                        ]);
-
-                    if (profileError) {
-                        console.error('Profile creation error:', profileError);
-                        // Не блокируем, если профиль не создался, пользователь все равно создан
+                                email: formData.email,
+                                ...profileUpdates
+                            });
+                        }
                     }
 
-                    // Сразу входим
+                    // Переход на главную
                     navigate('/');
                 }
             }

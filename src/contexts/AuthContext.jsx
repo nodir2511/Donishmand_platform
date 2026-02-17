@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { supabase } from '../services/supabase';
 
 const AuthContext = createContext({});
@@ -24,97 +24,131 @@ const forceCleanup = () => {
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
+    const [permissions, setPermissions] = useState([]);
     const [loading, setLoading] = useState(true);
+
+    // Флаг для блокировки onAuthStateChange при создании пользователей
+    const skipAuthChangeRef = useRef(false);
 
     useEffect(() => {
         let isMounted = true;
 
-        const checkUser = async () => {
-            try {
-                const { data: { user }, error } = await supabase.auth.getUser();
+        // Функция загрузки профиля
+        const loadProfile = async (sessionUser) => {
+            if (!sessionUser) return null;
 
-                if (error || !user) {
-                    // Пользователь не найден на сервере — чистим локальные данные
-                    forceCleanup();
-                    if (isMounted) {
-                        setUser(null);
-                        setProfile(null);
-                    }
+            // Хелпер для таймаута запроса (3 секунды)
+            const requestWithTimeout = (promise, ms = 3000) => {
+                return Promise.race([
+                    promise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), ms))
+                ]);
+            };
+
+            const finishLoad = async (data) => {
+                // 3. Если учитель — грузим права
+                if (data.role === 'teacher') {
+                    const { data: perms } = await supabase
+                        .from('subject_permissions')
+                        .select('subject_id, can_edit')
+                        .eq('user_id', sessionUser.id);
+                    if (isMounted) setPermissions(perms || []);
                 } else {
-                    if (isMounted) setUser(user);
+                    if (isMounted) setPermissions([]);
+                }
+                return data;
+            };
 
-                    // Загружаем профиль
-                    const { data: profileData, error: profileError } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', user.id)
-                        .single();
+            try {
+                // 1. Пробуем RPC (обходит RLS) с таймаутом
+                try {
+                    let { data, error } = await requestWithTimeout(
+                        supabase.rpc('get_my_profile'),
+                        3000
+                    );
 
-                    if (profileError || !profileData) {
-                        console.warn('Профиль не найден:', profileError?.message);
-                        // Профиль отсутствует — выходим принудительно
-                        forceCleanup();
-                        try { await supabase.auth.signOut(); } catch (e) { /* игнорируем */ }
-                        if (isMounted) {
-                            setUser(null);
-                            setProfile(null);
-                        }
-                    } else {
-                        if (isMounted) setProfile(profileData);
+                    // RPC возвращает массив
+                    if (data && data.length > 0) data = data[0];
+                    else if (!error && (!data || data.length === 0)) data = null;
+
+                    if (data && !error) {
+                        return await finishLoad(data);
                     }
+                } catch (e) {
+                    // Ignore RPC timeout/error and proceed to fallback
                 }
-            } catch (error) {
-                console.error('Ошибка проверки сессии:', error);
-                forceCleanup();
-                if (isMounted) {
-                    setUser(null);
-                    setProfile(null);
+
+                // 2. Fallback: Прямой запрос (Direct Select)
+                // Если RPC завис или упал, пробуем обычный select (он работает через RLS)
+                try {
+                    const { data, error } = await requestWithTimeout(
+                        supabase
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', sessionUser.id)
+                            .maybeSingle(),
+                        3000
+                    );
+
+                    if (data && !error) {
+                        return await finishLoad(data);
+                    }
+                    if (error) console.error('Direct Select Error:', error);
+
+                } catch (e) {
+                    console.error('Direct select timed out:', e);
                 }
-            } finally {
-                if (isMounted) setLoading(false);
+
+            } catch (err) {
+                console.error('Ошибка загрузки профиля (Global):', err);
             }
+            return null;
         };
 
-        checkUser();
-
-        // Слушаем изменения авторизации
+        // ЕДИНАЯ точка входа для состояния авторизации
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth event:", event);
+            if (skipAuthChangeRef.current) return;
 
-            if (event === 'SIGNED_OUT' || !session?.user) {
-                if (isMounted) {
-                    setUser(null);
-                    setProfile(null);
+            if (!isMounted) return;
+
+            if (event === 'SIGNED_OUT') {
+                setUser(null);
+                setProfile(null);
+                setPermissions([]);
+                setLoading(false);
+            }
+            else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+                if (session?.user) {
+                    // Если пользователь поменялся или это первая загрузка
+                    if (session.user.id !== user?.id) {
+                        setUser(session.user);
+                    }
+
+                    // Важно: не убираем loading, пока не загрузим профиль!
+                    const profileData = await loadProfile(session.user);
+
+                    if (isMounted) {
+                        setProfile(profileData);
+                        setLoading(false); // Только теперь снимаем экран загрузки
+                    }
+                } else {
+                    // Странный кейс: событие входа есть, а юзера нет
                     setLoading(false);
                 }
-                return;
-            }
-
-            if (isMounted) {
-                setUser(session.user);
-                // Загружаем профиль
-                const { data } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .single();
-                setProfile(data || null);
-                setLoading(false);
             }
         });
 
-        // Таймаут безопасности
+        // Таймаут безопасности 10 сек (по просьбе пользователя)
         const timeoutId = setTimeout(() => {
             if (isMounted) {
                 setLoading(prev => {
                     if (prev) {
-                        console.warn('Auth timeout — принудительная загрузка');
                         return false;
                     }
                     return prev;
                 });
             }
-        }, 3000);
+        }, 10000);
 
         return () => {
             isMounted = false;
@@ -147,11 +181,30 @@ export const AuthProvider = ({ children }) => {
     const value = {
         user,
         profile,
+        permissions,
         loading,
         signOut,
         isAuthenticated: !!user,
-        isTeacher: profile?.role === 'teacher' || profile?.role === 'admin' || profile?.role === 'super_admin',
-        isSuperAdmin: profile?.role === 'super_admin'
+        isTeacher: profile?.role === 'teacher',
+        isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
+        isSuperAdmin: profile?.role === 'super_admin',
+        // Управление блокировкой onAuthStateChange
+        setSkipAuthChange: (value) => { skipAuthChangeRef.current = value; },
+        // Проверка: может ли текущий пользователь редактировать предмет
+        canEditSubject: (subjectId) => {
+            if (profile?.role === 'super_admin') return true;
+            if (profile?.role === 'teacher') {
+                return permissions.some(p => p.subject_id === subjectId && p.can_edit);
+            }
+            return false;
+        },
+        // Проверка: может ли пользователь просматривать предмет
+        canViewSubject: (subjectId) => {
+            if (profile?.role === 'super_admin' || profile?.role === 'admin') return true;
+            if (profile?.role === 'teacher') return profile?.subject === subjectId;
+            // Ученик — по кластеру
+            return true; // Фильтрация на уровне HomePage
+        },
     };
 
     return (

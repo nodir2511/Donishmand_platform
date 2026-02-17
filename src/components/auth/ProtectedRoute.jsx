@@ -3,7 +3,8 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute = ({ children, requireTeacher = false, requireSuperAdmin = false }) => {
+// Защищённый маршрут с поддержкой разных уровней доступа
+const ProtectedRoute = ({ children, requireTeacher = false, requireAdmin = false, requireSuperAdmin = false }) => {
     const { user, profile, loading } = useAuth();
     const location = useLocation();
 
@@ -16,17 +17,22 @@ const ProtectedRoute = ({ children, requireTeacher = false, requireSuperAdmin = 
     }
 
     if (!user) {
-        // Redirect to login, saving the location they were trying to go to
+        // Перенаправление на логин с сохранением текущего маршрута
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
+    // Только суперадмин
     if (requireSuperAdmin && profile?.role !== 'super_admin') {
-        // Redirect to home if user is not a super admin
         return <Navigate to="/" replace />;
     }
 
+    // Админ или суперадмин
+    if (requireAdmin && profile?.role !== 'admin' && profile?.role !== 'super_admin') {
+        return <Navigate to="/" replace />;
+    }
+
+    // Учитель с правами, админ или суперадмин
     if (requireTeacher && profile?.role !== 'teacher' && profile?.role !== 'admin' && profile?.role !== 'super_admin') {
-        // Redirect to home if user is not a teacher/admin/super_admin but tries to access teacher route
         return <Navigate to="/" replace />;
     }
 

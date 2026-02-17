@@ -133,14 +133,14 @@ import { useAuth } from '../../contexts/AuthContext';
 const SectionPage = () => {
     const { subjectId, sectionId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher } = useAuth(); // Используем хук
+    const { isTeacher, isAdmin } = useAuth(); // Используем хук
 
     return (
         <CourseLayout subjectId={subjectId}>
             <SectionContent
                 subjectId={subjectId}
                 sectionId={sectionId}
-                isTeacher={isTeacher}
+                isTeacher={isTeacher || isAdmin}
                 navigate={navigate}
             />
         </CourseLayout>

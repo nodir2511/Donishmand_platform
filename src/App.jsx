@@ -13,6 +13,7 @@ const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
 const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
 const AdminPage = React.lazy(() => import('./components/pages/AdminPage'));
 const AuthPage = React.lazy(() => import('./components/pages/AuthPage'));
+const ProfilePage = React.lazy(() => import('./components/pages/ProfilePage'));
 const NotFoundPage = React.lazy(() => import('./components/pages/NotFoundPage'));
 
 // Индикатор загрузки при переходах между страницами
@@ -65,13 +66,23 @@ function AppContent() {
                         <Route
                             path="/admin"
                             element={
-                                <ProtectedRoute requireSuperAdmin={true}>
+                                <ProtectedRoute requireAdmin={true}>
                                     <AdminPage />
                                 </ProtectedRoute>
                             }
                         />
 
                         <Route path="/login" element={<AuthPage />} />
+
+                        <Route
+                            path="/profile"
+                            element={
+                                <ProtectedRoute>
+                                    <ProfilePage />
+                                </ProtectedRoute>
+                            }
+                        />
+
                         <Route path="*" element={<NotFoundPage />} />
                     </Routes>
                 </Suspense>

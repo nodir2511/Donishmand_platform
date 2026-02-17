@@ -40,7 +40,8 @@ const LessonPage = () => {
     const [showTestViewer, setShowTestViewer] = useState(false);
 
     // Определяем режим учителя
-    const { isTeacher } = useAuth();
+    const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
+    const isTeacher = rawIsTeacher || isAdmin; // Учитель, админ или суперадмин — не сохраняет прогресс
 
     // ЗАГРУЗКА ДАННЫХ
     useEffect(() => {

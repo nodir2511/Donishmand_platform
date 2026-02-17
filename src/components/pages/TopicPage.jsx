@@ -130,7 +130,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const TopicPage = () => {
     const { subjectId, sectionId, topicId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher } = useAuth();
+    const { isTeacher, isAdmin } = useAuth();
 
     return (
         <CourseLayout subjectId={subjectId}>
@@ -138,7 +138,7 @@ const TopicPage = () => {
                 subjectId={subjectId}
                 sectionId={sectionId}
                 topicId={topicId}
-                isTeacher={isTeacher}
+                isTeacher={isTeacher || isAdmin}
                 navigate={navigate}
             />
         </CourseLayout>

@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
-    const { user, profile, signOut } = useAuth();
+    const { user, profile, signOut, permissions } = useAuth();
     const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -46,6 +46,16 @@ const Navbar = () => {
     const userInitials = profile?.full_name
         ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
         : user?.email?.[0].toUpperCase() || 'U';
+
+    // Отображение названия роли
+    const getRoleName = (role) => {
+        switch (role) {
+            case 'super_admin': return t('profilePage.roleSuperAdmin');
+            case 'admin': return t('profilePage.roleAdmin');
+            case 'teacher': return t('profilePage.roleTeacher');
+            default: return t('studentRole');
+        }
+    };
 
     return (
         <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-gaming-bg/80 backdrop-blur-xl border-b border-white/5 py-3' : 'bg-transparent py-6'}`}>
@@ -94,15 +104,16 @@ const Navbar = () => {
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
                         </Link>
 
-                        {/* Показываем ссылку Creator только учителям */}
-                        {(profile?.role === 'teacher' || profile?.role === 'admin') && (
+                        {/* Ссылка Creator: суперадмин или учитель с правами на редактирование */}
+                        {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (
                             <Link to="/creator" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                                 {t('navCreator')}
                                 <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
                             </Link>
                         )}
 
-                        {profile?.role === 'super_admin' && (
+                        {/* Ссылка Admin: админ или суперадмин */}
+                        {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
                             <Link to="/admin" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                                 {t('navAdmin')}
                                 <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-red-500 -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
@@ -133,7 +144,7 @@ const Navbar = () => {
                                         <div className="text-left hidden lg:block">
                                             <div className="text-xs font-bold text-white leading-none mb-0.5">{profile?.full_name || user.email}</div>
                                             <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider leading-none">
-                                                {profile?.role === 'student' ? t('studentRole') : t('teacherRole')}
+                                                {getRoleName(profile?.role)}
                                             </div>
                                         </div>
                                         <ChevronDown size={14} className={`text-gaming-textMuted transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
@@ -145,12 +156,12 @@ const Navbar = () => {
                                             <div className="px-4 py-3 border-b border-white/5 lg:hidden">
                                                 <p className="text-sm font-bold text-white truncate">{profile?.full_name || user.email}</p>
                                                 <p className="text-xs text-gaming-textMuted mt-0.5 uppercase tracking-wider">
-                                                    {profile?.role === 'student' ? t('studentRole') : t('teacherRole')}
+                                                    {getRoleName(profile?.role)}
                                                 </p>
                                             </div>
 
                                             <div className="py-1">
-                                                <button onClick={() => { }} className="w-full text-left px-4 py-2.5 text-sm text-gaming-textMuted hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                                                <button onClick={() => { navigate('/profile'); setShowProfileMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-gaming-textMuted hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
                                                     <User size={16} />
                                                     {t('profile')}
                                                 </button>
@@ -188,7 +199,7 @@ const Navbar = () => {
                                 <div className="overflow-hidden">
                                     <div className="font-bold text-white truncate">{profile?.full_name || user.email}</div>
                                     <div className="text-xs text-gaming-textMuted uppercase tracking-wider">
-                                        {profile?.role === 'student' ? t('studentRole') : t('teacherRole')}
+                                        {getRoleName(profile?.role)}
                                     </div>
                                 </div>
                             </div>
@@ -224,13 +235,15 @@ const Navbar = () => {
                             {t('navAbout')}
                         </Link>
 
-                        {(profile?.role === 'teacher' || profile?.role === 'admin') && (
+                        {/* Ссылка Creator (мобильное): суперадмин или учитель с правами */}
+                        {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (
                             <Link to="/creator" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                                 {t('navCreator')}
                             </Link>
                         )}
 
-                        {profile?.role === 'super_admin' && (
+                        {/* Ссылка Admin (мобильное): админ или суперадмин */}
+                        {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
                             <Link to="/admin" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                                 {t('navAdmin')}
                             </Link>

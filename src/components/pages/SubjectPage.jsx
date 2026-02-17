@@ -114,7 +114,7 @@ const SubjectPage = () => {
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher } = useAuth(); // Используем хук вместо пропса
+    const { isTeacher, isAdmin } = useAuth(); // Используем хук вместо пропса
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
 
     return (
@@ -122,7 +122,7 @@ const SubjectPage = () => {
             <SubjectContent
                 subjectId={subjectId}
                 subjectName={subjectName}
-                isTeacher={isTeacher}
+                isTeacher={isTeacher || isAdmin}
                 navigate={navigate}
             />
         </CourseLayout>

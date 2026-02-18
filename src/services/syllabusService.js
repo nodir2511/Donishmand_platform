@@ -23,19 +23,20 @@ const splitContent = (content) => {
         if (!questions || !Array.isArray(questions)) return { ru: [], tj: [] };
 
         const ru = questions.map(q => {
-            const base = { id: q.id, type: q.type, image: q.image };
+            // Priority: new imageRu field, then legacy image field
+            const base = { id: q.id, type: q.type, image: q.imageRu || q.image };
             base.text = q.textRu || '';
             if (q.type === 'multiple_choice') {
                 base.options = (q.options || []).map(opt => ({
-                    id: opt.id, text: opt.textRu || '', image: opt.image
+                    id: opt.id, text: opt.textRu || '', image: opt.imageRu || opt.image
                 }));
                 base.correctId = q.correctId;
             } else if (q.type === 'matching') {
                 base.leftItems = (q.leftItems || []).map(item => ({
-                    id: item.id, text: item.textRu || '', image: item.image
+                    id: item.id, text: item.textRu || '', image: item.imageRu || item.image
                 }));
                 base.rightItems = (q.rightItems || []).map(item => ({
-                    id: item.id, text: item.textRu || '', image: item.image
+                    id: item.id, text: item.textRu || '', image: item.imageRu || item.image
                 }));
                 base.correctMatches = q.correctMatches;
             } else if (q.type === 'numeric') {
@@ -46,19 +47,20 @@ const splitContent = (content) => {
         });
 
         const tj = questions.map(q => {
-            const base = { id: q.id, type: q.type, image: q.image };
+            // Priority: new imageTj field, then fallback to imageRu, then legacy image
+            const base = { id: q.id, type: q.type, image: q.imageTj || q.imageRu || q.image };
             base.text = q.textTj || '';
             if (q.type === 'multiple_choice') {
                 base.options = (q.options || []).map(opt => ({
-                    id: opt.id, text: opt.textTj || '', image: opt.image
+                    id: opt.id, text: opt.textTj || '', image: opt.imageTj || opt.imageRu || opt.image
                 }));
                 base.correctId = q.correctId;
             } else if (q.type === 'matching') {
                 base.leftItems = (q.leftItems || []).map(item => ({
-                    id: item.id, text: item.textTj || '', image: item.image
+                    id: item.id, text: item.textTj || '', image: item.imageTj || item.imageRu || item.image
                 }));
                 base.rightItems = (q.rightItems || []).map(item => ({
-                    id: item.id, text: item.textTj || '', image: item.image
+                    id: item.id, text: item.textTj || '', image: item.imageTj || item.imageRu || item.image
                 }));
                 base.correctMatches = q.correctMatches;
             } else if (q.type === 'numeric') {
@@ -102,9 +104,75 @@ const splitContent = (content) => {
  * @returns {object} - Единый объект контента для редакторов и LessonPage
  */
 const mergeContent = (contentRu, contentTj) => {
+    // Вспомогательные функции для восстановления текста из старых полей
+    const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
+    const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
+    const pickBestText = (qObj) => {
+        if (!qObj) return '';
+        const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
+        for (const v of variants) {
+            if (v && !isNumeric(v)) return v;
+        }
+        return '';
+    };
+
+    // Восстановление текста вопросов из всех возможных полей
+    const recoverQuestionTexts = (questions) => {
+        if (!questions || !Array.isArray(questions)) return questions;
+        return questions.map(q => {
+            const recovered = { ...q };
+            if (!recovered.textRu || isNumeric(recovered.textRu)) {
+                recovered.textRu = pickBestText(q);
+            }
+            if (!recovered.textTj || isNumeric(recovered.textTj)) {
+                // Для TJ пробуем из TJ-полей
+                const tjVariants = [q.textTj, q.question, q.text, q.title];
+                for (const v of tjVariants) {
+                    if (v && !isNumeric(v) && v !== recovered.textRu) {
+                        recovered.textTj = v;
+                        break;
+                    }
+                }
+            }
+            // Восстанавливаем тексты опций
+            if (recovered.options) {
+                recovered.options = recovered.options.map(opt => ({
+                    ...opt,
+                    textRu: (!opt.textRu || isNumeric(opt.textRu)) ? pickBestText(opt) : opt.textRu,
+                    textTj: opt.textTj || ''
+                }));
+            }
+            if (recovered.leftItems) {
+                recovered.leftItems = recovered.leftItems.map(item => ({
+                    ...item,
+                    textRu: (!item.textRu || isNumeric(item.textRu)) ? pickBestText(item) : item.textRu,
+                    textTj: item.textTj || ''
+                }));
+            }
+            if (recovered.rightItems) {
+                recovered.rightItems = recovered.rightItems.map(item => ({
+                    ...item,
+                    textRu: (!item.textRu || isNumeric(item.textRu)) ? pickBestText(item) : item.textRu,
+                    textTj: item.textTj || ''
+                }));
+            }
+            return recovered;
+        });
+    };
+
     // Обратная совместимость: если content_ru содержит старый объединённый формат
-    // (bodyRu, descriptionRu, slidesRu), возвращаем его напрямую
+    // (bodyRu, descriptionRu, slidesRu), возвращаем его напрямую,
+    // но с восстановлением текста вопросов
     if (contentRu && (contentRu.slidesRu || contentRu.text?.bodyRu)) {
+        if (contentRu.test?.questions) {
+            return {
+                ...contentRu,
+                test: {
+                    ...contentRu.test,
+                    questions: recoverQuestionTexts(contentRu.test.questions)
+                }
+            };
+        }
         return contentRu;
     }
 
@@ -115,32 +183,63 @@ const mergeContent = (contentRu, contentTj) => {
     const mergeQuestions = (ruQuestions, tjQuestions) => {
         const ruQ = ruQuestions || [];
         const tjQ = tjQuestions || [];
+
+        const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
+        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
+        const pickBestText = (qObj) => {
+            if (!qObj) return '';
+            // Проверяем все возможные поля на наличие нечислового текста
+            // 'question' часто содержит текст в старых форматах, а 'text' может содержать числовой ответ
+            const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
+            for (const v of variants) {
+                if (v && !isNumeric(v)) return v;
+            }
+            return '';
+        };
+
         // Берём RU как основу (там все ID и структура), добавляем TJ тексты
         return ruQ.map((rq, idx) => {
             const tq = tjQ[idx] || {};
             const merged = {
-                id: rq.id, type: rq.type, image: rq.image,
-                textRu: rq.text || '',
-                textTj: tq.text || ''
+                id: rq.id, type: rq.type,
+                imageRu: rq.image,
+                imageTj: tq.image,
+                textRu: pickBestText(rq),
+                textTj: pickBestText(tq)
             };
             if (rq.type === 'multiple_choice') {
-                merged.options = (rq.options || []).map((opt, optIdx) => ({
-                    id: opt.id, image: opt.image,
-                    textRu: opt.text || '',
-                    textTj: tq.options?.[optIdx]?.text || ''
-                }));
+                merged.options = (rq.options || []).map((opt, optIdx) => {
+                    const tOpt = tq.options?.[optIdx] || {};
+                    return {
+                        id: opt.id,
+                        imageRu: opt.image,
+                        imageTj: tOpt.image,
+                        textRu: pickBestText(opt),
+                        textTj: pickBestText(tOpt)
+                    };
+                });
                 merged.correctId = rq.correctId;
             } else if (rq.type === 'matching') {
-                merged.leftItems = (rq.leftItems || []).map((item, i) => ({
-                    id: item.id, image: item.image,
-                    textRu: item.text || '',
-                    textTj: tq.leftItems?.[i]?.text || ''
-                }));
-                merged.rightItems = (rq.rightItems || []).map((item, i) => ({
-                    id: item.id, image: item.image,
-                    textRu: item.text || '',
-                    textTj: tq.rightItems?.[i]?.text || ''
-                }));
+                merged.leftItems = (rq.leftItems || []).map((item, i) => {
+                    const tItem = tq.leftItems?.[i] || {};
+                    return {
+                        id: item.id,
+                        imageRu: item.image,
+                        imageTj: tItem.image,
+                        textRu: pickBestText(item),
+                        textTj: pickBestText(tItem)
+                    };
+                });
+                merged.rightItems = (rq.rightItems || []).map((item, i) => {
+                    const tItem = tq.rightItems?.[i] || {};
+                    return {
+                        id: item.id,
+                        imageRu: item.image,
+                        imageTj: tItem.image,
+                        textRu: pickBestText(item),
+                        textTj: pickBestText(tItem)
+                    };
+                });
                 merged.correctMatches = rq.correctMatches;
             } else if (rq.type === 'numeric') {
                 merged.digits = rq.digits;
@@ -300,6 +399,7 @@ export const syllabusService = {
         }
 
         let content;
+
         if (lang) {
             // Режим просмотра: один язык → обернуть в единый формат
             const langContent = lang === 'ru' ? data.content_ru : data.content_tj;
@@ -346,30 +446,59 @@ const wrapSingleLangContent = (content, lang) => {
 
     // Конвертируем вопросы из одноязычного формата (text) в двуязычный (textRu/textTj)
     const wrapQuestions = (questions) => {
+        const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
+        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
+        const pickBestText = (qObj) => {
+            if (!qObj) return '';
+            const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
+            for (const v of variants) {
+                if (v && !isNumeric(v)) return v;
+            }
+            return '';
+        };
+
         return (questions || []).map(q => {
+            const bestText = pickBestText(q);
             const wrapped = {
-                id: q.id, type: q.type, image: q.image,
-                textRu: isRu ? (q.text || '') : '',
-                textTj: isRu ? '' : (q.text || '')
+                id: q.id, type: q.type,
+                imageRu: isRu ? (q.image || null) : null,
+                imageTj: isRu ? null : (q.image || null),
+                textRu: isRu ? bestText : '',
+                textTj: isRu ? '' : bestText
             };
             if (q.type === 'multiple_choice') {
-                wrapped.options = (q.options || []).map(opt => ({
-                    id: opt.id, image: opt.image,
-                    textRu: isRu ? (opt.text || '') : '',
-                    textTj: isRu ? '' : (opt.text || '')
-                }));
+                wrapped.options = (q.options || []).map(opt => {
+                    const bText = pickBestText(opt);
+                    return {
+                        id: opt.id,
+                        imageRu: isRu ? (opt.image || null) : null,
+                        imageTj: isRu ? null : (opt.image || null),
+                        textRu: isRu ? bText : '',
+                        textTj: isRu ? '' : bText
+                    };
+                });
                 wrapped.correctId = q.correctId;
             } else if (q.type === 'matching') {
-                wrapped.leftItems = (q.leftItems || []).map(item => ({
-                    id: item.id, image: item.image,
-                    textRu: isRu ? (item.text || '') : '',
-                    textTj: isRu ? '' : (item.text || '')
-                }));
-                wrapped.rightItems = (q.rightItems || []).map(item => ({
-                    id: item.id, image: item.image,
-                    textRu: isRu ? (item.text || '') : '',
-                    textTj: isRu ? '' : (item.text || '')
-                }));
+                wrapped.leftItems = (q.leftItems || []).map(item => {
+                    const bText = pickBestText(item);
+                    return {
+                        id: item.id,
+                        imageRu: isRu ? (item.image || null) : null,
+                        imageTj: isRu ? null : (item.image || null),
+                        textRu: isRu ? bText : '',
+                        textTj: isRu ? '' : bText
+                    };
+                });
+                wrapped.rightItems = (q.rightItems || []).map(item => {
+                    const bText = pickBestText(item);
+                    return {
+                        id: item.id,
+                        imageRu: isRu ? (item.image || null) : null,
+                        imageTj: isRu ? null : (item.image || null),
+                        textRu: isRu ? bText : '',
+                        textTj: isRu ? '' : bText
+                    };
+                });
                 wrapped.correctMatches = q.correctMatches;
             } else if (q.type === 'numeric') {
                 wrapped.digits = q.digits;

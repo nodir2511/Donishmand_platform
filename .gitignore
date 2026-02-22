@@ -125,3 +125,11 @@ dist
 *.njsproj
 *.sln
 *.sw?
+
+# Temporary test and setup scripts
+check_schema.js
+test_db.js
+verify_supabase.js
+seed_supabase.js
+testLogic.js
+

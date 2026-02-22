@@ -4,7 +4,7 @@ import { syllabusService } from '../services/syllabusService';
 // Контекст для хранения структуры предмета (разделы → темы → уроки)
 const SyllabusContext = createContext(null);
 
-// Re-export invalidation from service for backward compatibility
+// Экспорт функции инвалидации кэша из сервиса для обратной совместимости
 export const invalidateSyllabusCache = (subjectId) => {
     syllabusService.invalidateCache(subjectId);
 };
@@ -24,7 +24,7 @@ export const SyllabusProvider = ({ subjectId, children }) => {
         const fetchStructure = async () => {
             setLoading(true);
             try {
-                // Service handles caching now
+                // Сервис теперь сам управляет кешированием
                 const data = await syllabusService.getStructure(subjectId);
                 if (mounted) {
                     setSubjectData(data || { sections: [] });

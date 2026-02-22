@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Menu, X, Sparkles, User, LogOut, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,6 +8,7 @@ const Navbar = () => {
     const { t, i18n } = useTranslation();
     const { user, profile, signOut, permissions } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -75,8 +76,8 @@ const Navbar = () => {
                     <div className="hidden md:flex items-center bg-white/5 backdrop-blur-md rounded-full border border-white/5 p-1.5 shadow-sm">
                         <button
                             onClick={() => {
-                                if (window.location.pathname !== '/') {
-                                    window.location.href = '/#courses-section';
+                                if (location.pathname !== '/') {
+                                    navigate('/#courses-section');
                                 } else {
                                     document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
                                 }
@@ -86,23 +87,19 @@ const Navbar = () => {
                             {t('navCourses')}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
                         </button>
-                        <button
-                            onClick={() => {
-                                if (window.location.pathname !== '/') {
-                                    window.location.href = '/#courses-section';
-                                } else {
-                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
-                                }
-                            }}
-                            className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group"
-                        >
-                            {t('navLibrary')}
-                            <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
-                        </button>
+
                         <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
                             {t('navAbout')}
                             <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
                         </Link>
+
+                        {/* Ссылка Классы: для всех авторизованных (Ученики видят "Мой класс", учителя "Классы") */}
+                        {user && (
+                            <Link to="/classes" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group border-l border-white/10 ml-2 pl-6">
+                                {profile?.role === 'student' ? 'Мои классы' : 'Классы'}
+                                <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-purple -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                            </Link>
+                        )}
 
                         {/* Ссылка Creator: суперадмин или учитель с правами на редактирование */}
                         {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (
@@ -208,8 +205,8 @@ const Navbar = () => {
                         <button
                             onClick={() => {
                                 setIsOpen(false);
-                                if (window.location.pathname !== '/') {
-                                    window.location.href = '/#courses-section';
+                                if (location.pathname !== '/') {
+                                    navigate('/#courses-section');
                                 } else {
                                     document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
                                 }
@@ -218,22 +215,17 @@ const Navbar = () => {
                         >
                             {t('navCourses')}
                         </button>
-                        <button
-                            onClick={() => {
-                                setIsOpen(false);
-                                if (window.location.pathname !== '/') {
-                                    window.location.href = '/#courses-section';
-                                } else {
-                                    document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
-                                }
-                            }}
-                            className="text-left font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors"
-                        >
-                            {t('navLibrary')}
-                        </button>
+
                         <Link to="/" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
                             {t('navAbout')}
                         </Link>
+
+                        {/* Ссылка Классы (мобильное) */}
+                        {user && (
+                            <Link to="/classes" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors border-l-2 border-gaming-purple ml-2">
+                                {profile?.role === 'student' ? 'Мои классы' : 'Классы'}
+                            </Link>
+                        )}
 
                         {/* Ссылка Creator (мобильное): суперадмин или учитель с правами */}
                         {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (

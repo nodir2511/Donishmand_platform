@@ -37,7 +37,7 @@ const TextEditor = ({ data, onChange, lang }) => {
                 {lang === 'ru' ? 'Текстовый материал' : 'Матни дарсӣ'}
             </h4>
 
-            {/* Text RU */}
+            {/* Текст RU */}
             <div className="flex gap-2">
                 <div className="flex-1">
                     <label className="block text-sm text-gaming-textMuted mb-2">
@@ -60,7 +60,7 @@ const TextEditor = ({ data, onChange, lang }) => {
                 </button>
             </div>
 
-            {/* Text TJ */}
+            {/* Текст TJ */}
             <div className="flex gap-2">
                 <div className="flex-1">
                     <label className="block text-sm text-gaming-textMuted mb-2">
@@ -83,7 +83,7 @@ const TextEditor = ({ data, onChange, lang }) => {
                 </button>
             </div>
 
-            {/* Character count */}
+            {/* Количество символов */}
             <div className="flex justify-between text-xs text-gaming-textMuted">
                 <span>RU: {(data.bodyRu || '').length} {lang === 'ru' ? 'символов' : 'аломат'}</span>
                 <span>TJ: {(data.bodyTj || '').length} {lang === 'ru' ? 'символов' : 'аломат'}</span>

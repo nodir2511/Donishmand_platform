@@ -33,7 +33,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
             <div className="w-full max-w-4xl bg-gaming-card/95 rounded-3xl border border-white/10 my-8 shadow-2xl flex flex-col max-h-[90vh]">
 
-                {/* Header */}
+                {/* Шапка */}
                 <div className="flex items-center justify-between p-6 border-b border-white/10 shrink-0">
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-1">
@@ -48,7 +48,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                     </button>
                 </div>
 
-                {/* Toolbar */}
+                {/* Панель инструментов */}
                 <div className="p-4 bg-black/20 border-b border-white/5 flex justify-between items-center shrink-0">
                     <button
                         onClick={toggleAll}
@@ -61,7 +61,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                     </button>
                 </div>
 
-                {/* Questions List */}
+                {/* Список вопросов */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-8">
                     {questions.map((q, idx) => {
                         const isAnswerVisible = visibleAnswers[q.id];
@@ -92,10 +92,10 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                     </button>
                                 </div>
 
-                                {/* Content */}
+                                {/* Контент */}
                                 <div className="transition-all duration-300">
 
-                                    {/* Multiple Choice */}
+                                    {/* Один из многих */}
                                     {q.type === 'multiple_choice' && (
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-11">
                                             {q.options.map((opt, oIdx) => {
@@ -129,7 +129,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                         </div>
                                     )}
 
-                                    {/* Matching */}
+                                    {/* Установление соответствия */}
                                     {q.type === 'matching' && (
                                         <div className="pl-11 space-y-4">
                                             <div className="grid grid-cols-2 gap-8">
@@ -182,7 +182,7 @@ const TestTeacherView = ({ questions, lang, onClose }) => {
                                         </div>
                                     )}
 
-                                    {/* Numeric */}
+                                    {/* Числовой ответ */}
                                     {q.type === 'numeric' && (
                                         <div className="pl-11">
                                             <div className="inline-flex items-center gap-3 px-4 py-2 bg-green-500/5 border border-white/5 rounded-xl transition-all duration-300">

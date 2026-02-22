@@ -46,7 +46,7 @@ const LessonPage = () => {
     const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin; // Учитель, админ или суперадмин — не сохраняет прогресс
 
-    // ЗАГРУЗКА ДАННЫХ
+    // ЗАГРУЗКА ДАННЫХ И ПРОГРЕССА
     useEffect(() => {
         const fetchLessonData = async () => {
             setLoading(true);
@@ -60,9 +60,7 @@ const LessonPage = () => {
                     return;
                 }
 
-                // 2. Получаем структуру предмета, чтобы найти контекст (предыдущий/следующий урок, заголовки)
-                // Если subject есть в уроке - используем его. 
-                // Если нет (старые данные) - придется искать (но для MVP считаем что есть).
+                // 2. Получаем структуру предмета
                 const subjectKey = lesson.subject;
                 let contextData = null;
 
@@ -70,7 +68,6 @@ const LessonPage = () => {
                     const structure = await syllabusService.getStructure(subjectKey);
 
                     if (structure && structure.sections) {
-                        // Ищем наш урок в структуре
                         for (let sIndex = 0; sIndex < structure.sections.length; sIndex++) {
                             const sec = structure.sections[sIndex];
                             if (!sec.topics) continue;
@@ -81,7 +78,7 @@ const LessonPage = () => {
 
                                 if (lIndex !== -1) {
                                     contextData = {
-                                        lesson: { ...lesson, ...top.lessons[lIndex], content: lesson.content }, // Мержим данные из БД и структуры
+                                        lesson: { ...lesson, ...top.lessons[lIndex], content: lesson.content },
                                         topic: top,
                                         section: sec,
                                         subjectKey,
@@ -97,7 +94,72 @@ const LessonPage = () => {
                     }
                 }
 
-                setLessonData(contextData || { lesson, subjectKey }); // Если контекст не найден, хотя бы урок покажем
+                setLessonData(contextData || { lesson, subjectKey });
+
+                // 3. Загружаем прогресс с сервера для учеников
+                if (!isTeacher) {
+                    const { data: user } = await supabase.auth.getUser();
+                    if (user?.user?.id) {
+                        // Прогресс по уроку
+                        const { data: progressData } = await supabase
+                            .from('user_lesson_progress')
+                            .select('*')
+                            .eq('lesson_id', lessonId)
+                            .eq('user_id', user.user.id)
+                            .single();
+
+                        // Результаты тестов
+                        const { data: testData } = await supabase
+                            .from('user_test_results')
+                            .select('*')
+                            .eq('lesson_id', lessonId)
+                            .eq('user_id', user.user.id);
+
+                        if (progressData || testData) {
+                            setProgress(prev => {
+                                const newProgress = { ...prev };
+
+                                if (progressData) {
+                                    if (progressData.video_watched) newProgress.videoWatched = true;
+                                    if (progressData.text_read) newProgress.textRead = true;
+
+                                    // Для слайдов мы храним только количество, поэтому эмулируем просмотренные ID
+                                    // Если просмотрено N слайдов, считаем массивом [0, 1, ... N]
+                                    if (progressData.slides_viewed_count > 0 && lesson.content?.slidesRu) {
+                                        const slides = lang === 'tj' ? lesson.content.slidesTj : lesson.content.slidesRu;
+                                        const slidesToMock = Math.min(progressData.slides_viewed_count, progressData.total_slides || slides?.length || 0);
+                                        // Локальное кэширование все равно работает по ID, так что смешиваем
+                                        const mockIds = (slides || []).slice(0, slidesToMock).map(s => s.id);
+                                        newProgress.slidesViewed = [...new Set([...prev.slidesViewed, ...mockIds])];
+                                    }
+                                }
+
+                                if (testData && testData.length > 0) {
+                                    // Конвертируем из БД в локальный формат для статистики
+                                    const historyFromDb = testData.map(t => ({
+                                        score: t.score,
+                                        correct: t.correct_count,
+                                        total: t.total_questions,
+                                        timestamp: new Date(t.created_at).getTime(),
+                                        passed: t.is_passed
+                                    }));
+                                    // Объединяем с локальной историей, чтобы не затереть то что только что сдали офлайн
+                                    const merged = [...prev.testHistory, ...historyFromDb];
+                                    // Убираем дубликаты по времени (примерно)
+                                    const unique = Object.values(merged.reduce((acc, curr) => {
+                                        // Округляем до секунды для дедупликации
+                                        const key = Math.round(curr.timestamp / 1000);
+                                        acc[key] = curr;
+                                        return acc;
+                                    }, {}));
+                                    newProgress.testHistory = unique.sort((a, b) => a.timestamp - b.timestamp);
+                                }
+
+                                return newProgress;
+                            });
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Error fetching lesson:', error);
             } finally {
@@ -106,7 +168,7 @@ const LessonPage = () => {
         };
 
         fetchLessonData();
-    }, [lessonId, lang]);
+    }, [lessonId, lang, isTeacher]);
 
 
     // Определение существующего контента
@@ -170,11 +232,34 @@ const LessonPage = () => {
         }
     }, [loading, hasVideo, hasText, hasSlides]);
 
+    // Сохранение прогресса в БД
+    const syncProgressToDb = async (updates) => {
+        if (isTeacher) return;
+        try {
+            const { data: user } = await supabase.auth.getUser();
+            if (!user?.user?.id) return;
+
+            // Upsert (создаст или обновит запись)
+            await supabase.from('user_lesson_progress').upsert({
+                user_id: user.user.id,
+                lesson_id: lessonId,
+                ...updates,
+                updated_at: new Date()
+            }, { onConflict: 'user_id,lesson_id' });
+
+        } catch (err) {
+            console.error('Failed to sync progress:', err);
+        }
+    };
+
     // Пометить видео как просмотренное
     const handleVideoComplete = () => {
         if (isTeacher) return; // Учитель не сохраняет прогресс
-        localStorage.setItem(getProgressKey(lessonId, 'video'), 'true');
-        setProgress(prev => ({ ...prev, videoWatched: true }));
+        if (!progress.videoWatched) {
+            localStorage.setItem(getProgressKey(lessonId, 'video'), 'true');
+            setProgress(prev => ({ ...prev, videoWatched: true }));
+            syncProgressToDb({ video_watched: true });
+        }
     };
 
     // Пометить текст как прочитанный
@@ -183,6 +268,7 @@ const LessonPage = () => {
         if (!progress.textRead) {
             localStorage.setItem(getProgressKey(lessonId, 'text'), 'true');
             setProgress(prev => ({ ...prev, textRead: true }));
+            syncProgressToDb({ text_read: true });
         }
     };
 
@@ -192,6 +278,10 @@ const LessonPage = () => {
         const newViewed = [...new Set([...progress.slidesViewed, slideId])];
         localStorage.setItem(getProgressKey(lessonId, 'slides'), JSON.stringify(newViewed));
         setProgress(prev => ({ ...prev, slidesViewed: newViewed }));
+        syncProgressToDb({
+            slides_viewed_count: newViewed.length,
+            total_slides: totalSlides
+        });
     };
 
     // Обработка клика по кнопке теста
@@ -522,7 +612,7 @@ const LessonPage = () => {
                                                 <button
                                                     key={slide.id}
                                                     onClick={() => {
-                                                        handleSlideView(slide.id); // Mark as viewed when clicked
+                                                        handleSlideView(slide.id); // Отметить как просмотренное при клике
                                                         setShowSlidesViewer(true);
                                                     }}
                                                     className="relative w-full rounded-2xl overflow-hidden border border-white/5 hover:border-gaming-gold/30 transition-all group shadow-lg"

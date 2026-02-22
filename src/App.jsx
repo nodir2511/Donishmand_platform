@@ -13,6 +13,11 @@ const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
 const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
 const AdminPage = React.lazy(() => import('./components/pages/AdminPage'));
 const AuthPage = React.lazy(() => import('./components/pages/AuthPage'));
+
+// Classes pages
+const ClassesPage = React.lazy(() => import('./components/pages/classes/ClassesPage'));
+const ClassDetailsPage = React.lazy(() => import('./components/pages/classes/ClassDetailsPage'));
+
 const ProfilePage = React.lazy(() => import('./components/pages/ProfilePage'));
 const NotFoundPage = React.lazy(() => import('./components/pages/NotFoundPage'));
 
@@ -53,24 +58,34 @@ function AppContent() {
                         <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage />} />
                         <Route path="/lesson/:lessonId" element={<LessonPage />} />
 
-                        {/* Protected Route for Creator */}
+                        {/* Защищенный маршрут для создателя курса */}
                         <Route
                             path="/creator"
                             element={
-                                <ProtectedRoute requireTeacher={true}>
+                                <ProtectedRoute allowedRoles={['teacher', 'admin', 'super_admin']}>
                                     <CreatorPage />
                                 </ProtectedRoute>
                             }
                         />
 
-                        <Route
-                            path="/admin"
-                            element={
-                                <ProtectedRoute requireAdmin={true}>
-                                    <AdminPage />
-                                </ProtectedRoute>
-                            }
-                        />
+                        {/* Administration Route */}
+                        <Route path="/admin" element={
+                            <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+                                <AdminPage />
+                            </ProtectedRoute>
+                        } />
+
+                        {/* Classes Routes */}
+                        <Route path="/classes" element={
+                            <ProtectedRoute>
+                                <ClassesPage />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/classes/:classId" element={
+                            <ProtectedRoute>
+                                <ClassDetailsPage />
+                            </ProtectedRoute>
+                        } />
 
                         <Route path="/login" element={<AuthPage />} />
 

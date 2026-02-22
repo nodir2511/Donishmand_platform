@@ -4,13 +4,13 @@ import { useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, Plus, Trash2, Save, FileText, Video, ClipboardList, Presentation,
     ChevronDown, ChevronRight, GripVertical, Edit3, ArrowRightLeft, Loader2, GraduationCap,
-    FolderPlus, Book, Layers
+    FolderPlus, Book, Layers, Sparkles
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { SUBJECT_NAMES, ALL_SUBJECTS_LIST } from '../../constants/data';
-// import LessonContentEditor from '../creator/LessonContentEditor'; // Lazy load instead
+// import LessonContentEditor from '../creator/LessonContentEditor'; // Используем ленивую загрузку (Lazy load)
 const LessonContentEditor = React.lazy(() => import('../creator/LessonContentEditor'));
 import { translateText } from '../../services/translationService';
 
@@ -131,7 +131,7 @@ const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, onDelet
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-                {/* Move Button */}
+                {/* Кнопка перемещения */}
                 <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'move'); }}
                     className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors"
@@ -176,7 +176,7 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose }) => {
             }
         } else if (itemType === 'lesson') {
             if (selectedSectionId && selectedTopicId) {
-                // If moving to same topic, do nothing or handle reorder (but this modal is for moving *between* containers)
+                // Если тема та же самая - ничего не делаем (это модальное окно для перемещения МЕЖДУ контейнерами)
                 if (selectedSectionId !== item.fromSectionId || selectedTopicId !== item.fromTopicId) {
                     onMove(selectedSectionId, selectedTopicId);
                 }
@@ -191,7 +191,7 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose }) => {
                     {t('creator.moveTo')}
                 </h3>
 
-                {/* Select Section */}
+                {/* Выбор раздела */}
                 <div className="mb-4">
                     <label className="block text-sm text-gaming-textMuted mb-2">
                         {t('creator.section')}
@@ -208,7 +208,7 @@ const MoveModal = ({ item, itemType, syllabus, onMove, onClose }) => {
                     </select>
                 </div>
 
-                {/* Select Topic (Only for Lessons) */}
+                {/* Выбор темы (только для уроков) */}
                 {itemType === 'lesson' && (
                     <div className="mb-4">
                         <label className="block text-sm text-gaming-textMuted mb-2">
@@ -507,7 +507,7 @@ const CreatorPage = () => {
             id: `les_${Date.now()}`,
             title: newLessonTitleRu.trim(),
             titleTj: newLessonTitleTj.trim() || autoTranslate(newLessonTitleRu.trim(), 'ru', 'tj'),
-            type: 'text', // Default type, will be updated based on content
+            type: 'text', // Тип по умолчанию, будет обновлен на основе контента
             content: {}
         };
         setSyllabus(prev => ({
@@ -528,40 +528,82 @@ const CreatorPage = () => {
     };
 
     // ОБРАБОТЧИКИ УДАЛЕНИЯ
-    const handleDeleteSection = (sectionId) => {
-        setSyllabus(prev => ({
-            ...prev,
-            [selectedSubject]: { ...prev[selectedSubject], sections: prev[selectedSubject].sections.filter(sec => sec.id !== sectionId) }
-        }));
+    const handleDeleteSection = async (sectionId) => {
+        if (!window.confirm('Вы точно хотите удалить этот раздел и все его уроки? Это действие нельзя отменить.')) return;
+
+        try {
+            const section = syllabus[selectedSubject]?.sections.find(s => s.id === sectionId);
+            if (section) {
+                const lessonIds = section.topics.flatMap(t => t.lessons.map(l => l.id));
+                if (lessonIds.length > 0) {
+                    await syllabusService.deleteLessons(lessonIds).catch(console.error);
+                }
+            }
+
+            setSyllabus(prev => ({
+                ...prev,
+                [selectedSubject]: { ...prev[selectedSubject], sections: prev[selectedSubject].sections.filter(sec => sec.id !== sectionId) }
+            }));
+            invalidateSyllabusCache(selectedSubject);
+        } catch (error) {
+            console.error('Ошибка удаления раздела: ', error);
+        }
     };
 
-    const handleDeleteTopic = (sectionId, topicId) => {
-        setSyllabus(prev => ({
-            ...prev,
-            [selectedSubject]: {
-                ...prev[selectedSubject],
-                sections: prev[selectedSubject].sections.map(sec =>
-                    sec.id === sectionId ? { ...sec, topics: sec.topics.filter(top => top.id !== topicId) } : sec
-                )
+    const handleDeleteTopic = async (sectionId, topicId) => {
+        if (!window.confirm('Вы точно хотите удалить эту тему и все её уроки? Это действие нельзя отменить.')) return;
+
+        try {
+            const section = syllabus[selectedSubject]?.sections.find(s => s.id === sectionId);
+            const topic = section?.topics.find(t => t.id === topicId);
+            if (topic) {
+                const lessonIds = topic.lessons.map(l => l.id);
+                if (lessonIds.length > 0) {
+                    await syllabusService.deleteLessons(lessonIds).catch(console.error);
+                }
             }
-        }));
+
+            setSyllabus(prev => ({
+                ...prev,
+                [selectedSubject]: {
+                    ...prev[selectedSubject],
+                    sections: prev[selectedSubject].sections.map(sec =>
+                        sec.id === sectionId ? { ...sec, topics: sec.topics.filter(top => top.id !== topicId) } : sec
+                    )
+                }
+            }));
+            invalidateSyllabusCache(selectedSubject);
+        } catch (error) {
+            console.error('Ошибка удаления темы: ', error);
+        }
     };
 
-    const handleDeleteLesson = (sectionId, topicId, lessonId) => {
-        setSyllabus(prev => ({
-            ...prev,
-            [selectedSubject]: {
-                ...prev[selectedSubject],
-                sections: prev[selectedSubject].sections.map(sec =>
-                    sec.id === sectionId ? {
-                        ...sec,
-                        topics: sec.topics.map(top =>
-                            top.id === topicId ? { ...top, lessons: top.lessons.filter(les => les.id !== lessonId) } : top
-                        )
-                    } : sec
-                )
-            }
-        }));
+    const handleDeleteLesson = async (sectionId, topicId, lessonId) => {
+        if (!window.confirm(t('creator.confirmDelete'))) return;
+
+        try {
+            await syllabusService.deleteLesson(lessonId);
+
+            setSyllabus(prev => ({
+                ...prev,
+                [selectedSubject]: {
+                    ...prev[selectedSubject],
+                    sections: prev[selectedSubject].sections.map(sec =>
+                        sec.id === sectionId ? {
+                            ...sec,
+                            topics: sec.topics.map(top =>
+                                top.id === topicId ? { ...top, lessons: top.lessons.filter(les => les.id !== lessonId) } : top
+                            )
+                        } : sec
+                    )
+                }
+            }));
+            // Сбрасываем кэш, так как структура могла сломаться если урок останется в индексе
+            invalidateSyllabusCache(selectedSubject);
+        } catch (error) {
+            console.error('Ошибка удаления урока из БД:', error);
+            alert('Не удалось полностью удалить контент урока из базы данных.');
+        }
     };
 
 
@@ -744,6 +786,33 @@ const CreatorPage = () => {
     };
 
     const [isLessonSaving, setIsLessonSaving] = useState(false);
+    const [autoSaveStatus, setAutoSaveStatus] = useState(null); // 'saving', 'saved', 'error', null
+
+    const handleAutoSaveLesson = async (updatedContent) => {
+        if (!editingLessonContext || !editingLesson) return;
+
+        setAutoSaveStatus('saving');
+        try {
+            const updatedLesson = { ...editingLesson, content: updatedContent };
+
+            let detectedType = 'text';
+            if ((updatedLesson.content.test?.questions?.length || 0) > 0) detectedType = 'test';
+            else if (updatedLesson.content.video?.url || updatedLesson.content.video?.urlTj) detectedType = 'video';
+            else if ((updatedLesson.content.slidesRu?.length || 0) > 0 || (updatedLesson.content.slidesTj?.length || 0) > 0) detectedType = 'presentation';
+
+            const lessonToSave = { ...updatedLesson, type: detectedType };
+
+            await syllabusService.saveLesson(lessonToSave, selectedSubject);
+
+            setEditingLesson(lessonToSave);
+
+            setAutoSaveStatus('saved');
+            setTimeout(() => setAutoSaveStatus(null), 3000);
+        } catch (error) {
+            console.error('Ошибка автосохранения:', error);
+            setAutoSaveStatus('error');
+        }
+    };
 
     const handleSaveLesson = async (updatedLesson) => {
         setIsLessonSaving(true);
@@ -1160,6 +1229,8 @@ const CreatorPage = () => {
                 <LessonContentEditor
                     lesson={editingLesson}
                     onSave={handleSaveLesson}
+                    onAutoSave={handleAutoSaveLesson}
+                    autoSaveStatus={autoSaveStatus}
                     onClose={() => { if (!isLessonSaving) { setEditingLesson(null); setEditingLessonContext(null); } }}
                     lang={lang}
                     isSaving={isLessonSaving}

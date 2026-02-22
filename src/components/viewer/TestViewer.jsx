@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { X, CheckCircle, XCircle, ArrowRight, ChevronLeft, ChevronRight, Trophy, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
 import { shuffleArray } from '../../utils/shuffle';
 import { renderKatex } from '../../utils/katexRenderer';
+import { supabase } from '../../services/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PASS_THRESHOLD = 80;
 
@@ -13,6 +15,10 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const [shakeWarning, setShakeWarning] = useState(false); // Предупреждение при незаполненных ответах
     const [warningMessage, setWarningMessage] = useState('');
     const [lockedQuestions, setLockedQuestions] = useState(new Set()); // Вопросы, заблокированные после перехода
+
+    // Определяем режим учителя, чтобы не сохранять прогресс
+    const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
+    const isTeacher = rawIsTeacher || isAdmin;
 
     // --- ФУНКЦИИ БЕЗОПАСНОСТИ НАЧАЛО ---
     const [isFocused, setIsFocused] = useState(true);
@@ -41,7 +47,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     }, []);
     // --- ФУНКЦИИ БЕЗОПАСНОСТИ КОНЕЦ ---
 
-    const progressKey = `test_progress_v2_${lessonId}`; // v2 forces fresh start
+    const progressKey = `test_progress_v2_${lessonId}`; // v2 принудительно начинает сначала
 
     // Рандомизация вопросов с восстановлением прогресса
     const randomizedQuestions = useMemo(() => {
@@ -235,6 +241,24 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
         // Сохранение последнего результата (для обратной совместимости)
         localStorage.setItem(`test_result_${lessonId}`, JSON.stringify(newResult));
+
+        // Сохранение в базу данных Supabase (если не учитель)
+        if (!isTeacher) {
+            supabase.auth.getUser().then(({ data: user }) => {
+                if (user?.user?.id) {
+                    supabase.from('user_test_results').insert({
+                        user_id: user.user.id,
+                        lesson_id: lessonId,
+                        score: score,
+                        correct_count: correct,
+                        total_questions: totalQuestions,
+                        is_passed: isPassed
+                    }).then(({ error }) => {
+                        if (error) console.error('Failed to save test result to DB:', error);
+                    });
+                }
+            });
+        }
 
         // Сбор монет при успешной сдаче
         if (isPassed) {

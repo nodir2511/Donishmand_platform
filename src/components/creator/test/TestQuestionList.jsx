@@ -24,23 +24,27 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, lang }) => {
 
     const Icon = QUESTION_ICONS[question.type] || List;
 
-    // Improved question text resolution with legacy support
-    // We EXCLUDE fields if they contain only numbers (legacy IDs/sequences/answers like 25, 1234)
+    // Улучшенное определение текста вопроса с поддержкой устаревших данных
+    // Мы ИСКЛЮЧАЕМ устаревшие поля, если они содержат только числа (старые ID/последовательности/ответы вроде 25, 1234)
     const getQuestionText = () => {
         const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
         const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
 
-        // Проверяем все возможные поля на наличие нечислового текста
-        // 'question' часто содержит текст в старых данных, в то время как 'text' может быть ответом
-        const variants = [
-            currentLang === 'tj' ? question.textTj : question.textRu,
-            currentLang === 'tj' ? question.textRu : question.textTj,
+        // Новые поля (textRu, textTj) - выводим как есть (не фильтруя через isNumeric, так как там может быть любой текст)
+        const primaryText = currentLang === 'tj' ? question.textTj : question.textRu;
+        const secondaryText = currentLang === 'tj' ? question.textRu : question.textTj;
+
+        if (primaryText && stripHtmlTags(primaryText).length > 0) return primaryText;
+        if (secondaryText && stripHtmlTags(secondaryText).length > 0) return secondaryText;
+
+        // Для устаревших полей применяем фильтрацию isNumeric
+        const legacyVariants = [
             question.question,
             question.text,
             question.title
         ];
 
-        for (const v of variants) {
+        for (const v of legacyVariants) {
             if (v && !isNumeric(v)) return v;
         }
 
@@ -49,14 +53,14 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, lang }) => {
 
     const questionText = getQuestionText();
 
-    // Safer HTML stripping using DOMParser or Regex
+    // Безопасное удаление HTML-тегов с использованием DOMParser или регулярных выражений
     const stripHtml = (html) => {
         if (!html) return '';
-        // Replace block tags with space to prevent words merging
+        // Заменяем блочные теги пробелом для предотвращения слипания слов
         let text = html.replace(/<\/(p|div|h\d|li|br)>/g, ' ');
-        // Regex to strip tags
+        // Регулярное выражение для удаления тегов
         text = text.replace(/<[^>]*>?/gm, '');
-        // Decode common entities and trim
+        // Декодируем общие сущности и обрезаем пробелы
         return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
     };
 

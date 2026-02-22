@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Save, Video, FileText, ClipboardList, Presentation, Loader2 } from 'lucide-react';
+import { X, Save, Video, FileText, ClipboardList, Presentation, Loader2, CheckCircle2 } from 'lucide-react';
 import VideoEditor from './VideoEditor';
 import TextEditor from './TextEditor';
 import TestEditor from './TestEditor';
 import SlidesEditor from './SlidesEditor';
+import useDebounce from '../../hooks/useDebounce';
 
 const TABS = [
     { id: 'video', icon: Video, label: 'creator.video' },
@@ -13,7 +14,7 @@ const TABS = [
     { id: 'slides', icon: Presentation, label: 'creator.presentation' },
 ];
 
-const LessonContentEditor = ({ lesson, onSave, onClose, isSaving }) => {
+const LessonContentEditor = ({ lesson, onSave, onAutoSave, onClose, isSaving, autoSaveStatus }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const [activeTab, setActiveTab] = useState('video');
@@ -25,6 +26,16 @@ const LessonContentEditor = ({ lesson, onSave, onClose, isSaving }) => {
         slidesTj: []
     });
 
+    const debouncedContent = useDebounce(content, 1500);
+
+    // Авто-сохранение контента
+    useEffect(() => {
+        // Если контент изменился по сравнению с изначальным lesson.content или прошлым сохраненным
+        if (onAutoSave && debouncedContent && JSON.stringify(debouncedContent) !== JSON.stringify(lesson.content)) {
+            onAutoSave(debouncedContent);
+        }
+    }, [debouncedContent]);
+
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
     };
@@ -35,10 +46,6 @@ const LessonContentEditor = ({ lesson, onSave, onClose, isSaving }) => {
 
     const handleSave = () => {
         onSave({ ...lesson, content });
-        // Не закрываем здесь, закрытие будет после успешного сохранения в родителе
-        // Но если родитель просто обновляет стейт, то закроем?
-        // Лучше передать ответственность за закрытие родителю или ждать успешного промиса.
-        // Для простоты: Родитель сам решит когда закрыть (после await save).
     };
 
     return (
@@ -46,10 +53,24 @@ const LessonContentEditor = ({ lesson, onSave, onClose, isSaving }) => {
             <div className="w-full max-w-4xl h-[90vh] sm:h-auto sm:max-h-[90vh] bg-gaming-card/95 backdrop-blur-xl rounded-t-3xl sm:rounded-3xl border border-white/10 overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 shrink-0">
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-bold">
-                            {t('creator.editing')}
-                        </h2>
+                    <div className="flex flex-col">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl sm:text-2xl font-bold">
+                                {t('creator.editing')}
+                            </h2>
+                            {autoSaveStatus === 'saving' && (
+                                <span className="flex items-center gap-1 text-xs px-2 py-1 bg-white/5 rounded-full text-gaming-textMuted">
+                                    <Loader2 size={12} className="animate-spin" />
+                                    Сохранение...
+                                </span>
+                            )}
+                            {autoSaveStatus === 'saved' && (
+                                <span className="flex items-center gap-1 text-xs px-2 py-1 bg-green-500/10 text-green-400 rounded-full">
+                                    <CheckCircle2 size={12} />
+                                    Сохранено в базу
+                                </span>
+                            )}
+                        </div>
                         <p className="text-gaming-textMuted mt-1 text-sm sm:text-base truncate max-w-[200px] sm:max-w-md">
                             {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
                         </p>

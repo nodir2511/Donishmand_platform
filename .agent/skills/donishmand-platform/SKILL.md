@@ -104,3 +104,11 @@ Fullscreen modals should:
 - **Context**: Use `AuthContext` to manage user session globally.
 - **Profiles**: User data (role, school, grade) must be stored in a `profiles` table, linked to `auth.users` by ID.
 - **Hooks**: Use custom hooks `useAuth()` to access user state.
+
+## 13. Data Integrity & Parsing (Supabase Constraints)
+- **Undefined Values**: Supabase REST API (PostgREST) strict JSON parsers will throw `406 Not Acceptable` if a JSON object contains `undefined` values. Before updating JSONB columns, ALWAYS clean the payload using a recursive `cleanUndefined` utility (which must preserve `Date` objects).
+- **Numeric Filtering**: When implementing backward compatibility parsers for old database schemas, **NEVER** use aggressive filtering like `isNumeric` (e.g., `/^\d+$/`) on new database fields. Legitimate content such as "123" or math answers like "2" must be saved and loaded as-is without being stripped.
+- **Data Deletion (Cascade)**: When deleting high-level entities (e.g., Users, Course Sections, Topics) from the UI, **ALWAYS** execute the corresponding SQL `DELETE` queries to physically remove all nested dependent records (like `lessons` or `profiles`). DO NOT leave "orphaned" dummy data in the database.
+
+## 14. Code Completeness
+- Do not leave empty template structures or `// TODO` comments for features you are assigned to implement. All related logic, localization keys, and database queries must be created simultaneously.

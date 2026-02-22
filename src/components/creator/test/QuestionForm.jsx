@@ -11,7 +11,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
 
-    // Local state for the form with legacy data support
+    // Локальное состояние формы с поддержкой устаревших данных
     const [q, setQ] = useState(() => {
         const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
         const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
@@ -25,7 +25,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
             return '';
         };
 
-        // Migration for main question
+        // Миграция для основного вопроса
         const base = {
             ...initialQuestion,
             textRu: initialQuestion.textRu || getValidLegacyText(initialQuestion),
@@ -34,7 +34,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
             imageTj: initialQuestion.imageTj ?? null,
         };
 
-        // Migration for options
+        // Миграция для вариантов ответа
         if (base.options) {
             base.options = base.options.map(opt => ({
                 ...opt,
@@ -45,7 +45,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
             }));
         }
 
-        // Migration for matching leftItems
+        // Миграция для элементов слева (соответствие)
         if (base.leftItems) {
             base.leftItems = base.leftItems.map(item => ({
                 ...item,
@@ -56,7 +56,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
             }));
         }
 
-        // Migration for matching rightItems
+        // Миграция для элементов справа (соответствие)
         if (base.rightItems) {
             base.rightItems = base.rightItems.map(item => ({
                 ...item,
@@ -114,7 +114,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
         setTranslating(prev => ({ ...prev, [key]: true }));
         try {
             const translated = await translateText(text, direction === 'ru_tj' ? 'ru' : 'tj', direction === 'ru_tj' ? 'tj' : 'ru');
-            // Helper to set nested value
+            // Вспомогательная функция для установки вложенного значения
             if (fieldPath.length === 1) {
                 updateField(fieldPath[0], translated);
             } else if (fieldPath[0] === 'options') {

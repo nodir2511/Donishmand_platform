@@ -211,8 +211,8 @@ const RichTextEditor = ({ content, onChange, placeholder, minHeight = '200px', m
         fileInputRef.current?.click();
     };
 
-    // Memoize extensions to prevent re-creation on every render, which can cause "Duplicate extension" warnings
-    // especially in React Strict Mode or during hot-reloads.
+    // Мемоизируем расширения для предотвращения пересоздания при каждом рендере, что может вызвать предупреждения "Duplicate extension"
+    // особенно в React Strict Mode или во время hot-reload'ов.
     const extensions = React.useMemo(() => [
         StarterKit,
         Subscript,

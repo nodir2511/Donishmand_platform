@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import HeroSection from '../sections/HeroSection';
-import ClusterSelect from '../features/ClusterSelect';
 import CourseCard from '../features/CourseCard';
+import OnboardingSubjectsSection from '../features/OnboardingSubjectsSection';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -11,6 +12,15 @@ const HomePage = () => {
     const [activeClusterId, setActiveClusterId] = useState(0);
     const lang = i18n.resolvedLanguage || 'ru';
     const { profile } = useAuth();
+    const location = useLocation();
+
+    useEffect(() => {
+        if (location.hash === '#courses-section') {
+            setTimeout(() => {
+                document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }, [location]);
 
     // Определяем доступные предметы в зависимости от роли
     const getSubjectsForRole = () => {
@@ -26,47 +36,58 @@ const HomePage = () => {
             return [profile.subject];
         }
 
-        // Ученик — по кластеру из профиля
-        if (profile?.cluster_id) {
-            const cluster = CLUSTERS_STRUCTURE.find(c => c.id === profile.cluster_id);
-            return cluster ? cluster.subjects : ALL_SUBJECTS_LIST;
+        // Выбранные предметы ученика
+        if (profile?.selected_subjects && profile.selected_subjects.length > 0) {
+            return profile.selected_subjects;
         }
 
-        // По умолчанию (неавторизованные или без кластера) — показать по выбранному фильтру
+        // По умолчанию (неавторизованные) — показать по выбранному фильтру
         if (activeClusterId === 0) return ALL_SUBJECTS_LIST;
         const cluster = CLUSTERS_STRUCTURE.find(c => c.id === activeClusterId);
         return cluster ? cluster.subjects : [];
     };
 
     const subjectsToDisplay = getSubjectsForRole();
+    const isStudent = profile?.role === 'student' || !profile?.role;
+    const hasSelectedSubjects = profile?.selected_subjects && profile.selected_subjects.length > 0;
+    const isTeacher = profile?.role === 'teacher';
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+    const isGuest = !profile;
 
     // Определяем заголовок секции
     const getSectionTitle = () => {
-        if (profile?.role === 'teacher' && profile?.subject) {
+        if (isTeacher && profile?.subject) {
             return t('allSubjects'); // Учитель видит только один предмет
         }
-        if (profile?.cluster_id && profile?.role !== 'admin' && profile?.role !== 'super_admin') {
-            const cluster = CLUSTERS_STRUCTURE.find(c => c.id === profile.cluster_id);
-            if (cluster) {
-                return `${t('cluster')} ${cluster.id}: ${lang === 'ru' ? cluster.titleRu : cluster.titleTj}`;
-            }
+        if (isStudent && hasSelectedSubjects) {
+            return 'Мои предметы';
         }
         if (activeClusterId === 0) return t('allSubjects');
         const cluster = CLUSTERS_STRUCTURE.find(c => c.id === activeClusterId);
-        return `${t('cluster')} ${activeClusterId}: ${lang === 'ru' ? cluster.titleRu : cluster.titleTj}`;
+        return `${t('cluster')} ${activeClusterId}: ${lang === 'ru' ? cluster?.titleRu : cluster?.titleTj}`;
     };
 
     // Показывать ли переключатель кластеров
-    // Учитель и ученик с кластером НЕ видят переключатель
-    const showClusterSelect = !profile?.cluster_id || profile?.role === 'admin' || profile?.role === 'super_admin';
-    const isTeacherSingleSubject = profile?.role === 'teacher' && profile?.subject;
+    // Показываем ТОЛЬКО гостям
+    const showClusterSelect = isGuest;
+
+    // Скрываем HeroSection для всех авторизованных
+    const showHeroSection = isGuest;
+
+    // Если это студент, который еще не выбрал предметы, показываем ТОЛЬКО онбординг
+    if (!isGuest && isStudent && !hasSelectedSubjects) {
+        return (
+            <main className="relative">
+                <OnboardingSubjectsSection />
+            </main>
+        );
+    }
 
     return (
         <main className="relative">
-            <HeroSection />
+            {showHeroSection && <HeroSection />}
 
-            {/* Переключатель кластеров (скрыт для учеников с кластером и учителей) */}
-            {showClusterSelect && !isTeacherSingleSubject && (
+            {showClusterSelect && (
                 <ClusterSelect
                     activeClusterId={activeClusterId}
                     setActiveClusterId={setActiveClusterId}

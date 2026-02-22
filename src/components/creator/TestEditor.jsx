@@ -16,12 +16,12 @@ const TestEditor = ({ data, onChange, lang }) => {
     const { t } = useTranslation();
     const questions = data.questions || [];
 
-    // UI State
+    // Состояние пользовательского интерфейса
     const [editingQuestionId, setEditingQuestionId] = useState(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [activeMenu, setActiveMenu] = useState(null);
 
-    // Dnd Sensors
+    // Сенсоры Drag-and-Drop
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -31,10 +31,10 @@ const TestEditor = ({ data, onChange, lang }) => {
 
     const handleAddQuestion = (type) => {
         const newQuestion = {
-            id: `new_${Date.now()}`, // Temporary ID for new question
+            id: `new_${Date.now()}`, // Временный ID для нового вопроса
             type,
             textRu: '', textTj: '', imageRu: null, imageTj: null,
-            // Init based on type
+            // Инициализация на основе типа
             ...(type === 'multiple_choice' ? {
                 options: Array(4).fill(null).map((_, i) => ({
                     id: `opt_${Date.now()}_${i}`,
@@ -66,10 +66,10 @@ const TestEditor = ({ data, onChange, lang }) => {
         };
 
         setEditingQuestionId(newQuestion.id);
-        // We temporarily store the new question in state only when passing to modal
-        // But to simplify, we can add it to list immediately? 
-        // Better pattern: Modal works on a detached object. On save, we add/update.
-        // So we need a "draft" state.
+        // Мы временно храним новый вопрос в состоянии только при передаче в модальное окно
+        // Но для упрощения, мы можем добавить его в список сразу?
+        // Лучший паттерн: Модальное окно работает с отдеённым объектом. При сохранении мы добавляем/обновляем.
+        // Поэтому нам нужно состояние "черновика".
         setDraftQuestion(newQuestion);
         setIsModalOpen(true);
         setActiveMenu(null);
@@ -92,13 +92,13 @@ const TestEditor = ({ data, onChange, lang }) => {
         let newQuestions = [...questions];
 
         if (updatedQuestion.id.startsWith('new_')) {
-            // It's a new question, replace temp ID with permanent one?
-            // Actually, keep unique timestamp ID is fine, just remove 'new_' prefix if we want
-            // or just treat it as a valid ID. Let's update ID to be sure.
+            // Это новый вопрос, заменить временный ID на постоянный?
+            // На самом деле, оставить уникальный timestamp ID - нормально, можно просто убрать префикс 'new_'
+            // или просто считать его валидным ID. Давайте обновим ID для уверенности.
             const finalQuestion = { ...updatedQuestion, id: updatedQuestion.id.replace('new_', 'q_') };
             newQuestions.push(finalQuestion);
         } else {
-            // Update existing
+            // Обновление существующего
             const index = newQuestions.findIndex(q => q.id === updatedQuestion.id);
             if (index !== -1) newQuestions[index] = updatedQuestion;
         }
@@ -153,7 +153,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                 </div>
             </div>
 
-            {/* List */}
+            {/* Список */}
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={questions.map(q => q.id)} strategy={verticalListSortingStrategy}>
                     <TestQuestionList
@@ -173,7 +173,7 @@ const TestEditor = ({ data, onChange, lang }) => {
                 </div>
             )}
 
-            {/* Modal */}
+            {/* Модальное окно */}
             {isModalOpen && draftQuestion && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in-up">
                     <QuestionForm

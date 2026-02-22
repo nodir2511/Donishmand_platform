@@ -23,7 +23,7 @@ const splitContent = (content) => {
         if (!questions || !Array.isArray(questions)) return { ru: [], tj: [] };
 
         const ru = questions.map(q => {
-            // Priority: new imageRu field, then legacy image field
+            // Приоритет: новое поле imageRu, затем устаревшее поле image
             const base = { id: q.id, type: q.type, image: q.imageRu || q.image };
             base.text = q.textRu || '';
             if (q.type === 'multiple_choice') {
@@ -47,7 +47,7 @@ const splitContent = (content) => {
         });
 
         const tj = questions.map(q => {
-            // Priority: new imageTj field, then fallback to imageRu, then legacy image
+            // Приоритет: новое поле imageTj, затем резервное imageRu, затем устаревшее поле image
             const base = { id: q.id, type: q.type, image: q.imageTj || q.imageRu || q.image };
             base.text = q.textTj || '';
             if (q.type === 'multiple_choice') {
@@ -109,7 +109,7 @@ const mergeContent = (contentRu, contentTj) => {
     const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
     const pickBestText = (qObj) => {
         if (!qObj) return '';
-        const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
+        const variants = [qObj.question, qObj.text, qObj.title];
         for (const v of variants) {
             if (v && !isNumeric(v)) return v;
         }
@@ -121,11 +121,12 @@ const mergeContent = (contentRu, contentTj) => {
         if (!questions || !Array.isArray(questions)) return questions;
         return questions.map(q => {
             const recovered = { ...q };
-            if (!recovered.textRu || isNumeric(recovered.textRu)) {
+
+            // Если текст пустой, пытаемся вытащить из старых полей, игнорируя одни цифры (старый баг с ID)
+            if (!recovered.textRu) {
                 recovered.textRu = pickBestText(q);
             }
-            if (!recovered.textTj || isNumeric(recovered.textTj)) {
-                // Для TJ пробуем из TJ-полей
+            if (!recovered.textTj) {
                 const tjVariants = [q.textTj, q.question, q.text, q.title];
                 for (const v of tjVariants) {
                     if (v && !isNumeric(v) && v !== recovered.textRu) {
@@ -138,21 +139,21 @@ const mergeContent = (contentRu, contentTj) => {
             if (recovered.options) {
                 recovered.options = recovered.options.map(opt => ({
                     ...opt,
-                    textRu: (!opt.textRu || isNumeric(opt.textRu)) ? pickBestText(opt) : opt.textRu,
+                    textRu: !opt.textRu ? pickBestText(opt) : opt.textRu,
                     textTj: opt.textTj || ''
                 }));
             }
             if (recovered.leftItems) {
                 recovered.leftItems = recovered.leftItems.map(item => ({
                     ...item,
-                    textRu: (!item.textRu || isNumeric(item.textRu)) ? pickBestText(item) : item.textRu,
+                    textRu: !item.textRu ? pickBestText(item) : item.textRu,
                     textTj: item.textTj || ''
                 }));
             }
             if (recovered.rightItems) {
                 recovered.rightItems = recovered.rightItems.map(item => ({
                     ...item,
-                    textRu: (!item.textRu || isNumeric(item.textRu)) ? pickBestText(item) : item.textRu,
+                    textRu: !item.textRu ? pickBestText(item) : item.textRu,
                     textTj: item.textTj || ''
                 }));
             }
@@ -178,24 +179,13 @@ const mergeContent = (contentRu, contentTj) => {
 
     const ru = contentRu || {};
     const tj = contentTj || {};
+    console.log('[DEBUG mergeContent] ru.test?.questions:', JSON.stringify(ru.test?.questions, null, 2));
+    console.log('[DEBUG mergeContent] tj.test?.questions:', JSON.stringify(tj.test?.questions, null, 2));
 
     // Объединяем вопросы теста обратно в двуязычный формат
     const mergeQuestions = (ruQuestions, tjQuestions) => {
         const ruQ = ruQuestions || [];
         const tjQ = tjQuestions || [];
-
-        const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
-        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
-        const pickBestText = (qObj) => {
-            if (!qObj) return '';
-            // Проверяем все возможные поля на наличие нечислового текста
-            // 'question' часто содержит текст в старых форматах, а 'text' может содержать числовой ответ
-            const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
-            for (const v of variants) {
-                if (v && !isNumeric(v)) return v;
-            }
-            return '';
-        };
 
         // Берём RU как основу (там все ID и структура), добавляем TJ тексты
         return ruQ.map((rq, idx) => {
@@ -204,8 +194,8 @@ const mergeContent = (contentRu, contentTj) => {
                 id: rq.id, type: rq.type,
                 imageRu: rq.image,
                 imageTj: tq.image,
-                textRu: pickBestText(rq),
-                textTj: pickBestText(tq)
+                textRu: rq.text || '',
+                textTj: tq.text || ''
             };
             if (rq.type === 'multiple_choice') {
                 merged.options = (rq.options || []).map((opt, optIdx) => {
@@ -214,8 +204,8 @@ const mergeContent = (contentRu, contentTj) => {
                         id: opt.id,
                         imageRu: opt.image,
                         imageTj: tOpt.image,
-                        textRu: pickBestText(opt),
-                        textTj: pickBestText(tOpt)
+                        textRu: opt.text || '',
+                        textTj: tOpt.text || ''
                     };
                 });
                 merged.correctId = rq.correctId;
@@ -226,8 +216,8 @@ const mergeContent = (contentRu, contentTj) => {
                         id: item.id,
                         imageRu: item.image,
                         imageTj: tItem.image,
-                        textRu: pickBestText(item),
-                        textTj: pickBestText(tItem)
+                        textRu: item.text || '',
+                        textTj: tItem.text || ''
                     };
                 });
                 merged.rightItems = (rq.rightItems || []).map((item, i) => {
@@ -236,8 +226,8 @@ const mergeContent = (contentRu, contentTj) => {
                         id: item.id,
                         imageRu: item.image,
                         imageTj: tItem.image,
-                        textRu: pickBestText(item),
-                        textTj: pickBestText(tItem)
+                        textRu: item.text || '',
+                        textTj: tItem.text || ''
                     };
                 });
                 merged.correctMatches = rq.correctMatches;
@@ -329,6 +319,8 @@ export const syllabusService = {
      * @param {string} subject - ID предмета
      */
     async getStructure(subject) {
+        if (!subject || subject === 'undefined' || subject === 'null') return null;
+
         if (cache.structures[subject]) {
             return cache.structures[subject];
         }
@@ -337,12 +329,13 @@ export const syllabusService = {
             .from('subject_syllabus')
             .select('data')
             .eq('subject', subject)
-            .single();
+            .maybeSingle();
 
         if (error) {
-            if (error.code === 'PGRST116') return null; // Запись не найдена (пусто)
             throw error;
         }
+
+        if (!data) return null;
 
         cache.structures[subject] = data.data;
         return data.data; // Возвращает { sections: [...] }
@@ -357,18 +350,63 @@ export const syllabusService = {
     async saveLesson(lesson, subject) {
         const { contentRu, contentTj } = splitContent(lesson.content);
 
+        // Функция очистки от undefined (Supabase REST API может отвечать 406 Not Acceptable на undefined ключи)
+        const cleanUndefined = (obj) => {
+            if (Array.isArray(obj)) return obj.map(cleanUndefined);
+            if (obj instanceof Date) return obj; // Не ломаем даты
+            if (obj !== null && typeof obj === 'object') {
+                return Object.fromEntries(
+                    Object.entries(obj)
+                        .filter(([_, v]) => v !== undefined)
+                        .map(([k, v]) => [k, cleanUndefined(v)])
+                );
+            }
+            return obj;
+        };
+
+        const payload = cleanUndefined({
+            id: lesson.id,
+            title_ru: lesson.title,
+            title_tj: lesson.titleTj,
+            subject: subject,
+            content_ru: contentRu,
+            content_tj: contentTj,
+            is_published: true,
+            updated_at: new Date()
+        });
+
         const { error } = await supabase
             .from('lessons')
-            .upsert({
-                id: lesson.id,
-                title_ru: lesson.title,
-                title_tj: lesson.titleTj,
-                subject: subject,
-                content_ru: contentRu,
-                content_tj: contentTj,
-                is_published: true,
-                updated_at: new Date()
-            }, { onConflict: 'id' });
+            .upsert(payload, { onConflict: 'id' });
+
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Удалить контент урока по ID из БД.
+     * @param {string} lessonId
+     */
+    async deleteLesson(lessonId) {
+        const { error } = await supabase
+            .from('lessons')
+            .delete()
+            .eq('id', lessonId);
+
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Массовое удаление уроков по массиву ID.
+     * @param {string[]} lessonIds
+     */
+    async deleteLessons(lessonIds) {
+        if (!lessonIds || lessonIds.length === 0) return true;
+        const { error } = await supabase
+            .from('lessons')
+            .delete()
+            .in('id', lessonIds);
 
         if (error) throw error;
         return true;
@@ -446,57 +484,42 @@ const wrapSingleLangContent = (content, lang) => {
 
     // Конвертируем вопросы из одноязычного формата (text) в двуязычный (textRu/textTj)
     const wrapQuestions = (questions) => {
-        const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
-        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
-        const pickBestText = (qObj) => {
-            if (!qObj) return '';
-            const variants = [qObj.textRu, qObj.textTj, qObj.question, qObj.text, qObj.title];
-            for (const v of variants) {
-                if (v && !isNumeric(v)) return v;
-            }
-            return '';
-        };
-
         return (questions || []).map(q => {
-            const bestText = pickBestText(q);
             const wrapped = {
                 id: q.id, type: q.type,
                 imageRu: isRu ? (q.image || null) : null,
                 imageTj: isRu ? null : (q.image || null),
-                textRu: isRu ? bestText : '',
-                textTj: isRu ? '' : bestText
+                textRu: isRu ? (q.text || '') : '',
+                textTj: isRu ? '' : (q.text || '')
             };
             if (q.type === 'multiple_choice') {
                 wrapped.options = (q.options || []).map(opt => {
-                    const bText = pickBestText(opt);
                     return {
                         id: opt.id,
                         imageRu: isRu ? (opt.image || null) : null,
                         imageTj: isRu ? null : (opt.image || null),
-                        textRu: isRu ? bText : '',
-                        textTj: isRu ? '' : bText
+                        textRu: isRu ? (opt.text || '') : '',
+                        textTj: isRu ? '' : (opt.text || '')
                     };
                 });
                 wrapped.correctId = q.correctId;
             } else if (q.type === 'matching') {
                 wrapped.leftItems = (q.leftItems || []).map(item => {
-                    const bText = pickBestText(item);
                     return {
                         id: item.id,
                         imageRu: isRu ? (item.image || null) : null,
                         imageTj: isRu ? null : (item.image || null),
-                        textRu: isRu ? bText : '',
-                        textTj: isRu ? '' : bText
+                        textRu: isRu ? (item.text || '') : '',
+                        textTj: isRu ? '' : (item.text || '')
                     };
                 });
                 wrapped.rightItems = (q.rightItems || []).map(item => {
-                    const bText = pickBestText(item);
                     return {
                         id: item.id,
                         imageRu: isRu ? (item.image || null) : null,
                         imageTj: isRu ? null : (item.image || null),
-                        textRu: isRu ? bText : '',
-                        textTj: isRu ? '' : bText
+                        textRu: isRu ? (item.text || '') : '',
+                        textTj: isRu ? '' : (item.text || '')
                     };
                 });
                 wrapped.correctMatches = q.correctMatches;

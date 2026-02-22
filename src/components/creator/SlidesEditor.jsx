@@ -26,14 +26,14 @@ const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => 
             className="bg-gaming-bg/30 rounded-xl p-4 border border-white/5"
         >
             <div className="flex items-start gap-3">
-                {/* Drag Handle */}
+                {/* Ползунок для перетаскивания */}
                 <div {...attributes} {...listeners} className="mt-2 cursor-grab text-gaming-textMuted hover:text-white">
                     <GripVertical size={18} />
                 </div>
 
-                {/* Slide Content */}
+                {/* Содержимое слайда */}
                 <div className="flex-1 space-y-3">
-                    {/* Slide Number */}
+                    {/* Номер слайда */}
                     <div className="flex items-center justify-between">
                         <span className="text-sm text-gaming-textMuted">
                             {lang === 'ru' ? 'Слайд' : 'Слайд'} #{index + 1}
@@ -48,7 +48,7 @@ const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => 
                         </div>
                     </div>
 
-                    {/* Image URL */}
+                    {/* URL изображения */}
                     <div className="flex items-center gap-2">
                         <Image size={16} className="text-gaming-textMuted" />
                         <input
@@ -60,7 +60,7 @@ const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => 
                         />
                     </div>
 
-                    {/* Image Preview */}
+                    {/* Предпросмотр изображения */}
                     {slide.imageUrl && (
                         <div className="w-full h-32 rounded-lg overflow-hidden bg-gaming-card/50">
                             <img
@@ -72,7 +72,7 @@ const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => 
                         </div>
                     )}
 
-                    {/* Caption */}
+                    {/* Подпись (Текст) */}
                     <input
                         type="text"
                         value={slide[captionField] || ''}
@@ -155,7 +155,7 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
 
     return (
         <div className="space-y-4">
-            {/* Toolbar */}
+            {/* Панель инструментов */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
                 <div className="flex flex-col gap-2">
                     <h4 className="text-lg font-semibold text-gaming-gold flex items-center gap-2">
@@ -163,7 +163,7 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
                         {lang === 'ru' ? 'Слайды презентации' : 'Слайдҳои презентатсия'}
                     </h4>
 
-                    {/* Language Switcher */}
+                    {/* Переключатель языка */}
                     <div className="flex p-1 bg-black/30 rounded-xl border border-white/5 w-fit">
                         <button
                             onClick={() => setEditLang('ru')}
@@ -215,7 +215,7 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
                 </div>
             </div>
 
-            {/* Slide List */}
+            {/* Список слайдов */}
             {slides.length === 0 ? (
                 <div className="text-center py-12 bg-gaming-bg/20 rounded-2xl border border-dashed border-white/10">
                     <Presentation size={48} className="mx-auto mb-3 opacity-20 text-gaming-gold" />

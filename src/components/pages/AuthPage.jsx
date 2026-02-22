@@ -36,7 +36,7 @@ const AuthPage = () => {
         setError(null);
     };
 
-    // Helper: Timeout promise
+    // Вспомогательная функция: Promise с таймаутом
     const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms));
 
     // Отправка формы
@@ -46,7 +46,7 @@ const AuthPage = () => {
         setError(null);
 
         try {
-            // Race condition: Auth call vs 10s timeout
+            // Выполняем запрос с таймаутом 10 сек (Race condition)
             if (isLogin) {
                 // 1. Вход
                 const { data, error } = await Promise.race([
@@ -199,7 +199,7 @@ const AuthPage = () => {
                     )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Role Selection Hook */}
+                        {/* Выбор роли */}
                         {!isLogin && (
                             <div className="flex bg-gaming-bg/50 p-1 rounded-xl mb-6 border border-white/10">
                                 <button
@@ -300,7 +300,7 @@ const AuthPage = () => {
                             </div>
                         </div>
 
-                        {/* STUDENT FIELDS */}
+                        {/* ПОЛЯ ДЛЯ УЧЕНИКА */}
                         {!isLogin && formData.role === 'student' && (
                             <>
                                 {/* Язык и Класс */}
@@ -377,7 +377,7 @@ const AuthPage = () => {
                             </>
                         )}
 
-                        {/* TEACHER FIELDS */}
+                        {/* ПОЛЯ ДЛЯ УЧИТЕЛЯ */}
                         {!isLogin && formData.role === 'teacher' && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
                                 {/* Предмет */}
@@ -417,7 +417,7 @@ const AuthPage = () => {
                             </div>
                         )}
 
-                        {/* Password */}
+                        {/* Пароль */}
                         <div className="space-y-1.5">
                             <label className="text-sm font-medium text-gaming-textMuted ml-1">
                                 {t('authPassword')}
@@ -475,7 +475,7 @@ const AuthPage = () => {
                             </div>
                         )}
 
-                        {/* Button */}
+                        {/* Кнопка */}
                         <button
                             type="submit"
                             disabled={loading}
@@ -490,7 +490,7 @@ const AuthPage = () => {
                         </button>
                     </form>
 
-                    {/* Switcher */}
+                    {/* Переключатель входа/регистрации */}
                     <div className="mt-8 pt-6 border-t border-white/5 text-center">
                         <p className="text-gaming-textMuted text-sm mb-3">
                             {isLogin ? t('authNoAccount') : t('authHasAccount')}

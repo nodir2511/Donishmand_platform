@@ -27,7 +27,15 @@ export const AuthProvider = ({ children }) => {
         try {
             const cached = localStorage.getItem('sb-profile-cache');
             if (cached) {
-                const parsed = JSON.parse(cached);
+                let parsed;
+                try {
+                    parsed = JSON.parse(cached);
+                } catch (parseError) {
+                    console.warn('⚠️ Ошибка парсинга кеша профиля, кеш будет сброшен', parseError);
+                    localStorage.removeItem('sb-profile-cache');
+                    return { user: null, profile: null, permissions: [], loading: true };
+                }
+
                 // Простая валидация (время жизни кеша, например 24 часа)
                 if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
                     return {
@@ -117,7 +125,7 @@ export const AuthProvider = ({ children }) => {
                     return await finishLoad(data);
                 }
             } catch (e) {
-                // Ignore RPC timeout/error and proceed to fallback
+                // Игнорируем ошибку/таймаут RPC и переходим к резервному варианту
             }
 
             // 2. Fallback: Прямой запрос (Direct Select)
@@ -134,10 +142,10 @@ export const AuthProvider = ({ children }) => {
                 if (data && !error) {
                     return await finishLoad(data);
                 }
-                if (error) console.error('Direct Select Error:', error);
+                if (error) console.error('Ошибка прямого запроса:', error);
 
             } catch (e) {
-                console.error('Direct select timed out:', e);
+                console.error('Таймаут прямого запроса:', e);
             }
 
         } catch (err) {
@@ -238,7 +246,7 @@ export const AuthProvider = ({ children }) => {
             if (isMounted) {
                 setLoading(prev => {
                     if (prev) {
-                        console.warn('⚠️ Safety timeout logic triggered');
+                        console.warn('⚠️ Сработала логика безопасного таймаута');
                         return false;
                     }
                     return prev;
@@ -265,7 +273,35 @@ export const AuthProvider = ({ children }) => {
         } catch (e) {
             console.error("SignOut error (ignored):", e);
         }
-        window.location.href = '/';
+        window.location.href = import.meta.env.BASE_URL || '/';
+    };
+
+    const updateSelectedSubjects = async (subjectsArray) => {
+        if (!user) return false;
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ selected_subjects: subjectsArray })
+                .eq('id', user.id);
+            if (error) throw error;
+
+            setProfile(prev => ({ ...prev, selected_subjects: subjectsArray }));
+
+            // Обновляем кеш
+            try {
+                const cached = localStorage.getItem('sb-profile-cache');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    parsed.profile = { ...parsed.profile, selected_subjects: subjectsArray };
+                    localStorage.setItem('sb-profile-cache', JSON.stringify(parsed));
+                }
+            } catch (e) { }
+
+            return true;
+        } catch (err) {
+            console.error('Ошибка при обновлении выбранных предметов:', err);
+            return false;
+        }
     };
 
     const value = {
@@ -274,6 +310,7 @@ export const AuthProvider = ({ children }) => {
         permissions,
         loading,
         signOut,
+        updateSelectedSubjects,
         isAuthenticated: !!user,
         isTeacher: profile?.role === 'teacher',
         isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',
@@ -295,14 +332,7 @@ export const AuthProvider = ({ children }) => {
 
     return (
         <AuthContext.Provider value={value}>
-            {loading ? (
-                <div className="flex items-center justify-center min-h-screen bg-gaming-bg">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="w-12 h-12 border-4 border-gaming-primary/30 border-t-gaming-primary rounded-full animate-spin" />
-                        <span className="text-gaming-textMuted text-sm">Загрузка...</span>
-                    </div>
-                </div>
-            ) : children}
+            {children}
         </AuthContext.Provider>
     );
 };

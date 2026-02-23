@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -275,9 +275,14 @@ const CreatorPage = () => {
     const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' (сохранено), 'saving' (сохранение), 'error' (ошибка)
     const debouncedSyllabus = useDebounce(syllabus, 2000); // Ждем 2 сек после последнего изменения
 
+    // Guard: блокируем auto-save до завершения загрузки данных из Supabase
+    const isCloudLoaded = useRef(false);
+
     useEffect(() => {
         // Пропускаем начальную загрузку или пустой объект
         if (!debouncedSyllabus) return;
+        // Не сохраняем в облако, пока не загрузили актуальные данные из Supabase
+        if (!isCloudLoaded.current) return;
 
         const syncToCloud = async () => {
             setSaveStatus('saving');
@@ -712,12 +717,9 @@ const CreatorPage = () => {
     // --- СИНХРОНИЗАЦИЯ С ОБЛАКОМ (ЗАГРУЗКА) ---
     useEffect(() => {
         const loadFromCloud = async () => {
-            // Если мы переключили предмет, попробуем загрузить его структуру из Supabase
-            // Чтобы всегда видеть актуальные данные.
+            // Блокируем auto-save на время загрузки из облака
+            isCloudLoaded.current = false;
             try {
-                // Можно добавить preloader, но пока просто в фоне или setSaveStatus('saving') чтобы показать активность
-                // Но лучше отдельный индикатор или просто молча, если локально что-то есть.
-                // Для надежности покажем, что идет синхронизация.
                 setSaveStatus('saving');
 
                 const cloudData = await syllabusService.getStructure(selectedSubject);
@@ -730,7 +732,9 @@ const CreatorPage = () => {
                 setSaveStatus('saved');
             } catch (error) {
                 console.error('Ошибка загрузки данных:', error);
-                // Не ставим error статус жестко, чтобы не пугать, если просто нет инета или данных нет
+            } finally {
+                // Разрешаем auto-save только после успешной загрузки из облака
+                isCloudLoaded.current = true;
             }
         };
 

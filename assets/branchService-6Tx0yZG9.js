@@ -1,4 +1,4 @@
-import{a as s}from"./index-YN3naZQP.js";const _={async getTeacherClasses(e){if(!e)return[];const{data:r,error:a}=await s.from("classes").select(`
+import{a as s}from"./index-BdCfHgNm.js";const _={async getTeacherClasses(e){if(!e)return[];const{data:r,error:a}=await s.from("classes").select(`
                 id, 
                 name, 
                 created_at,

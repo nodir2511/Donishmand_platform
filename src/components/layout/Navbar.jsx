@@ -77,7 +77,7 @@ const Navbar = () => {
                         <button
                             onClick={() => {
                                 if (location.pathname !== '/') {
-                                    navigate('/#courses-section');
+                                    navigate({ pathname: '/', hash: '#courses-section' });
                                 } else {
                                     document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
                                 }
@@ -206,7 +206,7 @@ const Navbar = () => {
                             onClick={() => {
                                 setIsOpen(false);
                                 if (location.pathname !== '/') {
-                                    navigate('/#courses-section');
+                                    navigate({ pathname: '/', hash: '#courses-section' });
                                 } else {
                                     document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
                                 }

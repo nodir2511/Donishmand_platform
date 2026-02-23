@@ -10,6 +10,7 @@ const SlidesViewer = React.lazy(() => import('../viewer/SlidesViewer'));
 const TestViewer = React.lazy(() => import('../viewer/TestViewer'));
 const TestTeacherView = React.lazy(() => import('../viewer/TestTeacherView'));
 import { syllabusService } from '../../services/syllabusService';
+import { supabase } from '../../services/supabase';
 import { renderKatex } from '../../utils/katexRenderer';
 
 // Ключи для отслеживания прогресса

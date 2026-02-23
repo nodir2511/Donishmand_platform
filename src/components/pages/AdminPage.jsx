@@ -7,7 +7,7 @@ import { branchService } from '../../services/branchService';
 import { ALL_SUBJECTS_LIST, SUBJECT_NAMES } from '../../constants/data';
 import {
     Loader2, Search, Shield, ShieldCheck, ShieldAlert, User, UserPlus,
-    X, Eye, EyeOff, BookOpen, Settings, ChevronLeft, ChevronRight, Trash2, MapPin, Building, Edit
+    X, Eye, EyeOff, BookOpen, Settings, ChevronLeft, ChevronRight, Trash2, MapPin, Building, Edit, CheckCircle, AlertCircle
 } from 'lucide-react';
 import useDebounce from '../../hooks/useDebounce';
 
@@ -275,6 +275,15 @@ const AdminPage = () => {
                     console.warn('Ошибка обновления профиля:', profileError);
                 }
 
+                // Автоматически подтверждаем email (чтобы не ждать перехода по ссылке)
+                const { error: confirmError } = await supabase.rpc('admin_confirm_user_email', {
+                    target_user_id: signUpData.user.id
+                });
+
+                if (confirmError) {
+                    console.warn('Ошибка подтверждения email:', confirmError);
+                }
+
                 // Если это был ученик и был выбран класс — прикрепляем
                 if (newUser.role === 'student' && newUser.class_id) {
                     try {
@@ -331,7 +340,25 @@ const AdminPage = () => {
             if (error) throw error;
 
             // Обновляем список пользователей
-            setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...editingUser } : u));
+            setUsers(users.map(u =>
+                u.id === editingUser.id ? { ...u, ...editingUser } : u
+            ));
+
+            // Если тумблер подтверждения включен, а email ещё не подтверждён
+            if (editingUser.email_confirmed && !editingUser.email_confirmed_at) {
+                const { error: confirmErr } = await supabase.rpc('admin_confirm_user_email', {
+                    target_user_id: editingUser.id
+                });
+                if (confirmErr) {
+                    console.warn('Ошибка подтверждения email:', confirmErr);
+                } else {
+                    // Обновляем локальное состояние
+                    setUsers(prev => prev.map(u =>
+                        u.id === editingUser.id ? { ...u, email_confirmed_at: new Date().toISOString() } : u
+                    ));
+                }
+            }
+
             setShowEditModal(false);
         } catch (error) {
             console.error('Ошибка редактирования пользователя:', error);
@@ -602,9 +629,16 @@ const AdminPage = () => {
                                                 {user.email || 'Нет email'}
                                             </td>
                                             <td className="p-4">
-                                                <span className={`px-3 py-1 rounded-full text-xs border ${getRoleColor(user.role)}`}>
-                                                    {user.role || 'user'}
-                                                </span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-3 py-1 rounded-full text-xs border ${getRoleColor(user.role)}`}>
+                                                        {user.role || 'user'}
+                                                    </span>
+                                                    {user.email_confirmed_at ? (
+                                                        <CheckCircle size={16} className="text-green-400" title="Email подтверждён" />
+                                                    ) : (
+                                                        <AlertCircle size={16} className="text-yellow-400" title="Email не подтверждён" />
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="p-4">
                                                 <div className="flex items-center gap-2">
@@ -1137,6 +1171,40 @@ const AdminPage = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Тумблер подтверждения email */}
+                            <div className="flex items-center justify-between p-3 rounded-xl border border-white/10 bg-white/5">
+                                <div>
+                                    <span className="text-sm font-medium text-white">Email подтверждён</span>
+                                    <p className="text-xs text-gaming-textMuted mt-0.5">
+                                        {editingUser.email_confirmed_at
+                                            ? `Подтверждён: ${new Date(editingUser.email_confirmed_at).toLocaleDateString()}`
+                                            : 'Пользователь не подтвердил email'
+                                        }
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingUser({
+                                        ...editingUser,
+                                        email_confirmed: !editingUser.email_confirmed_at && !editingUser.email_confirmed
+                                            ? true
+                                            : editingUser.email_confirmed
+                                                ? false
+                                                : true
+                                    })}
+                                    disabled={!!editingUser.email_confirmed_at}
+                                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${editingUser.email_confirmed_at || editingUser.email_confirmed
+                                        ? 'bg-green-500'
+                                        : 'bg-gray-600'
+                                        } ${editingUser.email_confirmed_at ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${editingUser.email_confirmed_at || editingUser.email_confirmed
+                                        ? 'translate-x-6'
+                                        : 'translate-x-0'
+                                        }`} />
+                                </button>
+                            </div>
 
                             <div className="flex gap-3 pt-2">
                                 <button

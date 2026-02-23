@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { SUBJECT_CONFIG, SUBJECT_NAMES } from '../../constants/data';
 import { useTranslation } from 'react-i18next';
 
-const CourseCard = ({ subjectId }) => {
+const CourseCard = ({ subjectId, progress = 0 }) => {
     const { i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const config = SUBJECT_CONFIG[subjectId];
@@ -32,9 +32,24 @@ const CourseCard = ({ subjectId }) => {
                 {title}
             </h3>
 
-            {/* Прогресс-бар (пока скрыт до реализации реального трекинга) */}
-            <div className="relative z-10 w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink rounded-full" style={{ width: '0%' }}></div>
+            {/* Прогресс-бар */}
+            <div className="relative z-10">
+                <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs text-gaming-textMuted">
+                        {progress > 0 ? 'Прогресс' : ''}
+                    </span>
+                    {progress > 0 && (
+                        <span className="text-xs font-bold text-gaming-primary">
+                            {progress}%
+                        </span>
+                    )}
+                </div>
+                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div
+                        className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink rounded-full transition-all duration-1000 ease-out"
+                        style={{ width: `${progress}%` }}
+                    />
+                </div>
             </div>
         </Link>
     );

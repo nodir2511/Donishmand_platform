@@ -7,6 +7,8 @@ import ClusterSelect from '../features/ClusterSelect';
 import OnboardingSubjectsSection from '../features/OnboardingSubjectsSection';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
+import { syllabusService } from '../../services/syllabusService';
 
 const HomePage = () => {
     const { t, i18n } = useTranslation();
@@ -15,6 +17,9 @@ const HomePage = () => {
     const { profile } = useAuth();
     const location = useLocation();
 
+    // Прогресс по предметам: { subjectId: процент }
+    const [subjectProgress, setSubjectProgress] = useState({});
+
     useEffect(() => {
         if (location.hash === '#courses-section') {
             setTimeout(() => {
@@ -22,6 +27,81 @@ const HomePage = () => {
             }, 100);
         }
     }, [location]);
+
+    // Загрузка прогресса для авторизованных пользователей
+    useEffect(() => {
+        if (!profile) return;
+
+        const loadProgress = async () => {
+            try {
+                // Получаем user_id через auth (совпадает с auth.uid() в RLS-политиках)
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser?.id) return;
+
+                // 1. Получаем все lesson_id, по которым есть прогресс у пользователя
+                const { data: progressData, error: progressErr } = await supabase
+                    .from('user_lesson_progress')
+                    .select('lesson_id')
+                    .eq('user_id', authUser.id);
+
+                const { data: testData, error: testErr } = await supabase
+                    .from('user_test_results')
+                    .select('lesson_id')
+                    .eq('user_id', authUser.id);
+
+                if (progressErr) console.warn('Ошибка загрузки lesson_progress:', progressErr);
+                if (testErr) console.warn('Ошибка загрузки test_results:', testErr);
+
+                // Объединяем уникальные lesson_id
+                const completedLessons = new Set();
+                if (progressData) progressData.forEach(p => completedLessons.add(p.lesson_id));
+                if (testData) testData.forEach(t => completedLessons.add(t.lesson_id));
+
+                console.log(`📊 Прогресс: найдено ${completedLessons.size} уроков с активностью`);
+
+                if (completedLessons.size === 0) return;
+
+                // 2. Для каждого предмета считаем процент
+                const progressMap = {};
+
+                for (const subjectId of ALL_SUBJECTS_LIST) {
+                    try {
+                        const structure = await syllabusService.getStructure(subjectId);
+                        if (!structure?.sections) continue;
+
+                        // Считаем все уроки в предмете
+                        let totalLessons = 0;
+                        let completedCount = 0;
+
+                        for (const section of structure.sections) {
+                            if (!section.topics) continue;
+                            for (const topic of section.topics) {
+                                if (!topic.lessons) continue;
+                                for (const lesson of topic.lessons) {
+                                    totalLessons++;
+                                    if (completedLessons.has(lesson.id)) {
+                                        completedCount++;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (totalLessons > 0) {
+                            progressMap[subjectId] = Math.round((completedCount / totalLessons) * 100);
+                        }
+                    } catch (err) {
+                        // Если структура предмета не загрузилась — пропускаем
+                    }
+                }
+
+                setSubjectProgress(progressMap);
+            } catch (err) {
+                console.error('Ошибка загрузки прогресса:', err);
+            }
+        };
+
+        loadProgress();
+    }, [profile]);
 
     // Определяем доступные предметы в зависимости от роли
     const getSubjectsForRole = () => {
@@ -112,6 +192,7 @@ const HomePage = () => {
                             <CourseCard
                                 key={`${activeClusterId}-${subjectId}-${index}`}
                                 subjectId={subjectId}
+                                progress={subjectProgress[subjectId] || 0}
                             />
                         ))}
                     </div>

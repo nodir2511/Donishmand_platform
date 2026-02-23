@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import HeroSection from '../sections/HeroSection';
 import CourseCard from '../features/CourseCard';
+import ClusterSelect from '../features/ClusterSelect';
 import OnboardingSubjectsSection from '../features/OnboardingSubjectsSection';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
 import { useAuth } from '../../contexts/AuthContext';

@@ -132,4 +132,6 @@ test_db.js
 verify_supabase.js
 seed_supabase.js
 testLogic.js
-
+test_signup.js
+test_columns.js
+count_lines.js

@@ -7,7 +7,7 @@ import { branchService } from '../../services/branchService';
 import { ALL_SUBJECTS_LIST, SUBJECT_NAMES } from '../../constants/data';
 import {
     Loader2, Search, Shield, ShieldCheck, ShieldAlert, User, UserPlus,
-    X, Eye, EyeOff, BookOpen, Settings, ChevronLeft, ChevronRight, Trash2, MapPin, Building
+    X, Eye, EyeOff, BookOpen, Settings, ChevronLeft, ChevronRight, Trash2, MapPin, Building, Edit
 } from 'lucide-react';
 import useDebounce from '../../hooks/useDebounce';
 
@@ -51,6 +51,12 @@ const AdminPage = () => {
     });
 
     const [availableClasses, setAvailableClasses] = useState([]);
+
+    // Состояния модального окна редактирования
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+    const [editError, setEditError] = useState('');
+    const [savingEdit, setSavingEdit] = useState(false);
 
     // Состояния модального окна прав на предметы
     const [showPermsModal, setShowPermsModal] = useState(false);
@@ -303,6 +309,35 @@ const AdminPage = () => {
             }
         } finally {
             setAddingUser(false);
+        }
+    };
+
+    // Сохранение изменений пользователя
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        setEditError('');
+        setSavingEdit(true);
+
+        try {
+            const { error } = await supabase.rpc('admin_update_profile', {
+                target_id: editingUser.id,
+                new_full_name: editingUser.full_name || '',
+                new_role: editingUser.role || 'student',
+                new_subject: editingUser.role === 'teacher' ? (editingUser.subject || null) : null,
+                new_grade: editingUser.role === 'student' ? (parseInt(editingUser.grade) || null) : null,
+                new_language: editingUser.role === 'student' ? (editingUser.language || 'tj') : 'tj'
+            });
+
+            if (error) throw error;
+
+            // Обновляем список пользователей
+            setUsers(users.map(u => u.id === editingUser.id ? { ...u, ...editingUser } : u));
+            setShowEditModal(false);
+        } catch (error) {
+            console.error('Ошибка редактирования пользователя:', error);
+            setEditError('Не удалось сохранить изменения');
+        } finally {
+            setSavingEdit(false);
         }
     };
 
@@ -586,6 +621,18 @@ const AdminPage = () => {
                                                                     <option key={r.value} value={r.value}>{r.label}</option>
                                                                 ))}
                                                             </select>
+
+                                                            {/* Кнопка «Редактировать» */}
+                                                            <button
+                                                                onClick={() => {
+                                                                    setEditingUser({ ...user });
+                                                                    setShowEditModal(true);
+                                                                }}
+                                                                title="Редактировать пользователя"
+                                                                className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-500 hover:bg-blue-500/20 transition-all hover:scale-105 active:scale-95"
+                                                            >
+                                                                <Edit size={16} />
+                                                            </button>
 
                                                             {/* Кнопка «Предметы» для учеников */}
                                                             {user.role === 'student' && (
@@ -989,6 +1036,132 @@ const AdminPage = () => {
                                 )}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== МОДАЛКА: Редактирование пользователя ========== */}
+            {showEditModal && editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div
+                        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                        onClick={() => setShowEditModal(false)}
+                    />
+                    <div className="relative bg-gaming-card border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-gaming-primary/10 animate-fade-in-up">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
+                                <Edit size={22} className="text-blue-500" />
+                                Редактировать профиль
+                            </h2>
+                            <button
+                                onClick={() => setShowEditModal(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-1"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {editError && (
+                            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                                {editError}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm text-gaming-textMuted mb-1.5">ФИО</label>
+                                <input
+                                    type="text"
+                                    value={editingUser.full_name || ''}
+                                    onChange={(e) => setEditingUser({ ...editingUser, full_name: e.target.value })}
+                                    className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-gaming-primary transition-colors"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-gaming-textMuted mb-1.5">Роль</label>
+                                <select
+                                    value={editingUser.role || 'user'}
+                                    onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
+                                    className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                >
+                                    {availableRoles.map(r => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {editingUser.role === 'teacher' && (
+                                <div className="animate-fade-in-up">
+                                    <label className="block text-sm text-gaming-textMuted mb-1.5">Предмет</label>
+                                    <select
+                                        value={editingUser.subject || ''}
+                                        onChange={(e) => setEditingUser({ ...editingUser, subject: e.target.value })}
+                                        className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                    >
+                                        <option value="">Без предмета</option>
+                                        {ALL_SUBJECTS_LIST.map(slug => (
+                                            <option key={slug} value={slug}>
+                                                {SUBJECT_NAMES[slug]?.[lang] || slug}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {editingUser.role === 'student' && (
+                                <div className="grid grid-cols-2 gap-4 animate-fade-in-up">
+                                    <div>
+                                        <label className="block text-sm text-gaming-textMuted mb-1.5">Класс</label>
+                                        <select
+                                            value={editingUser.grade || ''}
+                                            onChange={(e) => setEditingUser({ ...editingUser, grade: e.target.value })}
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                        >
+                                            <option value="">Не указан</option>
+                                            {[11, 10, 9, 8, 7, 6, 5].map(g => (
+                                                <option key={g} value={g}>{g} класс</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm text-gaming-textMuted mb-1.5">Язык</label>
+                                        <select
+                                            value={editingUser.language || 'tj'}
+                                            onChange={(e) => setEditingUser({ ...editingUser, language: e.target.value })}
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl py-2.5 px-4 text-white focus:outline-none focus:border-gaming-primary transition-colors cursor-pointer"
+                                        >
+                                            <option value="tj">Тоҷикӣ</option>
+                                            <option value="ru">Русский</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowEditModal(false)}
+                                    className="flex-1 py-2.5 px-4 rounded-xl border border-white/10 text-gray-400 hover:bg-white/5 hover:text-white transition-all"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingEdit}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-blue-400 text-white font-medium hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {savingEdit ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            Сохранение...
+                                        </>
+                                    ) : (
+                                        'Сохранить'
+                                    )}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

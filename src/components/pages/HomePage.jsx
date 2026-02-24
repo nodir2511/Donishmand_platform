@@ -58,6 +58,7 @@ const HomePage = () => {
                 if (testData) testData.forEach(t => completedLessons.add(t.lesson_id));
 
                 console.log(`📊 Прогресс: найдено ${completedLessons.size} уроков с активностью`);
+                console.log('📊 ID уроков:', [...completedLessons]);
 
                 if (completedLessons.size === 0) return;
 
@@ -67,11 +68,13 @@ const HomePage = () => {
                 for (const subjectId of ALL_SUBJECTS_LIST) {
                     try {
                         const structure = await syllabusService.getStructure(subjectId);
+                        console.log(`📊 ${subjectId}: structure =`, structure ? 'OK' : 'null', 'sections:', structure?.sections?.length || 0);
                         if (!structure?.sections) continue;
 
                         // Считаем все уроки в предмете
                         let totalLessons = 0;
                         let completedCount = 0;
+                        const lessonIds = [];
 
                         for (const section of structure.sections) {
                             if (!section.topics) continue;
@@ -79,6 +82,7 @@ const HomePage = () => {
                                 if (!topic.lessons) continue;
                                 for (const lesson of topic.lessons) {
                                     totalLessons++;
+                                    lessonIds.push(lesson.id);
                                     if (completedLessons.has(lesson.id)) {
                                         completedCount++;
                                     }
@@ -86,14 +90,17 @@ const HomePage = () => {
                             }
                         }
 
+                        console.log(`📊 ${subjectId}: ${completedCount}/${totalLessons} уроков, IDs:`, lessonIds.slice(0, 3));
+
                         if (totalLessons > 0) {
                             progressMap[subjectId] = Math.round((completedCount / totalLessons) * 100);
                         }
                     } catch (err) {
-                        // Если структура предмета не загрузилась — пропускаем
+                        console.error(`📊 Ошибка для ${subjectId}:`, err);
                     }
                 }
 
+                console.log('📊 Итоговый progressMap:', progressMap);
                 setSubjectProgress(progressMap);
             } catch (err) {
                 console.error('Ошибка загрузки прогресса:', err);

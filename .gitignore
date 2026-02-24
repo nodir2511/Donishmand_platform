@@ -135,3 +135,9 @@ testLogic.js
 test_signup.js
 test_columns.js
 count_lines.js
+test_name.js
+
+# AI Agent directories
+.agent/
+.gemini/
+.cursorrules

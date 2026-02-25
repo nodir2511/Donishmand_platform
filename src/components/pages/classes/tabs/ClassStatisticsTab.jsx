@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 // Конфигурация периодов
 const PERIOD_OPTIONS = [
@@ -221,7 +221,7 @@ const ClassStatisticsTab = ({ classData }) => {
         doc.text(new Date().toLocaleDateString('ru-RU'), 14, 28);
 
         // Таблица
-        doc.autoTable({
+        autoTable(doc, {
             head: [headers],
             body,
             startY: 34,
@@ -602,8 +602,8 @@ const SummaryView = ({ data, timeDynamics, topStudents, courseProgress, difficul
                                 </div>
                                 <div className="shrink-0">
                                     <div className={`text-sm sm:text-base font-bold px-3 py-1 rounded-lg ${q.errorRate >= 70 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
-                                            q.errorRate >= 40 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-                                                'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                        q.errorRate >= 40 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                            'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                                         }`}>
                                         {q.errorRate}% ошибок
                                     </div>

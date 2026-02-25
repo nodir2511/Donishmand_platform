@@ -5,21 +5,42 @@ import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './components/pages/HomePage';
 
-// Ленивая загрузка тяжёлых страниц (code-splitting)
-const SubjectPage = React.lazy(() => import('./components/pages/SubjectPage'));
-const SectionPage = React.lazy(() => import('./components/pages/SectionPage'));
-const TopicPage = React.lazy(() => import('./components/pages/TopicPage'));
-const LessonPage = React.lazy(() => import('./components/pages/LessonPage'));
-const CreatorPage = React.lazy(() => import('./components/pages/CreatorPage'));
-const AdminPage = React.lazy(() => import('./components/pages/AdminPage'));
-const AuthPage = React.lazy(() => import('./components/pages/AuthPage'));
+// Обёртка для React.lazy() с автоматическим перезапуском при ошибке загрузки чанка.
+// После нового деплоя хеши файлов меняются, и старые ссылки возвращают 404.
+// Эта функция автоматически перезагружает страницу один раз, чтобы получить новый index.html.
+const lazyWithRetry = (importFn) => {
+    return React.lazy(() =>
+        importFn().catch((error) => {
+            // Проверяем, не перезагружали ли мы уже страницу из-за этой ошибки
+            const hasReloaded = sessionStorage.getItem('chunk_reload');
+            if (!hasReloaded) {
+                sessionStorage.setItem('chunk_reload', '1');
+                window.location.reload();
+                // Возвращаем промис, который никогда не завершается (страница перезагрузится)
+                return new Promise(() => {});
+            }
+            // Если уже перезагружались — пробрасываем ошибку дальше (GlobalErrorBoundary покажет UI)
+            sessionStorage.removeItem('chunk_reload');
+            throw error;
+        })
+    );
+};
+
+// Ленивая загрузка тяжёлых страниц (code-splitting) с авто-перезагрузкой при 404
+const SubjectPage = lazyWithRetry(() => import('./components/pages/SubjectPage'));
+const SectionPage = lazyWithRetry(() => import('./components/pages/SectionPage'));
+const TopicPage = lazyWithRetry(() => import('./components/pages/TopicPage'));
+const LessonPage = lazyWithRetry(() => import('./components/pages/LessonPage'));
+const CreatorPage = lazyWithRetry(() => import('./components/pages/CreatorPage'));
+const AdminPage = lazyWithRetry(() => import('./components/pages/AdminPage'));
+const AuthPage = lazyWithRetry(() => import('./components/pages/AuthPage'));
 
 // Classes pages
-const ClassesPage = React.lazy(() => import('./components/pages/classes/ClassesPage'));
-const ClassDetailsPage = React.lazy(() => import('./components/pages/classes/ClassDetailsPage'));
+const ClassesPage = lazyWithRetry(() => import('./components/pages/classes/ClassesPage'));
+const ClassDetailsPage = lazyWithRetry(() => import('./components/pages/classes/ClassDetailsPage'));
 
-const ProfilePage = React.lazy(() => import('./components/pages/ProfilePage'));
-const NotFoundPage = React.lazy(() => import('./components/pages/NotFoundPage'));
+const ProfilePage = lazyWithRetry(() => import('./components/pages/ProfilePage'));
+const NotFoundPage = lazyWithRetry(() => import('./components/pages/NotFoundPage'));
 
 // Индикатор загрузки при переходах между страницами
 const PageLoader = () => (

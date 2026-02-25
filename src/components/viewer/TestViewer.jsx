@@ -246,21 +246,40 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         if (!isTeacher) {
             supabase.auth.getUser().then(({ data: user }) => {
                 if (user?.user?.id) {
+                    const userId = user.user.id;
+
+                    // 1. Сохраняем результат теста (с деталями по вопросам)
                     supabase.from('user_test_results').insert({
-                        user_id: user.user.id,
+                        user_id: userId,
                         lesson_id: lessonId,
                         score: score,
                         correct_count: correct,
                         total_questions: totalQuestions,
-                        is_passed: isPassed
+                        is_passed: isPassed,
+                        answers_detail: details.map(d => ({
+                            question_id: d.question.id,
+                            question_text: (d.question.textRu || '').slice(0, 150),
+                            is_correct: d.isCorrect,
+                            type: d.question.type
+                        }))
                     }).then(({ error }) => {
-                        if (error) console.error('Failed to save test result to DB:', error);
+                        if (error) console.error('Ошибка сохранения результата теста:', error);
                     });
+
+                    // 2. Начисляем монету при успешной сдаче (для лидерборда)
+                    if (isPassed) {
+                        supabase.from('coin_transactions').insert({
+                            user_id: userId,
+                            amount: 1
+                        }).then(({ error }) => {
+                            if (error) console.error('Ошибка начисления монеты:', error);
+                        });
+                    }
                 }
             });
         }
 
-        // Сбор монет при успешной сдаче
+        // Сбор монет в localStorage (для мгновенного отображения на клиенте)
         if (isPassed) {
             const currentCoins = parseInt(localStorage.getItem('user_coins') || '0');
             localStorage.setItem('user_coins', (currentCoins + 1).toString());

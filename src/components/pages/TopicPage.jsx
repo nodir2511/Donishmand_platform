@@ -1,13 +1,67 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { PlayCircle, FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
-import { getContainerStats, getLessonStats } from '../../utils/progressHelpers';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
+
+// Ключ кеша статистики по темам
+const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
+
+/**
+ * Загрузить кеш статистики из localStorage.
+ * @returns {Object} { lessonId: { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt } }
+ */
+const getCachedStats = () => {
+    try {
+        const cached = localStorage.getItem(TOPIC_STATS_CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+    } catch {
+        return {};
+    }
+};
+
+/**
+ * Сохранить статистику в localStorage-кеш.
+ */
+const saveCachedStats = (statsMap) => {
+    try {
+        // Мерж со старыми данными, чтобы не затирать другие предметы
+        const old = getCachedStats();
+        const merged = { ...old, ...statsMap };
+        localStorage.setItem(TOPIC_STATS_CACHE_KEY, JSON.stringify(merged));
+    } catch { /* ignore */ }
+};
+
+/**
+ * Рассчитать статистику по урокам из массива результатов тестов.
+ * @param {Array} testResults - массив записей из user_test_results
+ * @returns {Object} lessonsStats — { lessonId: { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt } }
+ */
+const computeStatsFromResults = (testResults) => {
+    const byLesson = {};
+    for (const r of testResults) {
+        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
+        byLesson[r.lesson_id].push(r);
+    }
+
+    const stats = {};
+    for (const [lessonId, results] of Object.entries(byLesson)) {
+        const totalAttempts = results.length;
+        const bestScore = Math.max(...results.map(r => r.score));
+        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
+        const avgErrorRate = Math.round(100 - avgScore);
+        const lastAttemptAt = Math.max(...results.map(r => new Date(r.created_at).getTime()));
+
+        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt };
+    }
+    return stats;
+};
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate }) => {
+const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, lessonStats }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
@@ -38,6 +92,29 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate }) =>
 
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
+    // Считаем агрегированную статистику по теме из серверных данных
+    const topicStats = (() => {
+        const lessonIds = topicData.lessons.map(l => l.id);
+        let completedCount = 0;
+        let totalAvgScore = 0;
+
+        for (const lid of lessonIds) {
+            const s = lessonStats[lid];
+            if (s) {
+                completedCount++;
+                totalAvgScore += s.avgScore;
+            }
+        }
+
+        if (completedCount === 0) return null;
+
+        return {
+            completedLessons: completedCount,
+            totalLessons: lessonIds.length,
+            avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
+        };
+    })();
+
     return (
         <div className="max-w-5xl">
             <h1 className="text-3xl font-bold mb-2 text-gaming-accent">
@@ -58,34 +135,28 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate }) =>
             </div>
 
             {/* Статистика темы */}
-            {(() => {
-                const stats = getContainerStats(topicData.lessons.map(l => l.id));
-                if (stats && !isTeacher) {
-                    return (
-                        <div className="mb-8 p-6 bg-gradient-to-r from-gaming-primary/10 to-gaming-purple/10 rounded-2xl border border-white/5 flex items-center gap-6">
-                            <div className="p-4 bg-gaming-primary/20 rounded-full text-gaming-primary">
-                                <FileText size={32} />
-                            </div>
-                            <div>
-                                <div className="text-3xl font-bold text-white mb-1">{stats.avgErrorRate}%</div>
-                                <div className="text-gaming-textMuted text-sm">
-                                    {lang === 'ru' ? 'Средний % ошибок по теме' : 'Миёна % хатогиҳо дар мавзӯъ'}
-                                </div>
-                                <div className="text-xs text-gaming-textMuted mt-1 opacity-70">
-                                    {lang === 'ru'
-                                        ? `На основе ${stats.completedLessons} пройденных уроков`
-                                        : `Дар асоси ${stats.completedLessons} дарсҳои гузашта`}
-                                </div>
-                            </div>
+            {topicStats && !isTeacher && (
+                <div className="mb-8 p-6 bg-gradient-to-r from-gaming-primary/10 to-gaming-purple/10 rounded-2xl border border-white/5 flex items-center gap-6">
+                    <div className="p-4 bg-gaming-primary/20 rounded-full text-gaming-primary">
+                        <FileText size={32} />
+                    </div>
+                    <div>
+                        <div className="text-3xl font-bold text-white mb-1">{topicStats.avgErrorRate}%</div>
+                        <div className="text-gaming-textMuted text-sm">
+                            {lang === 'ru' ? 'Средний % ошибок по теме' : 'Миёна % хатогиҳо дар мавзӯъ'}
                         </div>
-                    );
-                }
-                return null;
-            })()}
+                        <div className="text-xs text-gaming-textMuted mt-1 opacity-70">
+                            {lang === 'ru'
+                                ? `На основе ${topicStats.completedLessons} пройденных уроков`
+                                : `Дар асоси ${topicStats.completedLessons} дарсҳои гузашта`}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="space-y-4">
                 {topicData.lessons.map((lesson, index) => {
-                    const stats = getLessonStats(lesson.id);
+                    const stats = lessonStats[lesson.id] || null;
 
                     return (
                         <Link
@@ -123,14 +194,46 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate }) =>
     );
 };
 
-import { useAuth } from '../../contexts/AuthContext';
-
-// ...
-
 const TopicPage = () => {
     const { subjectId, sectionId, topicId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher, isAdmin } = useAuth();
+    const { isTeacher: rawIsTeacher, isAdmin, profile } = useAuth();
+    const isTeacher = rawIsTeacher || isAdmin;
+
+    // SWR: мгновенно показать кеш, затем обновить с сервера
+    const [lessonStats, setLessonStats] = useState(() => getCachedStats());
+
+    useEffect(() => {
+        if (isTeacher || !profile) return;
+
+        let cancelled = false;
+
+        const fetchStats = async () => {
+            try {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser?.id || cancelled) return;
+
+                const { data: testResults, error } = await supabase
+                    .from('user_test_results')
+                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
+                    .eq('user_id', authUser.id);
+
+                if (error || !testResults || cancelled) return;
+
+                const computed = computeStatsFromResults(testResults);
+
+                if (!cancelled) {
+                    setLessonStats(computed);
+                    saveCachedStats(computed);
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки статистики темы:', err);
+            }
+        };
+
+        fetchStats();
+        return () => { cancelled = true; };
+    }, [profile, isTeacher]);
 
     return (
         <CourseLayout subjectId={subjectId}>
@@ -138,11 +241,13 @@ const TopicPage = () => {
                 subjectId={subjectId}
                 sectionId={sectionId}
                 topicId={topicId}
-                isTeacher={isTeacher || isAdmin}
+                isTeacher={isTeacher}
                 navigate={navigate}
+                lessonStats={lessonStats}
             />
         </CourseLayout>
     );
 };
 
 export default TopicPage;
+

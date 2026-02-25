@@ -1,14 +1,76 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Book, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { SUBJECT_NAMES } from '../../constants/data';
 import CourseLayout from '../layout/CourseLayout';
-import { getContainerStats } from '../../utils/progressHelpers';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
+
+// Ключ кеша (общий с TopicPage и SectionPage)
+const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
+
+const getCachedStats = () => {
+    try {
+        const cached = localStorage.getItem(TOPIC_STATS_CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+    } catch {
+        return {};
+    }
+};
+
+const saveCachedStats = (statsMap) => {
+    try {
+        const old = getCachedStats();
+        localStorage.setItem(TOPIC_STATS_CACHE_KEY, JSON.stringify({ ...old, ...statsMap }));
+    } catch { /* ignore */ }
+};
+
+const computeStatsFromResults = (testResults) => {
+    const byLesson = {};
+    for (const r of testResults) {
+        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
+        byLesson[r.lesson_id].push(r);
+    }
+
+    const stats = {};
+    for (const [lessonId, results] of Object.entries(byLesson)) {
+        const totalAttempts = results.length;
+        const bestScore = Math.max(...results.map(r => r.score));
+        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
+        const avgErrorRate = Math.round(100 - avgScore);
+        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore };
+    }
+    return stats;
+};
+
+/**
+ * Рассчитать агрегированную статистику по массиву lesson IDs.
+ */
+const getAggregateStats = (lessonIds, lessonStats) => {
+    let completedCount = 0;
+    let totalAvgScore = 0;
+
+    for (const lid of lessonIds) {
+        const s = lessonStats[lid];
+        if (s) {
+            completedCount++;
+            totalAvgScore += s.avgScore;
+        }
+    }
+
+    if (completedCount === 0) return null;
+
+    return {
+        completedLessons: completedCount,
+        totalLessons: lessonIds.length,
+        avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
+    };
+};
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate }) => {
+const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonStats }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
@@ -65,9 +127,8 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate }) => {
                         </p>
                     </div>
                 ) : subjectData.sections.map((section, index) => {
-                    // Рассчитываем статистику для раздела
                     const allLessonIds = section.topics.flatMap(t => t.lessons.map(l => l.id));
-                    const stats = getContainerStats(allLessonIds);
+                    const stats = getAggregateStats(allLessonIds, lessonStats);
 
                     return (
                         <Link
@@ -105,25 +166,58 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate }) => {
     );
 };
 
-import { useAuth } from '../../contexts/AuthContext';
-
-// ...
-
 const SubjectPage = () => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher, isAdmin } = useAuth(); // Используем хук вместо пропса
+    const { isTeacher: rawIsTeacher, isAdmin, profile } = useAuth();
+    const isTeacher = rawIsTeacher || isAdmin;
     const subjectName = SUBJECT_NAMES[subjectId]?.[lang] || subjectId;
+
+    // SWR: мгновенно показать кеш, затем обновить с сервера
+    const [lessonStats, setLessonStats] = useState(() => getCachedStats());
+
+    useEffect(() => {
+        if (isTeacher || !profile) return;
+
+        let cancelled = false;
+
+        const fetchStats = async () => {
+            try {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser?.id || cancelled) return;
+
+                const { data: testResults, error } = await supabase
+                    .from('user_test_results')
+                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
+                    .eq('user_id', authUser.id);
+
+                if (error || !testResults || cancelled) return;
+
+                const computed = computeStatsFromResults(testResults);
+
+                if (!cancelled) {
+                    setLessonStats(computed);
+                    saveCachedStats(computed);
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки статистики предмета:', err);
+            }
+        };
+
+        fetchStats();
+        return () => { cancelled = true; };
+    }, [profile, isTeacher]);
 
     return (
         <CourseLayout subjectId={subjectId}>
             <SubjectContent
                 subjectId={subjectId}
                 subjectName={subjectName}
-                isTeacher={isTeacher || isAdmin}
+                isTeacher={isTeacher}
                 navigate={navigate}
+                lessonStats={lessonStats}
             />
         </CourseLayout>
     );

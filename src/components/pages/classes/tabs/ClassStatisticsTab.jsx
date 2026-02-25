@@ -9,8 +9,12 @@ import {
 import {
     TrendingUp, Users, Award, BookOpen, AlertCircle, Loader2,
     ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Download,
-    Trophy, Target, Filter, Calendar, User, Percent, BarChart3
+    Trophy, Target, Filter, Calendar, User, Percent, BarChart3,
+    FileSpreadsheet, FileText, HelpCircle
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 // Конфигурация периодов
 const PERIOD_OPTIONS = [
@@ -35,6 +39,7 @@ const ClassStatisticsTab = ({ classData }) => {
     const [timeDynamics, setTimeDynamics] = useState([]);
     const [topStudents, setTopStudents] = useState([]);
     const [courseProgress, setCourseProgress] = useState(null);
+    const [difficultQuestions, setDifficultQuestions] = useState([]);
 
     // Названия уроков
     const [lessonTitles, setLessonTitles] = useState({});
@@ -80,19 +85,21 @@ const ClassStatisticsTab = ({ classData }) => {
         try {
             if (viewMode === 'summary') {
                 // Параллельная загрузка всех данных
-                const [summary, dynamics, top, progress] = await Promise.all([
+                const [summary, dynamics, top, progress, difficult] = await Promise.all([
                     statisticsService.getClassSummaryStats(classData.id, filters),
                     statisticsService.getClassTimeDynamics(classData.id, filters),
                     statisticsService.getTopStudents(classData.id),
                     totalLessonsCount > 0
                         ? statisticsService.getCourseProgressStats(classData.id, totalLessonsCount)
-                        : Promise.resolve(null)
+                        : Promise.resolve(null),
+                    statisticsService.getDifficultQuestions(classData.id, filters)
                 ]);
 
                 setSummaryData(summary);
                 setTimeDynamics(dynamics);
                 setTopStudents(top);
                 setCourseProgress(progress);
+                setDifficultQuestions(difficult || []);
 
                 // Дозагрузка названий тестов, если их нет в lessonTitles
                 if (summary?.testsBreakdown?.length > 0) {
@@ -149,31 +156,80 @@ const ClassStatisticsTab = ({ classData }) => {
         fetchStatistics();
     }, [fetchStatistics]);
 
+    // Подготовка данных для экспорта
+    const getExportData = () => {
+        const source = studentsData.length > 0 ? studentsData : [];
+        return source.map(s => ({
+            'Имя ученика': s.name,
+            'Пройдено тестов': s.totalTests,
+            'Ср. балл (%)': s.averageScore,
+            'Открыто уроков': s.progress?.length || 0
+        }));
+    };
+
     // Экспорт CSV
     const handleExportCSV = () => {
-        if (!studentsData || studentsData.length === 0) {
-            alert('Нет данных для экспорта');
-            return;
-        }
-        const headers = ['Имя ученика', 'Пройдено тестов', 'Ср. балл', 'Открыто уроков'];
+        const rows = getExportData();
+        if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
+        const headers = Object.keys(rows[0]);
         const csvContent = [
             headers.join(','),
-            ...studentsData.map(s => [
-                `"${s.name}"`,
-                s.totalTests,
-                s.averageScore,
-                s.progress?.length || 0
-            ].join(','))
+            ...rows.map(r => headers.map(h => `"${r[h]}"`).join(','))
         ].join('\n');
 
         const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `class_${classData.name}_statistics.csv`);
+        link.setAttribute('download', `${classData.name}_статистика.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+    };
+
+    // Экспорт Excel
+    const handleExportExcel = () => {
+        const rows = getExportData();
+        if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        // Установка ширины колонок
+        ws['!cols'] = [
+            { wch: 25 }, // Имя
+            { wch: 18 }, // Тестов
+            { wch: 15 }, // Балл
+            { wch: 18 }, // Уроков
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Статистика');
+        XLSX.writeFile(wb, `${classData.name}_статистика.xlsx`);
+    };
+
+    // Экспорт PDF
+    const handleExportPDF = () => {
+        const rows = getExportData();
+        if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
+
+        const doc = new jsPDF();
+        const headers = Object.keys(rows[0]);
+        const body = rows.map(r => headers.map(h => String(r[h])));
+
+        // Заголовок документа
+        doc.setFontSize(16);
+        doc.text(`${classData.name} — Statistika`, 14, 20);
+        doc.setFontSize(10);
+        doc.text(new Date().toLocaleDateString('ru-RU'), 14, 28);
+
+        // Таблица
+        doc.autoTable({
+            head: [headers],
+            body,
+            startY: 34,
+            styles: { fontSize: 9, cellPadding: 3 },
+            headStyles: { fillColor: [108, 93, 211] }
+        });
+
+        doc.save(`${classData.name}_statistika.pdf`);
     };
 
     return (
@@ -203,14 +259,35 @@ const ClassStatisticsTab = ({ classData }) => {
                         </button>
                     </div>
 
-                    <button
-                        onClick={handleExportCSV}
-                        disabled={studentsData.length === 0 && viewMode === 'students'}
-                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors disabled:opacity-50 text-xs sm:text-sm w-full sm:w-auto justify-center sm:justify-start"
-                    >
-                        <Download size={16} />
-                        Экспорт (CSV)
-                    </button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <button
+                            onClick={handleExportCSV}
+                            disabled={studentsData.length === 0 && viewMode === 'students'}
+                            title="Скачать CSV"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors disabled:opacity-50 text-xs sm:text-sm"
+                        >
+                            <Download size={14} />
+                            CSV
+                        </button>
+                        <button
+                            onClick={handleExportExcel}
+                            disabled={studentsData.length === 0 && viewMode === 'students'}
+                            title="Скачать Excel"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-green-600/20 hover:bg-green-600/30 text-green-400 rounded-xl transition-colors disabled:opacity-50 text-xs sm:text-sm border border-green-600/20"
+                        >
+                            <FileSpreadsheet size={14} />
+                            Excel
+                        </button>
+                        <button
+                            onClick={handleExportPDF}
+                            disabled={studentsData.length === 0 && viewMode === 'students'}
+                            title="Скачать PDF"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl transition-colors disabled:opacity-50 text-xs sm:text-sm border border-red-500/20"
+                        >
+                            <FileText size={14} />
+                            PDF
+                        </button>
+                    </div>
                 </div>
 
                 {/* Фильтры */}
@@ -268,6 +345,7 @@ const ClassStatisticsTab = ({ classData }) => {
                     timeDynamics={timeDynamics}
                     topStudents={topStudents}
                     courseProgress={courseProgress}
+                    difficultQuestions={difficultQuestions}
                     lessonTitles={lessonTitles}
                     period={period}
                     selectedStudentId={selectedStudentId}
@@ -282,7 +360,7 @@ const ClassStatisticsTab = ({ classData }) => {
 // ===========================
 // КОМПОНЕНТ СВОДКИ
 // ===========================
-const SummaryView = ({ data, timeDynamics, topStudents, courseProgress, lessonTitles, period, selectedStudentId }) => {
+const SummaryView = ({ data, timeDynamics, topStudents, courseProgress, difficultQuestions, lessonTitles, period, selectedStudentId }) => {
     // В отличие от ResponsiveContainer, свой ResizeObserver на явной обертке дает точные пиксели и упреждает предупреждения Recharts
     const lineChartContainerRef = useRef(null);
     const barChartContainerRef = useRef(null);
@@ -501,6 +579,40 @@ const SummaryView = ({ data, timeDynamics, topStudents, courseProgress, lessonTi
                     </div>
                 )
             }
+
+            {/* Сложные вопросы (Анализ) */}
+            {difficultQuestions && difficultQuestions.length > 0 && (
+                <div className="bg-gaming-card border border-white/10 rounded-2xl overflow-hidden">
+                    <div className="p-3 sm:p-4 bg-red-500/5 border-b border-white/10 font-medium text-gray-300 text-sm sm:text-base flex items-center gap-2">
+                        <HelpCircle size={18} className="text-red-400" />
+                        Сложные вопросы — Топ провальных
+                    </div>
+                    <div className="divide-y divide-white/5">
+                        {difficultQuestions.map((q, idx) => (
+                            <div key={q.question_id || idx} className="p-3 sm:p-4 flex items-center justify-between hover:bg-white/5 transition-colors gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-xs sm:text-sm text-white" dangerouslySetInnerHTML={{ __html: q.question_text || 'Вопрос' }} />
+                                    <div className="text-[10px] sm:text-xs text-gaming-textMuted mt-1 flex items-center gap-2">
+                                        <span>{lessonTitles[q.lesson_id] || 'Тест'}</span>
+                                        <span>·</span>
+                                        <span>{q.total} попыток</span>
+                                        <span>·</span>
+                                        <span className="capitalize">{q.type === 'multiple_choice' ? 'Выбор' : q.type === 'matching' ? 'Соответствие' : 'Числовой'}</span>
+                                    </div>
+                                </div>
+                                <div className="shrink-0">
+                                    <div className={`text-sm sm:text-base font-bold px-3 py-1 rounded-lg ${q.errorRate >= 70 ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                                            q.errorRate >= 40 ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                                                'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                        }`}>
+                                        {q.errorRate}% ошибок
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Детальная таблица тестов */}
             {

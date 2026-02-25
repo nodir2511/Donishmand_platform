@@ -10,6 +10,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import { syllabusService } from '../../services/syllabusService';
 
+const PROGRESS_CACHE_KEY = 'donishmand_subject_progress';
+
 const HomePage = () => {
     const { t, i18n } = useTranslation();
     const [activeClusterId, setActiveClusterId] = useState(0);
@@ -17,8 +19,15 @@ const HomePage = () => {
     const { profile } = useAuth();
     const location = useLocation();
 
-    // Прогресс по предметам: { subjectId: процент }
-    const [subjectProgress, setSubjectProgress] = useState({});
+    // SWR: мгновенная инициализация прогресса из localStorage-кеша
+    const [subjectProgress, setSubjectProgress] = useState(() => {
+        try {
+            const cached = localStorage.getItem(PROGRESS_CACHE_KEY);
+            return cached ? JSON.parse(cached) : {};
+        } catch {
+            return {};
+        }
+    });
 
     useEffect(() => {
         if (location.hash === '#courses-section') {
@@ -28,86 +37,101 @@ const HomePage = () => {
         }
     }, [location]);
 
-    // Загрузка прогресса для авторизованных пользователей
+    // Фоновая загрузка актуального прогресса из Supabase (SWR: revalidate)
     useEffect(() => {
         if (!profile) return;
 
+        let cancelled = false;
+
         const loadProgress = async () => {
             try {
-                // Получаем user_id через auth (совпадает с auth.uid() в RLS-политиках)
                 const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser?.id) return;
+                if (!authUser?.id || cancelled) return;
 
-                // 1. Получаем все lesson_id, по которым есть прогресс у пользователя
-                const { data: progressData, error: progressErr } = await supabase
-                    .from('user_lesson_progress')
-                    .select('lesson_id')
-                    .eq('user_id', authUser.id);
+                // Параллельно загружаем прогресс уроков и результаты тестов
+                const [progressRes, testRes] = await Promise.all([
+                    supabase
+                        .from('user_lesson_progress')
+                        .select('lesson_id')
+                        .eq('user_id', authUser.id),
+                    supabase
+                        .from('user_test_results')
+                        .select('lesson_id')
+                        .eq('user_id', authUser.id),
+                ]);
 
-                const { data: testData, error: testErr } = await supabase
-                    .from('user_test_results')
-                    .select('lesson_id')
-                    .eq('user_id', authUser.id);
-
-                if (progressErr) console.warn('Ошибка загрузки lesson_progress:', progressErr);
-                if (testErr) console.warn('Ошибка загрузки test_results:', testErr);
+                if (progressRes.error) console.warn('Ошибка загрузки lesson_progress:', progressRes.error);
+                if (testRes.error) console.warn('Ошибка загрузки test_results:', testRes.error);
 
                 // Объединяем уникальные lesson_id
                 const completedLessons = new Set();
-                if (progressData) progressData.forEach(p => completedLessons.add(p.lesson_id));
-                if (testData) testData.forEach(t => completedLessons.add(t.lesson_id));
+                if (progressRes.data) progressRes.data.forEach(p => completedLessons.add(p.lesson_id));
+                if (testRes.data) testRes.data.forEach(t => completedLessons.add(t.lesson_id));
 
-                console.log(`📊 Прогресс: найдено ${completedLessons.size} уроков с активностью`);
-                console.log('📊 ID уроков:', [...completedLessons]);
+                if (cancelled) return;
 
-                if (completedLessons.size === 0) return;
+                if (completedLessons.size === 0) {
+                    // Если прогресса нет — очищаем кеш
+                    const empty = {};
+                    setSubjectProgress(empty);
+                    localStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(empty));
+                    return;
+                }
 
-                // 2. Для каждого предмета считаем процент
+                // Параллельно загружаем структуры ВСЕХ предметов
+                const structureResults = await Promise.all(
+                    ALL_SUBJECTS_LIST.map(async (subjectId) => {
+                        try {
+                            const structure = await syllabusService.getStructure(subjectId);
+                            return { subjectId, structure };
+                        } catch {
+                            return { subjectId, structure: null };
+                        }
+                    })
+                );
+
+                if (cancelled) return;
+
+                // Считаем прогресс по каждому предмету
                 const progressMap = {};
 
-                for (const subjectId of ALL_SUBJECTS_LIST) {
-                    try {
-                        const structure = await syllabusService.getStructure(subjectId);
-                        console.log(`📊 ${subjectId}: structure =`, structure ? 'OK' : 'null', 'sections:', structure?.sections?.length || 0);
-                        if (!structure?.sections) continue;
+                for (const { subjectId, structure } of structureResults) {
+                    if (!structure?.sections) continue;
 
-                        // Считаем все уроки в предмете
-                        let totalLessons = 0;
-                        let completedCount = 0;
-                        const lessonIds = [];
+                    let totalLessons = 0;
+                    let completedCount = 0;
 
-                        for (const section of structure.sections) {
-                            if (!section.topics) continue;
-                            for (const topic of section.topics) {
-                                if (!topic.lessons) continue;
-                                for (const lesson of topic.lessons) {
-                                    totalLessons++;
-                                    lessonIds.push(lesson.id);
-                                    if (completedLessons.has(lesson.id)) {
-                                        completedCount++;
-                                    }
+                    for (const section of structure.sections) {
+                        if (!section.topics) continue;
+                        for (const topic of section.topics) {
+                            if (!topic.lessons) continue;
+                            for (const lesson of topic.lessons) {
+                                totalLessons++;
+                                if (completedLessons.has(lesson.id)) {
+                                    completedCount++;
                                 }
                             }
                         }
+                    }
 
-                        console.log(`📊 ${subjectId}: ${completedCount}/${totalLessons} уроков, IDs:`, lessonIds.slice(0, 3));
-
-                        if (totalLessons > 0) {
-                            progressMap[subjectId] = Math.round((completedCount / totalLessons) * 100);
-                        }
-                    } catch (err) {
-                        console.error(`📊 Ошибка для ${subjectId}:`, err);
+                    if (totalLessons > 0) {
+                        progressMap[subjectId] = Math.round((completedCount / totalLessons) * 100);
                     }
                 }
 
-                console.log('📊 Итоговый progressMap:', progressMap);
+                if (cancelled) return;
+
+                // Обновляем состояние и сохраняем в кеш для следующего визита
                 setSubjectProgress(progressMap);
+                localStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(progressMap));
             } catch (err) {
                 console.error('Ошибка загрузки прогресса:', err);
             }
         };
 
         loadProgress();
+
+        return () => { cancelled = true; };
     }, [profile]);
 
     // Определяем доступные предметы в зависимости от роли

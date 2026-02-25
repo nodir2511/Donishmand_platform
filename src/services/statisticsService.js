@@ -355,5 +355,71 @@ export const statisticsService = {
             titles[l.id] = l.title_ru || l.title_tj || 'Тест';
         });
         return titles;
+    },
+
+    /**
+     * Получить статистику по сложным вопросам (какие вопросы проваливаются чаще всего).
+     * Работает с колонкой answers_detail (JSONB) из user_test_results.
+     * 
+     * @param {string} classId - ID класса
+     * @param {object} filters - { period: 'week'|'month'|'all' }
+     * @returns {Promise<Array>} Топ-15 самых провальных вопросов
+     */
+    async getDifficultQuestions(classId, filters = {}) {
+        const { period = 'all' } = filters;
+        const periodStart = getPeriodStartDate(period);
+
+        const { students } = await getClassStudents(classId);
+        if (students.length === 0) return [];
+
+        // Запрашиваем результаты тестов с деталями ответов
+        let query = supabase
+            .from('user_test_results')
+            .select('lesson_id, answers_detail')
+            .in('user_id', students)
+            .not('answers_detail', 'is', null);
+        if (periodStart) query = query.gte('created_at', periodStart);
+
+        const { data, error } = await query;
+        if (error) {
+            console.error('Ошибка загрузки деталей ответов:', error);
+            return [];
+        }
+        if (!data || data.length === 0) return [];
+
+        // Агрегируем по question_id
+        const questionStats = {};
+        data.forEach(result => {
+            const details = result.answers_detail;
+            if (!Array.isArray(details)) return;
+
+            details.forEach(d => {
+                const qId = d.question_id;
+                if (!qId) return;
+
+                if (!questionStats[qId]) {
+                    questionStats[qId] = {
+                        question_id: qId,
+                        question_text: d.question_text || 'Неизвестный вопрос',
+                        type: d.type || 'unknown',
+                        lesson_id: result.lesson_id,
+                        total: 0,
+                        errors: 0
+                    };
+                }
+                questionStats[qId].total += 1;
+                if (!d.is_correct) questionStats[qId].errors += 1;
+            });
+        });
+
+        // Сортируем по проценту ошибок (desc), минимум 2 попытки для релевантности
+        return Object.values(questionStats)
+            .filter(q => q.total >= 2)
+            .map(q => ({
+                ...q,
+                errorRate: Math.round((q.errors / q.total) * 100)
+            }))
+            .sort((a, b) => b.errorRate - a.errorRate)
+            .slice(0, 15);
     }
 };

@@ -1,13 +1,75 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
-import { getContainerStats } from '../../utils/progressHelpers';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
+
+// Ключ кеша (общий с TopicPage)
+const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
+
+const getCachedStats = () => {
+    try {
+        const cached = localStorage.getItem(TOPIC_STATS_CACHE_KEY);
+        return cached ? JSON.parse(cached) : {};
+    } catch {
+        return {};
+    }
+};
+
+const saveCachedStats = (statsMap) => {
+    try {
+        const old = getCachedStats();
+        localStorage.setItem(TOPIC_STATS_CACHE_KEY, JSON.stringify({ ...old, ...statsMap }));
+    } catch { /* ignore */ }
+};
+
+const computeStatsFromResults = (testResults) => {
+    const byLesson = {};
+    for (const r of testResults) {
+        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
+        byLesson[r.lesson_id].push(r);
+    }
+
+    const stats = {};
+    for (const [lessonId, results] of Object.entries(byLesson)) {
+        const totalAttempts = results.length;
+        const bestScore = Math.max(...results.map(r => r.score));
+        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
+        const avgErrorRate = Math.round(100 - avgScore);
+        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore };
+    }
+    return stats;
+};
+
+/**
+ * Рассчитать агрегированную статистику по массиву lesson IDs.
+ */
+const getAggregateStats = (lessonIds, lessonStats) => {
+    let completedCount = 0;
+    let totalAvgScore = 0;
+
+    for (const lid of lessonIds) {
+        const s = lessonStats[lid];
+        if (s) {
+            completedCount++;
+            totalAvgScore += s.avgScore;
+        }
+    }
+
+    if (completedCount === 0) return null;
+
+    return {
+        completedLessons: completedCount,
+        totalLessons: lessonIds.length,
+        avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
+    };
+};
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SectionContent = ({ subjectId, sectionId, isTeacher, navigate }) => {
+const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
@@ -36,6 +98,10 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate }) => {
 
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
+    // Агрегированная статистика по всему разделу
+    const allLessonIds = sectionData.topics.flatMap(topic => topic.lessons.map(l => l.id));
+    const sectionStats = getAggregateStats(allLessonIds, lessonStats);
+
     return (
         <div className="max-w-5xl">
             <h1 className="text-3xl font-bold mb-2 text-gaming-primary">
@@ -56,39 +122,29 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate }) => {
             </div>
 
             {/* Статистика раздела */}
-            {(() => {
-                // Собираем все ID уроков из всех тем раздела
-                const allLessonIds = sectionData.topics.flatMap(topic => topic.lessons.map(l => l.id));
-                const stats = getContainerStats(allLessonIds);
-
-                if (stats && !isTeacher) {
-                    return (
-                        <div className="mb-8 p-6 bg-gradient-to-r from-gaming-accent/10 to-gaming-blue/10 rounded-2xl border border-white/5 flex items-center gap-6">
-                            <div className="p-4 bg-gaming-accent/20 rounded-full text-gaming-accent">
-                                <FileText size={32} />
-                            </div>
-                            <div>
-                                <div className="text-3xl font-bold text-white mb-1">{stats.avgErrorRate}%</div>
-                                <div className="text-gaming-textMuted text-sm">
-                                    {lang === 'ru' ? 'Средний % ошибок по разделу' : 'Миёна % хатогиҳо дар бахш'}
-                                </div>
-                                <div className="text-xs text-gaming-textMuted mt-1 opacity-70">
-                                    {lang === 'ru'
-                                        ? `На основе ${stats.completedLessons} пройденных уроков`
-                                        : `Дар асоси ${stats.completedLessons} дарсҳои гузашта`}
-                                </div>
-                            </div>
+            {sectionStats && !isTeacher && (
+                <div className="mb-8 p-6 bg-gradient-to-r from-gaming-accent/10 to-gaming-blue/10 rounded-2xl border border-white/5 flex items-center gap-6">
+                    <div className="p-4 bg-gaming-accent/20 rounded-full text-gaming-accent">
+                        <FileText size={32} />
+                    </div>
+                    <div>
+                        <div className="text-3xl font-bold text-white mb-1">{sectionStats.avgErrorRate}%</div>
+                        <div className="text-gaming-textMuted text-sm">
+                            {lang === 'ru' ? 'Средний % ошибок по разделу' : 'Миёна % хатогиҳо дар бахш'}
                         </div>
-                    );
-                }
-                return null;
-            })()}
+                        <div className="text-xs text-gaming-textMuted mt-1 opacity-70">
+                            {lang === 'ru'
+                                ? `На основе ${sectionStats.completedLessons} пройденных уроков`
+                                : `Дар асоси ${sectionStats.completedLessons} дарсҳои гузашта`}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="space-y-4">
                 {sectionData.topics.map((topic, index) => {
-                    // Рассчитываем статистику для темы
                     const lessonIds = topic.lessons.map(l => l.id);
-                    const stats = getContainerStats(lessonIds);
+                    const stats = getAggregateStats(lessonIds, lessonStats);
 
                     return (
                         <Link
@@ -126,22 +182,55 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate }) => {
     );
 };
 
-import { useAuth } from '../../contexts/AuthContext';
-
-// ...
-
 const SectionPage = () => {
     const { subjectId, sectionId } = useParams();
     const navigate = useNavigate();
-    const { isTeacher, isAdmin } = useAuth(); // Используем хук
+    const { isTeacher: rawIsTeacher, isAdmin, profile } = useAuth();
+    const isTeacher = rawIsTeacher || isAdmin;
+
+    // SWR: мгновенно показать кеш, затем обновить с сервера
+    const [lessonStats, setLessonStats] = useState(() => getCachedStats());
+
+    useEffect(() => {
+        if (isTeacher || !profile) return;
+
+        let cancelled = false;
+
+        const fetchStats = async () => {
+            try {
+                const { data: { user: authUser } } = await supabase.auth.getUser();
+                if (!authUser?.id || cancelled) return;
+
+                const { data: testResults, error } = await supabase
+                    .from('user_test_results')
+                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
+                    .eq('user_id', authUser.id);
+
+                if (error || !testResults || cancelled) return;
+
+                const computed = computeStatsFromResults(testResults);
+
+                if (!cancelled) {
+                    setLessonStats(computed);
+                    saveCachedStats(computed);
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки статистики раздела:', err);
+            }
+        };
+
+        fetchStats();
+        return () => { cancelled = true; };
+    }, [profile, isTeacher]);
 
     return (
         <CourseLayout subjectId={subjectId}>
             <SectionContent
                 subjectId={subjectId}
                 sectionId={sectionId}
-                isTeacher={isTeacher || isAdmin}
+                isTeacher={isTeacher}
                 navigate={navigate}
+                lessonStats={lessonStats}
             />
         </CourseLayout>
     );

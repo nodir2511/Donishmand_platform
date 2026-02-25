@@ -107,7 +107,7 @@ const LessonPage = () => {
                             .select('*')
                             .eq('lesson_id', lessonId)
                             .eq('user_id', user.user.id)
-                            .single();
+                            .maybeSingle();
 
                         // Результаты тестов
                         const { data: testData } = await supabase

@@ -157,8 +157,21 @@ const ClassStatisticsTab = ({ classData }) => {
     }, [fetchStatistics]);
 
     // Подготовка данных для экспорта
-    const getExportData = () => {
-        const source = studentsData.length > 0 ? studentsData : [];
+    const getExportData = async () => {
+        let source = studentsData;
+        // Если мы в режиме сводки, данные об учениках не загружены в стейт, 
+        // поэтому загружаем их на лету для экспорта
+        if (viewMode === 'summary') {
+            try {
+                source = await statisticsService.getStudentsDetailedStats(classData.id, { period, studentId: selectedStudentId });
+            } catch (err) {
+                console.error('Ошибка загрузки данных для экспорта:', err);
+                source = [];
+            }
+        }
+
+        if (!source || source.length === 0) return [];
+
         return source.map(s => ({
             'Имя ученика': s.name,
             'Пройдено тестов': s.totalTests,
@@ -168,8 +181,8 @@ const ClassStatisticsTab = ({ classData }) => {
     };
 
     // Экспорт CSV
-    const handleExportCSV = () => {
-        const rows = getExportData();
+    const handleExportCSV = async () => {
+        const rows = await getExportData();
         if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
         const headers = Object.keys(rows[0]);
         const csvContent = [
@@ -188,8 +201,8 @@ const ClassStatisticsTab = ({ classData }) => {
     };
 
     // Экспорт Excel
-    const handleExportExcel = () => {
-        const rows = getExportData();
+    const handleExportExcel = async () => {
+        const rows = await getExportData();
         if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
 
         const ws = XLSX.utils.json_to_sheet(rows);
@@ -206,8 +219,8 @@ const ClassStatisticsTab = ({ classData }) => {
     };
 
     // Экспорт PDF
-    const handleExportPDF = () => {
-        const rows = getExportData();
+    const handleExportPDF = async () => {
+        const rows = await getExportData();
         if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
 
         const doc = new jsPDF();

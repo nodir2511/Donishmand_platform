@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
 import { CLUSTERS_STRUCTURE } from '../../constants/data';
 import {
@@ -12,6 +13,10 @@ import {
 const ProfilePage = () => {
     const { t } = useTranslation();
     const { user, profile } = useAuth();
+
+    if (profile?.role === 'student') {
+        return <Navigate to="/dashboard" replace />;
+    }
 
     // Состояние формы
     const [formData, setFormData] = useState({

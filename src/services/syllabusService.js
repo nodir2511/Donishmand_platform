@@ -483,43 +483,54 @@ const wrapSingleLangContent = (content, lang) => {
     const isRu = lang === 'ru';
 
     // Конвертируем вопросы из одноязычного формата (text) в двуязычный (textRu/textTj)
+    // ДОБАВЛЕН ФОЛБЭК: Если текст для запрошенного языка пуст, берем из другого языка.
     const wrapQuestions = (questions) => {
         return (questions || []).map(q => {
+            const hasTargetText = isRu ? !!q.textRu : !!q.textTj;
+            const fallbackText = isRu ? (q.textRu || q.textTj || q.text || '') : (q.textTj || q.textRu || q.text || '');
+            const fallbackImage = isRu ? (q.imageRu || q.imageTj || q.image || null) : (q.imageTj || q.imageRu || q.image || null);
+
             const wrapped = {
                 id: q.id, type: q.type,
-                imageRu: isRu ? (q.image || null) : null,
-                imageTj: isRu ? null : (q.image || null),
-                textRu: isRu ? (q.text || '') : '',
-                textTj: isRu ? '' : (q.text || '')
+                imageRu: isRu ? fallbackImage : null,
+                imageTj: isRu ? null : fallbackImage,
+                textRu: isRu ? fallbackText : '',
+                textTj: isRu ? '' : fallbackText
             };
             if (q.type === 'multiple_choice') {
                 wrapped.options = (q.options || []).map(opt => {
+                    const fallbackOptText = isRu ? (opt.textRu || opt.textTj || opt.text || '') : (opt.textTj || opt.textRu || opt.text || '');
+                    const fallbackOptImage = isRu ? (opt.imageRu || opt.imageTj || opt.image || null) : (opt.imageTj || opt.imageRu || opt.image || null);
                     return {
                         id: opt.id,
-                        imageRu: isRu ? (opt.image || null) : null,
-                        imageTj: isRu ? null : (opt.image || null),
-                        textRu: isRu ? (opt.text || '') : '',
-                        textTj: isRu ? '' : (opt.text || '')
+                        imageRu: isRu ? fallbackOptImage : null,
+                        imageTj: isRu ? null : fallbackOptImage,
+                        textRu: isRu ? fallbackOptText : '',
+                        textTj: isRu ? '' : fallbackOptText
                     };
                 });
                 wrapped.correctId = q.correctId;
             } else if (q.type === 'matching') {
                 wrapped.leftItems = (q.leftItems || []).map(item => {
+                    const fallbackItemText = isRu ? (item.textRu || item.textTj || item.text || '') : (item.textTj || item.textRu || item.text || '');
+                    const fallbackItemImage = isRu ? (item.imageRu || item.imageTj || item.image || null) : (item.imageTj || item.imageRu || item.image || null);
                     return {
                         id: item.id,
-                        imageRu: isRu ? (item.image || null) : null,
-                        imageTj: isRu ? null : (item.image || null),
-                        textRu: isRu ? (item.text || '') : '',
-                        textTj: isRu ? '' : (item.text || '')
+                        imageRu: isRu ? fallbackItemImage : null,
+                        imageTj: isRu ? null : fallbackItemImage,
+                        textRu: isRu ? fallbackItemText : '',
+                        textTj: isRu ? '' : fallbackItemText
                     };
                 });
                 wrapped.rightItems = (q.rightItems || []).map(item => {
+                    const fallbackItemText = isRu ? (item.textRu || item.textTj || item.text || '') : (item.textTj || item.textRu || item.text || '');
+                    const fallbackItemImage = isRu ? (item.imageRu || item.imageTj || item.image || null) : (item.imageTj || item.imageRu || item.image || null);
                     return {
                         id: item.id,
-                        imageRu: isRu ? (item.image || null) : null,
-                        imageTj: isRu ? null : (item.image || null),
-                        textRu: isRu ? (item.text || '') : '',
-                        textTj: isRu ? '' : (item.text || '')
+                        imageRu: isRu ? fallbackItemImage : null,
+                        imageTj: isRu ? null : fallbackItemImage,
+                        textRu: isRu ? fallbackItemText : '',
+                        textTj: isRu ? '' : fallbackItemText
                     };
                 });
                 wrapped.correctMatches = q.correctMatches;

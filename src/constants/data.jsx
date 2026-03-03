@@ -2,6 +2,25 @@ import {
     BookOpen, Atom, Globe, Calculator, Beaker, Leaf, ScrollText, Languages
 } from 'lucide-react';
 
+// Набор готовых аватаров (gaming-стиль)
+export const AVATAR_OPTIONS = [
+    { id: 'av1', emoji: '🚀', gradient: 'from-blue-500 to-cyan-500' },
+    { id: 'av2', emoji: '🐉', gradient: 'from-red-500 to-orange-500' },
+    { id: 'av3', emoji: '🤖', gradient: 'from-gray-500 to-blue-400' },
+    { id: 'av4', emoji: '🧙', gradient: 'from-purple-500 to-indigo-500' },
+    { id: 'av5', emoji: '🥷', gradient: 'from-gray-700 to-gray-900' },
+    { id: 'av6', emoji: '⚔️', gradient: 'from-yellow-600 to-amber-700' },
+    { id: 'av7', emoji: '🎮', gradient: 'from-gaming-primary to-gaming-pink' },
+    { id: 'av8', emoji: '🦊', gradient: 'from-orange-400 to-red-500' },
+    { id: 'av9', emoji: '🐺', gradient: 'from-slate-500 to-slate-700' },
+    { id: 'av10', emoji: '🦅', gradient: 'from-amber-500 to-yellow-300' },
+    { id: 'av11', emoji: '🐼', gradient: 'from-gray-100 to-gray-300' },
+    { id: 'av12', emoji: '🦁', gradient: 'from-yellow-500 to-orange-600' },
+    { id: 'av13', emoji: '👾', gradient: 'from-green-400 to-emerald-600' },
+    { id: 'av14', emoji: '🎯', gradient: 'from-rose-500 to-pink-600' },
+    { id: 'av15', emoji: '💎', gradient: 'from-cyan-400 to-blue-600' },
+    { id: 'av16', emoji: '🔥', gradient: 'from-red-600 to-yellow-500' },
+];
 
 
 export const SUBJECT_CONFIG = {

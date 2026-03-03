@@ -17,7 +17,7 @@ const lazyWithRetry = (importFn) => {
                 sessionStorage.setItem('chunk_reload', '1');
                 window.location.reload();
                 // Возвращаем промис, который никогда не завершается (страница перезагрузится)
-                return new Promise(() => {});
+                return new Promise(() => { });
             }
             // Если уже перезагружались — пробрасываем ошибку дальше (GlobalErrorBoundary покажет UI)
             sessionStorage.removeItem('chunk_reload');
@@ -40,6 +40,7 @@ const ClassesPage = lazyWithRetry(() => import('./components/pages/classes/Class
 const ClassDetailsPage = lazyWithRetry(() => import('./components/pages/classes/ClassDetailsPage'));
 
 const ProfilePage = lazyWithRetry(() => import('./components/pages/ProfilePage'));
+const StudentDashboardPage = lazyWithRetry(() => import('./components/pages/StudentDashboardPage'));
 const NotFoundPage = lazyWithRetry(() => import('./components/pages/NotFoundPage'));
 
 // Индикатор загрузки при переходах между страницами
@@ -115,6 +116,16 @@ function AppContent() {
                             element={
                                 <ProtectedRoute>
                                     <ProfilePage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* Кабинет ученика */}
+                        <Route
+                            path="/dashboard"
+                            element={
+                                <ProtectedRoute>
+                                    <StudentDashboardPage />
                                 </ProtectedRoute>
                             }
                         />

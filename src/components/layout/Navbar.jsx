@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sparkles, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, Sparkles, User, LogOut, ChevronDown, BarChart3 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
+import { AVATAR_OPTIONS } from '../../constants/data';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
@@ -47,6 +48,8 @@ const Navbar = () => {
     const userInitials = profile?.full_name
         ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
         : user?.email?.[0].toUpperCase() || 'U';
+
+    const currentAvatar = AVATAR_OPTIONS.find(a => a.id === profile?.avatar_url);
 
     // Отображение названия роли
     const getRoleName = (role) => {
@@ -135,9 +138,15 @@ const Navbar = () => {
                                         onClick={() => setShowProfileMenu(!showProfileMenu)}
                                         className="flex items-center gap-3 pl-1 pr-3 py-1 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full transition-all group"
                                     >
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gaming-primary to-gaming-purple flex items-center justify-center text-white font-bold text-sm shadow-inner">
-                                            {userInitials}
-                                        </div>
+                                        {currentAvatar ? (
+                                            <div className={`w-9 h-9 rounded-full bg-gradient-to-br ${currentAvatar.gradient} flex items-center justify-center shadow-inner text-lg`}>
+                                                {currentAvatar.emoji}
+                                            </div>
+                                        ) : (
+                                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-gaming-primary to-gaming-purple flex items-center justify-center text-white font-bold text-sm shadow-inner">
+                                                {userInitials}
+                                            </div>
+                                        )}
                                         <div className="text-left hidden lg:block">
                                             <div className="text-xs font-bold text-white leading-none mb-0.5">{profile?.full_name || user.email}</div>
                                             <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider leading-none">
@@ -158,9 +167,9 @@ const Navbar = () => {
                                             </div>
 
                                             <div className="py-1">
-                                                <button onClick={() => { navigate('/profile'); setShowProfileMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-gaming-textMuted hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                                                    <User size={16} />
-                                                    {t('profile')}
+                                                <button onClick={() => { navigate(profile?.role === 'student' ? '/dashboard' : '/profile'); setShowProfileMenu(false); }} className="w-full text-left px-4 py-2.5 text-sm text-gaming-textMuted hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                                                    {profile?.role === 'student' ? <BarChart3 size={16} /> : <User size={16} />}
+                                                    {profile?.role === 'student' ? t('studentDashboard.cabinet') : t('profile')}
                                                 </button>
                                                 <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 flex items-center gap-2 transition-colors">
                                                     <LogOut size={16} />
@@ -190,9 +199,15 @@ const Navbar = () => {
                     <div className="flex flex-col gap-4">
                         {user && (
                             <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl border border-white/5">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gaming-primary to-gaming-purple flex items-center justify-center text-white font-bold shadow-inner">
-                                    {userInitials}
-                                </div>
+                                {currentAvatar ? (
+                                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${currentAvatar.gradient} flex items-center justify-center shadow-inner text-xl`}>
+                                        {currentAvatar.emoji}
+                                    </div>
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gaming-primary to-gaming-purple flex items-center justify-center text-white font-bold shadow-inner">
+                                        {userInitials}
+                                    </div>
+                                )}
                                 <div className="overflow-hidden">
                                     <div className="font-bold text-white truncate">{profile?.full_name || user.email}</div>
                                     <div className="text-xs text-gaming-textMuted uppercase tracking-wider">

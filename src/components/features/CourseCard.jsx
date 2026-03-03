@@ -3,13 +3,18 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { SUBJECT_CONFIG, SUBJECT_NAMES } from '../../constants/data';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../../contexts/AuthContext';
 
 const CourseCard = ({ subjectId, progress = 0 }) => {
     const { i18n } = useTranslation();
+    const { profile } = useAuth();
     const lang = i18n.resolvedLanguage || 'ru';
     const config = SUBJECT_CONFIG[subjectId];
     const title = SUBJECT_NAMES[subjectId][lang];
     const Icon = config.icon;
+
+    // Прогресс-бар показываем только ученикам
+    const showProgress = profile?.role === 'student' || !profile?.role;
 
     return (
         <Link to={`/subject/${subjectId}`} className="block group relative bg-gaming-card rounded-3xl p-6 border border-white/5 hover:border-gaming-primary/30 shadow-lg shadow-black/20 hover:shadow-gaming-primary/10 transition-all duration-500 hover:-translate-y-2 cursor-pointer overflow-hidden">
@@ -32,25 +37,27 @@ const CourseCard = ({ subjectId, progress = 0 }) => {
                 {title}
             </h3>
 
-            {/* Прогресс-бар */}
-            <div className="relative z-10">
-                <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs text-gaming-textMuted">
-                        {progress > 0 ? 'Прогресс' : ''}
-                    </span>
-                    {progress > 0 && (
-                        <span className="text-xs font-bold text-gaming-primary">
-                            {progress}%
+            {/* Прогресс-бар (только для учеников) */}
+            {showProgress && (
+                <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-gaming-textMuted">
+                            {progress > 0 ? 'Прогресс' : ''}
                         </span>
-                    )}
+                        {progress > 0 && (
+                            <span className="text-xs font-bold text-gaming-primary">
+                                {progress}%
+                            </span>
+                        )}
+                    </div>
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink rounded-full transition-all duration-1000 ease-out"
+                            style={{ width: `${progress}%` }}
+                        />
+                    </div>
                 </div>
-                <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div
-                        className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${progress}%` }}
-                    />
-                </div>
-            </div>
+            )}
         </Link>
     );
 };

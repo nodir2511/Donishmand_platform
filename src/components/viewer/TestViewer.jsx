@@ -5,6 +5,22 @@ import { renderKatex } from '../../utils/katexRenderer';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
+// Очистка объекта от undefined (PostgREST падает с ошибкой 400, если есть undefined)
+// Сохраняем Date объекты нетронутыми
+const cleanUndefined = (obj) => {
+    if (obj === undefined) return null;
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (obj instanceof Date) return obj;
+    if (Array.isArray(obj)) return obj.map(cleanUndefined);
+    const result = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = cleanUndefined(obj[key]);
+        }
+    }
+    return result;
+};
+
 const PASS_THRESHOLD = 80;
 
 const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
@@ -20,37 +36,90 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin;
 
-    // --- ФУНКЦИИ БЕЗОПАСНОСТИ НАЧАЛО ---
-    const [isFocused, setIsFocused] = useState(true);
+    // --- НОВЫЙ АНТИЧИТ НАЧАЛО ---
+    const [swapNotification, setSwapNotification] = useState(false);
 
-    React.useEffect(() => {
-        const checkFocus = () => {
-            // Агрессивная проверка фокуса для всех браузеров
-            const hasFocus = document.hasFocus() && !document.hidden;
-            setIsFocused(hasFocus);
+    // Функция замены неотвеченных вопросов
+    const swapUnansweredQuestions = useCallback(() => {
+        // Учителей не наказываем
+        if (isTeacher) return;
+
+        setRandomizedQuestions(prev => {
+            const lockedIds = new Set(lockedQuestions);
+            const currentIds = new Set(prev.map(q => q.id));
+
+            // Вопросы, на которые уже дан ответ (их не трогаем)
+            const answeredQs = prev.filter(q => lockedIds.has(q.id));
+            // Вопросы, на которые еще нет ответа (их надо заменить)
+            const unansweredQs = prev.filter(q => !lockedIds.has(q.id));
+
+            if (unansweredQs.length === 0) return prev; // Все отвечено
+
+            // Доступные вопросы из базы, которых еще НЕТ в текущем тесте
+            let availableQs = questions.filter(q => !currentIds.has(q.id));
+            availableQs = shuffleArray(availableQs);
+
+            const newUnansweredQs = unansweredQs.map((oldQ, index) => {
+                // Если есть доступный новый вопрос - берем его
+                if (index < availableQs.length) {
+                    const newQ = availableQs[index];
+                    if (newQ.type === 'multiple_choice') return { ...newQ, options: shuffleArray(newQ.options) };
+                    if (newQ.type === 'matching') return { ...newQ, leftItems: shuffleArray(newQ.leftItems), rightItems: shuffleArray(newQ.rightItems) };
+                    return newQ;
+                }
+                // Если новых вопросов не хватает (н-р всего 10 вопросов в БД),
+                // просто заново перемешиваем варианты ответов в текущем вопросе
+                const shuffledOldQ = { ...oldQ };
+                if (shuffledOldQ.type === 'multiple_choice') shuffledOldQ.options = shuffleArray(shuffledOldQ.options);
+                if (shuffledOldQ.type === 'matching') {
+                    shuffledOldQ.leftItems = shuffleArray(shuffledOldQ.leftItems);
+                    shuffledOldQ.rightItems = shuffleArray(shuffledOldQ.rightItems);
+                }
+                return shuffledOldQ;
+            });
+
+            // Показываем уведомление
+            setSwapNotification(true);
+            setTimeout(() => setSwapNotification(false), 5000);
+
+            // Собираем новый список, сохраняя порядок: сначала отвеченные (или по их индексам),
+            // но проще просто склеить отвеченные и новые в том же порядке.
+            // Чтобы сохранить позиции, пройдемся по оригинальному массиву `prev`:
+            let newIndex = 0;
+            return prev.map(q => {
+                if (lockedIds.has(q.id)) return q;
+                return newUnansweredQs[newIndex++];
+            });
+        });
+    }, [isTeacher, lockedQuestions, questions]);
+
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden && !showResults) {
+                swapUnansweredQuestions();
+            }
         };
 
-        // Слушатели событий
-        window.addEventListener('focus', checkFocus);
-        window.addEventListener('blur', checkFocus);
-        document.addEventListener('visibilitychange', checkFocus);
+        const handleWindowBlur = () => {
+            if (!showResults) {
+                swapUnansweredQuestions();
+            }
+        };
 
-        // Интервал для перестраховки (на случай если события не сработают)
-        const interval = setInterval(checkFocus, 300);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('blur', handleWindowBlur);
 
         return () => {
-            window.removeEventListener('focus', checkFocus);
-            window.removeEventListener('blur', checkFocus);
-            document.removeEventListener('visibilitychange', checkFocus);
-            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('blur', handleWindowBlur);
         };
-    }, []);
-    // --- ФУНКЦИИ БЕЗОПАСНОСТИ КОНЕЦ ---
+    }, [swapUnansweredQuestions, showResults]);
+    // --- НОВЫЙ АНТИЧИТ КОНЕЦ ---
 
     const progressKey = `test_progress_v2_${lessonId}`; // v2 принудительно начинает сначала
 
     // Рандомизация вопросов с восстановлением прогресса
-    const randomizedQuestions = useMemo(() => {
+    const [randomizedQuestions, setRandomizedQuestions] = useState(() => {
         if (!questions) return [];
 
         // Проверяем сохранённый прогресс
@@ -60,8 +129,6 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 const saved = JSON.parse(savedRaw);
 
                 // ВАЛИДАЦИЯ КЭША:
-                // 1. Проверяем наличие ключей textRu/textTj
-                // 2. Проверяем, что хотя бы в одном языке есть непустой текст
                 const isCacheValid = saved.questions && saved.questions.every(q =>
                     (q.textRu && q.textRu.trim().length > 0) || (q.textTj && q.textTj.trim().length > 0)
                 );
@@ -69,7 +136,6 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 if (!isCacheValid) {
                     console.warn('Кэш теста содержит пустые вопросы. Очистка...');
                     localStorage.removeItem(progressKey);
-                    // Пропускаем блок восстановления
                 } else if (saved.questions && saved.answers && saved.locked) {
                     // Восстанавливаем ответы и блокировки
                     setAnswers(saved.answers);
@@ -108,7 +174,21 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
             if (q.type === 'matching') return { ...q, leftItems: shuffleArray(q.leftItems), rightItems: shuffleArray(q.rightItems) };
             return q;
         });
-    }, [questions, testVersion, progressKey]);
+    });
+
+    // При вызове handleRestart мы должны обновить randomizedQuestions.
+    // Для этого используем useEffect, который следит за testVersion.
+    useEffect(() => {
+        if (testVersion > 0 && questions) {
+            const shuffledAll = shuffleArray(questions);
+            const selectedQuestions = shuffledAll.slice(0, 10);
+            setRandomizedQuestions(selectedQuestions.map(q => {
+                if (q.type === 'multiple_choice') return { ...q, options: shuffleArray(q.options) };
+                if (q.type === 'matching') return { ...q, leftItems: shuffleArray(q.leftItems), rightItems: shuffleArray(q.rightItems) };
+                return q;
+            }));
+        }
+    }, [testVersion, questions]);
 
     const currentQuestion = randomizedQuestions[currentIndex];
     const totalQuestions = randomizedQuestions.length;
@@ -145,7 +225,16 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const handleAnswer = (questionId, answer) => {
         // Если ответ уже заблокирован — не разрешаем менять
         if (isQuestionLocked(questionId)) return;
-        setAnswers(prev => ({ ...prev, [questionId]: answer }));
+        setAnswers(prev => {
+            const newAnswers = { ...prev, [questionId]: answer };
+
+            // Защита от undefined для Supabase (вызовет 400 ошибку)
+            if (newAnswers[questionId] === undefined) {
+                newAnswers[questionId] = null;
+            }
+
+            return newAnswers;
+        });
     };
 
     // Навигация
@@ -187,9 +276,10 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         }
     }, [shakeWarning]);
 
-    // Отправить тест и рассчитать результаты
-    const handleSubmit = () => {
-        // Валидация: проверяем наличие ответов на все вопросы
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Отправить тест и рассчитать результаты (СЕРВЕРНАЯ ПРОВЕРКА)
+    const handleSubmit = async () => {
         // Блокируем последний вопрос перед отправкой
         lockCurrentQuestion();
 
@@ -201,95 +291,96 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
             setWarningMessage(msg);
             return;
         }
-        let correct = 0;
-        const details = randomizedQuestions.map(q => {
-            const userAnswer = answers[q.id];
-            let isCorrect = false;
 
-            if (q.type === 'multiple_choice') {
-                isCorrect = userAnswer === q.correctId;
-            } else if (q.type === 'matching') {
-                isCorrect = Object.entries(q.correctMatches).every(
-                    ([left, right]) => userAnswer?.[left] === right
-                );
-            } else if (q.type === 'numeric') {
-                const correctValue = q.digits.join('');
-                isCorrect = userAnswer === correctValue;
+        setIsSubmitting(true);
+        const assignedIds = randomizedQuestions.map(q => q.id);
+
+        try {
+            // Если учитель, генерируем детали локально (учителя не сохраняют прогресс в БД)
+            if (isTeacher) {
+                let localCorrect = 0;
+                const details = randomizedQuestions.map(q => {
+                    const userAnswer = answers[q.id];
+                    let isCorrect = false;
+
+                    if (q.type === 'multiple_choice') isCorrect = userAnswer === q.correctId;
+                    else if (q.type === 'matching') isCorrect = Object.entries(q.correctMatches || {}).every(([l, r]) => userAnswer?.[l] === r);
+                    else if (q.type === 'numeric') isCorrect = userAnswer === (q.digits || []).join('');
+
+                    if (isCorrect) localCorrect++;
+                    return { question: q, userAnswer, isCorrect };
+                });
+                const score = Math.round((localCorrect / totalQuestions) * 100);
+                setResults({
+                    correct: localCorrect,
+                    total: totalQuestions,
+                    score,
+                    isPassed: score >= PASS_THRESHOLD,
+                    details
+                });
+            } else {
+                // Очистка ответов от undefined рекурсивно
+                const cleanedAnswers = cleanUndefined(answers);
+                const cleanedIds = cleanUndefined(assignedIds);
+
+                // Если ученик, вызываем безопасную серверную функцию RPM
+                const { data: serverResults, error } = await supabase.rpc('evaluate_test', {
+                    p_lesson_id: lessonId,
+                    p_user_answers: cleanedAnswers,
+                    p_question_ids: cleanedIds
+                });
+
+                if (error) throw error;
+
+                // Сбор монет в localStorage для мгновенного отображения
+                if (serverResults.isPassed) {
+                    const currentCoins = parseInt(localStorage.getItem('user_coins') || '0');
+                    localStorage.setItem('user_coins', (currentCoins + 1).toString());
+                }
+
+                // Локальная история для графика успеваемости
+                const historyKey = `test_history_${lessonId}`;
+                const currentHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
+                const newResult = {
+                    score: serverResults.score,
+                    correct: serverResults.correct,
+                    total: serverResults.total,
+                    timestamp: Date.now(),
+                    passed: serverResults.isPassed
+                };
+                localStorage.setItem(historyKey, JSON.stringify([...currentHistory, newResult]));
+                localStorage.setItem(`test_result_${lessonId}`, JSON.stringify(newResult));
+
+                setResults(serverResults);
             }
 
-            if (isCorrect) correct++;
-            return { question: q, userAnswer, isCorrect };
-        });
+            setShowResults(true);
+            localStorage.removeItem(progressKey);
+        } catch (err) {
+            console.error('Ошибка проверки теста на сервере:', err);
 
-        const score = Math.round((correct / totalQuestions) * 100);
-        const isPassed = score >= PASS_THRESHOLD;
+            // Если ошибка, предлагаем очистить старую попытку (кэш) и начать заново
+            const confirmClear = window.confirm(
+                lang === 'ru'
+                    ? 'Произошла ошибка при сохранении результатов. Возможно, ваша старая попытка (кэш) содержит устаревшие данные.\n\nХотите очистить старую попытку и начать тест заново?'
+                    : 'Хатогӣ ҳангоми нигоҳдории натиҷаҳо. Эҳтимол кӯшиши кӯҳнаи шумо (кэш) маълумоти нодуруст дорад.\n\nМехоҳед кӯшиши кӯнаро тоза кунед ва аз нав оғоз кунед?'
+            );
 
-        // Сохранение результата в localStorage (история)
-        const historyKey = `test_history_${lessonId}`;
-        const currentHistory = JSON.parse(localStorage.getItem(historyKey) || '[]');
-
-        const newResult = {
-            score,
-            correct,
-            total: totalQuestions,
-            timestamp: Date.now(),
-            passed: isPassed
-        };
-
-        const updatedHistory = [...currentHistory, newResult];
-        localStorage.setItem(historyKey, JSON.stringify(updatedHistory));
-
-        // Сохранение последнего результата (для обратной совместимости)
-        localStorage.setItem(`test_result_${lessonId}`, JSON.stringify(newResult));
-
-        // Сохранение в базу данных Supabase (если не учитель)
-        if (!isTeacher) {
-            supabase.auth.getUser().then(({ data: user }) => {
-                if (user?.user?.id) {
-                    const userId = user.user.id;
-
-                    // 1. Сохраняем результат теста (с деталями по вопросам)
-                    supabase.from('user_test_results').insert({
-                        user_id: userId,
-                        lesson_id: lessonId,
-                        score: score,
-                        correct_count: correct,
-                        total_questions: totalQuestions,
-                        is_passed: isPassed,
-                        answers_detail: details.map(d => ({
-                            question_id: d.question.id,
-                            question_text: (d.question.textRu || '').slice(0, 150),
-                            is_correct: d.isCorrect,
-                            type: d.question.type
-                        }))
-                    }).then(({ error }) => {
-                        if (error) console.error('Ошибка сохранения результата теста:', error);
-                    });
-
-                    // 2. Начисляем монету при успешной сдаче (для лидерборда)
-                    if (isPassed) {
-                        supabase.from('coin_transactions').insert({
-                            user_id: userId,
-                            amount: 1
-                        }).then(({ error }) => {
-                            if (error) console.error('Ошибка начисления монеты:', error);
-                        });
-                    }
-                }
-            });
+            if (confirmClear) {
+                // Очищаем прогресс и перезапускаем
+                localStorage.removeItem(progressKey);
+                setCurrentIndex(0);
+                setAnswers({});
+                setShakeWarning(false);
+                setWarningMessage('');
+                setLockedQuestions(new Set());
+                setResults(null);
+                setShowResults(false);
+                setTestVersion(v => v + 1);
+            }
+        } finally {
+            setIsSubmitting(false);
         }
-
-        // Сбор монет в localStorage (для мгновенного отображения на клиенте)
-        if (isPassed) {
-            const currentCoins = parseInt(localStorage.getItem('user_coins') || '0');
-            localStorage.setItem('user_coins', (currentCoins + 1).toString());
-        }
-
-        setResults({ correct, total: totalQuestions, score, isPassed, details });
-        setShowResults(true);
-
-        // Очищаем сохранённый прогресс после завершения теста
-        localStorage.removeItem(progressKey);
     };
 
     // Перезапустить тест
@@ -381,27 +472,80 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                         </p>
                     </div>
 
-                    {/* Детали */}
+                    {/* Детали ответов */}
                     <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
-                        {results.details.map((detail, idx) => (
-                            <div key={detail.question.id} className={`p-4 rounded-xl border ${detail.isCorrect ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                                <div className="flex items-start gap-3">
-                                    {detail.isCorrect ? <CheckCircle className="text-green-400 mt-1" size={20} /> : <XCircle className="text-red-400 mt-1" size={20} />}
-                                    <div className="flex-1">
-                                        <div className="font-medium mb-1 flex gap-1">
-                                            <span>{idx + 1}.</span>
-                                            <div dangerouslySetInnerHTML={{ __html: getQuestionText(detail.question) }} className="[&>p]:inline [&>p]:m-0" />
-                                        </div>
-                                        {!detail.isCorrect && detail.question.type === 'multiple_choice' && (
-                                            <div className="text-sm text-green-400 flex flex-wrap gap-1">
-                                                <span>{lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}</span>
-                                                <span className="font-semibold" dangerouslySetInnerHTML={{ __html: getOptionText(detail.question.options.find(o => o.id === detail.question.correctId)) }} />
+                        {results.details.map((detail, idx) => {
+                            // Поддержка двух форматов: серверного (is_correct, question.text)
+                            // и локального (isCorrect, question.textRu) — для режима учителя
+                            const isCorrect = detail.isCorrect ?? detail.is_correct ?? false;
+                            const q = detail.question || {};
+
+                            // Текст вопроса: новый формат (textRu/textTj) или серверный (text)
+                            const questionText = renderKatex(
+                                lang === 'tj'
+                                    ? (q.textTj || q.textRu || q.text || '')
+                                    : (q.textRu || q.text || '')
+                            );
+
+                            // Текст варианта ответа: аналогичный fallback
+                            const getOptText = (opt) => {
+                                if (!opt) return '';
+                                return renderKatex(
+                                    lang === 'tj'
+                                        ? (opt.textTj || opt.textRu || opt.text || '')
+                                        : (opt.textRu || opt.text || '')
+                                );
+                            };
+
+                            return (
+                                <div key={q.id || idx} className={`p-4 rounded-xl border ${isCorrect ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                                    <div className="flex items-start gap-3">
+                                        {isCorrect
+                                            ? <CheckCircle className="text-green-400 mt-1 shrink-0" size={20} />
+                                            : <XCircle className="text-red-400 mt-1 shrink-0" size={20} />
+                                        }
+                                        <div className="flex-1 min-w-0">
+                                            {/* Текст вопроса */}
+                                            <div className="font-medium mb-2 flex gap-1">
+                                                <span className="shrink-0">{idx + 1}.</span>
+                                                <div dangerouslySetInnerHTML={{ __html: questionText }} className="[&>p]:inline [&>p]:m-0" />
                                             </div>
-                                        )}
+
+                                            {/* Правильный ответ (только для неправильных) */}
+                                            {!isCorrect && (
+                                                <div className="text-sm text-green-400 mt-1">
+                                                    {q.type === 'multiple_choice' && (() => {
+                                                        const correctOpt = (q.options || []).find(o => o.id === q.correctId);
+                                                        return correctOpt ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                <span>{lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}</span>
+                                                                <span className="font-semibold" dangerouslySetInnerHTML={{ __html: getOptText(correctOpt) }} />
+                                                            </div>
+                                                        ) : null;
+                                                    })()}
+
+                                                    {q.type === 'numeric' && (() => {
+                                                        const correctVal = (q.digits || []).join('');
+                                                        return correctVal ? (
+                                                            <span>
+                                                                {lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}
+                                                                <span className="font-bold font-mono">{correctVal}{q.unit ? ` ${q.unit}` : ''}</span>
+                                                            </span>
+                                                        ) : null;
+                                                    })()}
+
+                                                    {q.type === 'matching' && (
+                                                        <span className="text-gaming-textMuted text-xs italic">
+                                                            {lang === 'ru' ? 'Соответствие не совпало' : 'Мувофиқат дуруст набуд'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Действия */}
@@ -434,23 +578,22 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 userSelect: 'none'
             }}>
 
-            {/* ОВЕРЛЕЙ РАЗМЫТИЯ (БЕЗОПАСНОСТЬ) */}
-            {!isFocused && (
-                <div className="fixed inset-0 z-[100] backdrop-blur-3xl flex items-center justify-center bg-black/90 cursor-not-allowed"
-                    onClick={(e) => e.stopPropagation()}>
-                    <div className="text-center p-6">
-                        <XCircle size={64} className="mx-auto mb-4 text-red-500 animate-pulse" />
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                            {lang === 'ru' ? 'Вернитесь к тесту!' : 'Ба тест баргардед!'}
-                        </h3>
-                        <p className="text-white/80">
-                            {lang === 'ru' ? 'Контент скрыт при потере фокуса' : 'Мундариҷа ҳангоми гум кардани фокус пинҳон карда мешавад'}
+            {/* УВЕДОМЛЕНИЕ ОБ АНТИЧИТЕ (ЗАМЕНА ВОПРОСОВ) */}
+            {swapNotification && (
+                <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 bg-red-500/90 backdrop-blur border border-red-500 text-white px-6 py-4 rounded-2xl shadow-[0_0_30px_rgba(239,68,68,0.5)] animate-in slide-in-from-top fade-in duration-300">
+                    <AlertTriangle size={24} className="animate-pulse" />
+                    <div>
+                        <h4 className="font-bold text-lg leading-tight">
+                            {lang === 'ru' ? 'Подозрительная активность!' : 'Фаъолияти шубҳанок!'}
+                        </h4>
+                        <p className="text-sm text-balance">
+                            {lang === 'ru' ? 'Так как вы покинули вкладку, все неотвеченные вопросы были заменены во избежание списывания.' : 'Азбаски шумо саҳифаро тарк кардед, ҳамаи саволҳои ҷавобдоданашуда иваз карда шуданд.'}
                         </p>
                     </div>
                 </div>
             )}
 
-            <div className={`w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 flex flex-col max-h-[90vh] ${!isFocused ? 'opacity-0 pointer-events-none' : ''}`}>
+            <div className={`w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 flex flex-col max-h-[90vh]`}>
 
                 {/* ВОДЯНОЙ ЗНАК */}
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.03] flex flex-wrap content-center justify-center gap-8 rotate-12 scale-150">
@@ -709,12 +852,19 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                                 </div>
                             )}
                             <button onClick={handleSubmit}
+                                disabled={isSubmitting}
                                 className={`flex items-center gap-2 px-6 py-2 rounded-xl transition-all ${shakeWarning
                                     ? 'bg-red-500/80 text-white animate-[shake_0.5s_ease-in-out]'
-                                    : 'bg-gaming-primary text-white hover:bg-gaming-primary/80'
+                                    : isSubmitting
+                                        ? 'bg-gaming-primary/50 text-white cursor-not-allowed'
+                                        : 'bg-gaming-primary text-white hover:bg-gaming-primary/80'
                                     }`}>
-                                <CheckCircle size={18} />
-                                {lang === 'ru' ? 'Завершить тест' : 'Тамом кардан'}
+                                {isSubmitting ? (
+                                    <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></div>
+                                ) : (
+                                    <CheckCircle size={18} />
+                                )}
+                                {isSubmitting ? (lang === 'ru' ? 'Проверка...' : 'Тафтиш...') : (lang === 'ru' ? 'Завершить тест' : 'Тамом кардан')}
                             </button>
                         </div>
                     ) : (

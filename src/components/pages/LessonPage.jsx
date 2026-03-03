@@ -174,11 +174,24 @@ const LessonPage = () => {
 
     // Определение существующего контента
     const lessonContent = lessonData?.lesson?.content || {};
+    // Видео (уже было с fallback)
     const videoUrl = lang === 'tj' ? (lessonContent.video?.urlTj || lessonContent.video?.url) : (lessonContent.video?.url || lessonContent.video?.urlTj);
     const hasVideo = !!videoUrl;
-    const hasText = !!(lessonContent.text?.bodyRu || lessonContent.text?.bodyTj);
-    const currentSlides = lang === 'tj' ? (lessonContent.slidesTj || []) : (lessonContent.slidesRu || []);
+
+    // Текст с fallback
+    const textTj = lessonContent.text?.bodyTj;
+    const textRu = lessonContent.text?.bodyRu;
+    const bodyText = lang === 'tj' ? (textTj || textRu) : (textRu || textTj);
+    const hasText = !!bodyText;
+
+    // Слайды с fallback
+    const slidesTj = lessonContent.slidesTj || [];
+    const slidesRu = lessonContent.slidesRu || [];
+    const currentSlides = lang === 'tj'
+        ? (slidesTj.length > 0 ? slidesTj : slidesRu)
+        : (slidesRu.length > 0 ? slidesRu : slidesTj);
     const hasSlides = currentSlides.length > 0;
+
     const hasTest = lessonContent.test?.questions?.length > 0;
     const hasContent = hasVideo || hasText || hasSlides;
     const testQuestions = lessonContent.test?.questions || [];
@@ -580,7 +593,7 @@ const LessonPage = () => {
                                         }}
                                     >
                                         <div
-                                            dangerouslySetInnerHTML={{ __html: renderKatex(lang === 'tj' ? (lessonContent.text.bodyTj || lessonContent.text.bodyRu) : lessonContent.text.bodyRu) }}
+                                            dangerouslySetInnerHTML={{ __html: renderKatex(bodyText) }}
                                         />
                                         {!progress.textRead && !isTeacher && (
                                             <button

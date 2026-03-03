@@ -11,6 +11,24 @@ const CoinIcon = ({ size = 16, className = '' }) => (
     </svg>
 );
 
+// Добавим локальный компонент для аватара
+const AvatarImage = ({ src, name }) => {
+    const [hasError, setHasError] = useState(false);
+
+    if (!src || hasError) {
+        return <>{name?.[0]?.toUpperCase() || '?'}</>;
+    }
+
+    return (
+        <img
+            src={src}
+            alt={name || ""}
+            className="w-9 h-9 rounded-full object-cover"
+            onError={() => setHasError(true)}
+        />
+    );
+};
+
 const ClassLeaderboardTab = ({ classId }) => {
     const [period, setPeriod] = useState('day'); // 'day', 'week', 'month', 'all'
     const [leaderboard, setLeaderboard] = useState([]);
@@ -233,11 +251,8 @@ const ClassLeaderboardTab = ({ classId }) => {
 
                                         {/* Имя + аватар */}
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-9 h-9 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold text-sm shrink-0">
-                                                {student.avatar
-                                                    ? <img src={student.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
-                                                    : student.name?.[0]?.toUpperCase() || '?'
-                                                }
+                                            <div className="w-9 h-9 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold text-sm shrink-0 overflow-hidden">
+                                                <AvatarImage src={student.avatar} name={student.name} />
                                             </div>
                                             <span className={`font-medium truncate ${student.coins > 0 ? 'text-white' : 'text-gaming-textMuted'}`}>
                                                 {student.name}

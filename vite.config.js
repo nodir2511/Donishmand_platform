@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/Donishmand_platform/', // Обязательно для GitHub Pages
   plugins: [react()],
-  base: '/Donishmand_platform/',
   server: {
     open: true,
   },

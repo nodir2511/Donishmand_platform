@@ -63,6 +63,82 @@ export const studentService = {
     },
 
     /**
+     * Получить динамику успеваемости по времени для линейного графика.
+     * Группирует результаты тестов по дате.
+     *
+     * @param {object} filters - { period: 'week'|'month'|'all', subjectId: string|null }
+     * @returns {Promise<Array>} Массив [{date, avgScore, passRate, testsCount}]
+     */
+    async getMyTimeDynamics(filters = {}) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Пользователь не авторизован');
+
+        // Определяем дату начала периода
+        let startDate = null;
+        if (filters.period && filters.period !== 'all') {
+            const now = new Date();
+            if (filters.period === 'week') startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            else if (filters.period === 'month') startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        }
+
+        let query = supabase
+            .from('user_test_results')
+            .select('lesson_id, score, is_passed, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true });
+
+        if (startDate) {
+            query = query.gte('created_at', startDate.toISOString());
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!data || data.length === 0) return [];
+
+        // Если нужна фильтрация по предмету — фильтруем по lesson_id
+        let filtered = data;
+        if (filters.subjectId) {
+            const subjectLessonIds = await this._getSubjectLessonIds(filters.subjectId);
+            filtered = data.filter(r => subjectLessonIds.has(r.lesson_id));
+        }
+
+        if (filtered.length === 0) return [];
+
+        // Группировка по дате
+        // Для недели — по дням, для месяца — по дням, для всего — по неделям (если > 14 точек)
+        const groupByWeek = filters.period === 'all' && filtered.length > 14;
+
+        const groups = {};
+        filtered.forEach(r => {
+            const d = new Date(r.created_at);
+            let key;
+            if (groupByWeek) {
+                // Номер недели: первый день недели
+                const dayOfWeek = d.getDay();
+                const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+                const monday = new Date(d);
+                monday.setDate(diff);
+                key = `${monday.getDate().toString().padStart(2, '0')}.${(monday.getMonth() + 1).toString().padStart(2, '0')}`;
+            } else {
+                key = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+            }
+
+            if (!groups[key]) groups[key] = { scores: [], passed: 0, total: 0 };
+            groups[key].scores.push(r.score);
+            groups[key].total++;
+            if (r.is_passed) groups[key].passed++;
+        });
+
+        // Преобразуем в массив для графика
+        return Object.entries(groups).map(([date, g]) => ({
+            date,
+            avgScore: Math.round(g.scores.reduce((a, b) => a + b, 0) / g.scores.length),
+            passRate: Math.round((g.passed / g.total) * 100),
+            testsCount: g.total,
+        }));
+    },
+
+    /**
      * Получить сводку прогресса по предметам.
      * @param {string[]} selectedSubjects - Массив ID предметов ученика
      * @returns {Promise<Object>} { subjects: [...], summary: {...} }

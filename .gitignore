@@ -136,6 +136,7 @@ test_signup.js
 test_columns.js
 count_lines.js
 test_name.js
+test_rpc.mjs
 
 # AI Agent directories
 .agent/

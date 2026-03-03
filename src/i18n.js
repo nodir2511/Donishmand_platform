@@ -16,9 +16,9 @@ i18n
         interpolation: {
             escapeValue: false, // React сам экранирует XSS
         },
-
         backend: {
-            loadPath: import.meta.env.BASE_URL + 'locales/{{lng}}/translation.json?v=' + new Date().getTime(),
+            // Гарантируем абсолютный путь от корня сайта, даже при вложенных роутах
+            loadPath: (import.meta.env.BASE_URL || '/Donishmand_platform/') + 'locales/{{lng}}/translation.json?v=' + new Date().getTime(),
         },
 
         detection: {

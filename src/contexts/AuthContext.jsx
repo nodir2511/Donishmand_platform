@@ -220,6 +220,11 @@ export const AuthProvider = ({ children }) => {
                 setPermissions([]);
                 setLoading(false);
             }
+            else if (event === 'PASSWORD_RECOVERY') {
+                // Пользователь пришёл по ссылке сброса пароля из email
+                // Перенаправляем на страницу логина с флагом recovery
+                window.location.href = '/login?recovery=true';
+            }
             else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
                 const isUserChanged = session?.user && session.user.id !== userIdRef.current;
 
@@ -317,7 +322,7 @@ export const AuthProvider = ({ children }) => {
         isSuperAdmin: profile?.role === 'super_admin',
         setSkipAuthChange: (value) => { skipAuthChangeRef.current = value; },
         canEditSubject: (subjectId) => {
-            if (profile?.role === 'super_admin') return true;
+            if (profile?.role === 'super_admin' || profile?.role === 'admin') return true;
             if (profile?.role === 'teacher') {
                 return permissions.some(p => p.subject_id === subjectId && p.can_edit);
             }

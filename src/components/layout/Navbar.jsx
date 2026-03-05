@@ -44,6 +44,9 @@ const Navbar = () => {
         setIsOpen(false);
     };
 
+    // Проверка активной ссылки
+    const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
+
     const currentLang = i18n.resolvedLanguage || 'ru';
     const userInitials = profile?.full_name
         ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
@@ -85,38 +88,38 @@ const Navbar = () => {
                                     document.getElementById('courses-section')?.scrollIntoView({ behavior: 'smooth' });
                                 }
                             }}
-                            className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group"
+                            className={`px-5 py-2 text-sm font-medium transition-colors relative group ${location.pathname === '/' ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}
                         >
                             {t('navCourses')}
-                            <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                            <span className={`absolute bottom-1 left-1/2 h-0.5 bg-gaming-accent -translate-x-1/2 transition-all duration-300 ${location.pathname === '/' ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                         </button>
 
-                        <Link to="/" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                        <Link to="/about" className={`px-5 py-2 text-sm font-medium transition-colors relative group ${isActive('/about') ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}>
                             {t('navAbout')}
-                            <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                            <span className={`absolute bottom-1 left-1/2 h-0.5 bg-gaming-accent -translate-x-1/2 transition-all duration-300 ${isActive('/about') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                         </Link>
 
                         {/* Ссылка Классы: для всех авторизованных (Ученики видят "Мой класс", учителя "Классы") */}
                         {user && (
-                            <Link to="/classes" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group border-l border-white/10 ml-2 pl-6">
-                                {profile?.role === 'student' ? 'Мои классы' : 'Классы'}
-                                <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-purple -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                            <Link to="/classes" className={`px-5 py-2 text-sm font-medium transition-colors relative group border-l border-white/10 ml-2 pl-6 ${isActive('/classes') ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}>
+                                {profile?.role === 'student' ? t('navMyClasses') : t('navClasses')}
+                                <span className={`absolute bottom-1 left-1/2 h-0.5 bg-gaming-purple -translate-x-1/2 transition-all duration-300 ${isActive('/classes') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                             </Link>
                         )}
 
                         {/* Ссылка Creator: суперадмин или учитель с правами на редактирование */}
                         {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (
-                            <Link to="/creator" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                            <Link to="/creator" className={`px-5 py-2 text-sm font-medium transition-colors relative group ${isActive('/creator') ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}>
                                 {t('navCreator')}
-                                <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gaming-accent -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                                <span className={`absolute bottom-1 left-1/2 h-0.5 bg-gaming-accent -translate-x-1/2 transition-all duration-300 ${isActive('/creator') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                             </Link>
                         )}
 
                         {/* Ссылка Admin: админ или суперадмин */}
                         {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
-                            <Link to="/admin" className="px-5 py-2 text-sm font-medium text-gaming-textMuted hover:text-white transition-colors relative group">
+                            <Link to="/admin" className={`px-5 py-2 text-sm font-medium transition-colors relative group ${isActive('/admin') ? 'text-white' : 'text-gaming-textMuted hover:text-white'}`}>
                                 {t('navAdmin')}
-                                <span className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-red-500 -translate-x-1/2 group-hover:w-1/2 transition-all duration-300"></span>
+                                <span className={`absolute bottom-1 left-1/2 h-0.5 bg-red-500 -translate-x-1/2 transition-all duration-300 ${isActive('/admin') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                             </Link>
                         )}
 
@@ -231,27 +234,27 @@ const Navbar = () => {
                             {t('navCourses')}
                         </button>
 
-                        <Link to="/" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                        <Link to="/about" onClick={() => setIsOpen(false)} className={`font-medium px-4 py-2 rounded-lg transition-colors ${isActive('/about') ? 'text-white bg-white/5' : 'text-white/80 hover:text-white hover:bg-white/5'}`}>
                             {t('navAbout')}
                         </Link>
 
                         {/* Ссылка Классы (мобильное) */}
                         {user && (
-                            <Link to="/classes" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors border-l-2 border-gaming-purple ml-2">
-                                {profile?.role === 'student' ? 'Мои классы' : 'Классы'}
+                            <Link to="/classes" onClick={() => setIsOpen(false)} className={`font-medium px-4 py-2 rounded-lg transition-colors border-l-2 border-gaming-purple ml-2 ${isActive('/classes') ? 'text-white bg-white/5' : 'text-white/80 hover:text-white hover:bg-white/5'}`}>
+                                {profile?.role === 'student' ? t('navMyClasses') : t('navClasses')}
                             </Link>
                         )}
 
                         {/* Ссылка Creator (мобильное): суперадмин или учитель с правами */}
                         {(profile?.role === 'super_admin' || (profile?.role === 'teacher' && permissions?.some(p => p.can_edit))) && (
-                            <Link to="/creator" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                            <Link to="/creator" onClick={() => setIsOpen(false)} className={`font-medium px-4 py-2 rounded-lg transition-colors ${isActive('/creator') ? 'text-white bg-white/5' : 'text-white/80 hover:text-white hover:bg-white/5'}`}>
                                 {t('navCreator')}
                             </Link>
                         )}
 
                         {/* Ссылка Admin (мобильное): админ или суперадмин */}
                         {(profile?.role === 'admin' || profile?.role === 'super_admin') && (
-                            <Link to="/admin" onClick={() => setIsOpen(false)} className="font-medium text-white/80 hover:text-white px-4 py-2 hover:bg-white/5 rounded-lg transition-colors">
+                            <Link to="/admin" onClick={() => setIsOpen(false)} className={`font-medium px-4 py-2 rounded-lg transition-colors ${isActive('/admin') ? 'text-white bg-white/5' : 'text-white/80 hover:text-white hover:bg-white/5'}`}>
                                 {t('navAdmin')}
                             </Link>
                         )}

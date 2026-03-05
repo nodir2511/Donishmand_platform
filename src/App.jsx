@@ -41,6 +41,7 @@ const ClassDetailsPage = lazyWithRetry(() => import('./components/pages/classes/
 
 const ProfilePage = lazyWithRetry(() => import('./components/pages/ProfilePage'));
 const StudentDashboardPage = lazyWithRetry(() => import('./components/pages/StudentDashboardPage'));
+const AboutPage = lazyWithRetry(() => import('./components/pages/AboutPage'));
 const NotFoundPage = lazyWithRetry(() => import('./components/pages/NotFoundPage'));
 
 // Индикатор загрузки при переходах между страницами
@@ -79,6 +80,7 @@ function AppContent() {
                         <Route path="/subject/:subjectId/section/:sectionId" element={<SectionPage />} />
                         <Route path="/subject/:subjectId/section/:sectionId/topic/:topicId" element={<TopicPage />} />
                         <Route path="/lesson/:lessonId" element={<LessonPage />} />
+                        <Route path="/about" element={<AboutPage />} />
 
                         {/* Защищенный маршрут для создателя курса */}
                         <Route

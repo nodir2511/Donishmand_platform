@@ -17,6 +17,7 @@ export default {
                     card: '#151525',      // Card background
                     cardHover: '#1E1E30', // Card hover
                     primary: '#6C5DD3',   // Primary Purple
+                    purple: '#8B5CF6',    // Light Purple (кнопки, градиенты)
                     accent: '#00E0FF',    // Cyborg Cyan
                     pink: '#FF49DB',      // Neon Pink
                     gold: '#FFD700',      // Gold

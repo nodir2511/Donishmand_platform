@@ -18,7 +18,7 @@ const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
 
 import { useAuth } from '../../contexts/AuthContext';
 
-//...
+
 
 const LessonPage = () => {
     const { t, i18n } = useTranslation();
@@ -553,13 +553,12 @@ const LessonPage = () => {
                                                     frameBorder="0"
                                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                                     allowFullScreen
-                                                    onLoad={handleVideoComplete}
                                                 />
                                             ) : (
                                                 <div className="text-white text-center p-4">
-                                                    <p>Не удалось загрузить видео</p>
+                                                    <p>{t('videoLoadError')}</p>
                                                     <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-gaming-primary hover:underline mt-2 inline-block">
-                                                        Открыть на YouTube
+                                                        {t('openOnYoutube')}
                                                     </a>
                                                 </div>
                                             );

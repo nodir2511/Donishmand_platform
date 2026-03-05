@@ -11,8 +11,16 @@ const AuthPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [successMessage, setSuccessMessage] = useState(null);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Определяем, пришёл ли пользователь по ссылке сброса пароля
+    const searchParams = new URLSearchParams(location.search);
+    const [isRecoveryMode, setIsRecoveryMode] = useState(searchParams.get('recovery') === 'true');
 
     // Данные формы
     const [formData, setFormData] = useState({
@@ -32,12 +40,67 @@ const AuthPage = () => {
     });
 
     const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.type === 'checkbox' ? 'checked' : 'value']: e.target.value });
+        const { name, value, type, checked } = e.target;
+        setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
         setError(null);
     };
 
     // Вспомогательная функция: Promise с таймаутом
     const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms));
+
+    // Сброс пароля
+    const handleForgotPassword = async () => {
+        if (!formData.email) {
+            setError(t('authForgotEnterEmail'));
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        setSuccessMessage(null);
+        try {
+            const { error: resetError } = await supabase.auth.resetPasswordForEmail(formData.email, {
+                redirectTo: `${window.location.origin}/login`,
+            });
+            if (resetError) throw resetError;
+            setSuccessMessage(t('authForgotSuccess'));
+            setShowForgotPassword(false);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Установка нового пароля (после перехода по ссылке из email)
+    const handleSetNewPassword = async (e) => {
+        e.preventDefault();
+        if (newPassword.length < 6) {
+            setError(t('authErrPasswordShort'));
+            return;
+        }
+        if (newPassword !== confirmNewPassword) {
+            setError(t('authErrPasswordMismatch'));
+            return;
+        }
+        setLoading(true);
+        setError(null);
+        try {
+            const { error: updateError } = await supabase.auth.updateUser({
+                password: newPassword,
+            });
+            if (updateError) throw updateError;
+            setSuccessMessage(t('authNewPasswordSuccess'));
+            setIsRecoveryMode(false);
+            // Убираем ?recovery=true из URL
+            navigate('/login', { replace: true });
+            // Через 2 сек редирект на главную
+            setTimeout(() => navigate('/'), 2000);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Отправка формы
     const handleSubmit = async (e) => {
@@ -65,11 +128,11 @@ const AuthPage = () => {
             } else {
                 // 2. Регистрация
                 if (formData.password !== formData.confirmPassword) {
-                    throw new Error('Пароли не совпадают');
+                    throw new Error(t('authErrPasswordMismatch'));
                 }
 
                 if (formData.password.length < 6) {
-                    throw new Error('Пароль должен быть не менее 6 символов');
+                    throw new Error(t('authErrPasswordShort'));
                 }
 
                 // Создаем пользователя в Auth с metadata (триггер создаст базовый профиль)
@@ -182,332 +245,453 @@ const AuthPage = () => {
                     {/* Декоративная линия сверху */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gaming-primary via-gaming-accent to-gaming-pink opacity-50"></div>
 
-                    <h2 className="text-2xl font-bold text-white mb-2 text-center">
-                        {isLogin ? t('authLoginTitle') : t('authRegisterTitle')}
-                    </h2>
-                    <p className="text-white/60 text-center mb-8 text-sm">
-                        {isLogin
-                            ? (isRu ? 'Войдите, чтобы продолжить обучение' : 'Барои идомаи таълим ворид шавед')
-                            : (isRu ? 'Присоединяйтесь к лучшей платформе' : 'Ба беҳтарин платформа ҳамроҳ шавед')
-                        }
-                    </p>
+                    {/* === РЕЖИМ СБРОСА ПАРОЛЯ === */}
+                    {isRecoveryMode ? (
+                        <>
+                            <h2 className="text-2xl font-bold text-white mb-2 text-center">
+                                {t('authNewPasswordTitle')}
+                            </h2>
+                            <p className="text-white/60 text-center mb-8 text-sm">
+                                {t('authNewPasswordSubtitle')}
+                            </p>
 
-                    {error && (
-                        <div className="mb-6 flex items-start gap-3 p-4 bg-red-500/5 border border-red-500/30 rounded-2xl shadow-lg shadow-red-500/5 animate-fade-in-up">
-                            <div className="shrink-0 w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mt-0.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                            {error && (
+                                <div className="mb-6 flex items-start gap-3 p-4 bg-red-500/5 border border-red-500/30 rounded-2xl animate-fade-in-up">
+                                    <div className="shrink-0 w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mt-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                    </div>
+                                    <p className="text-red-400 text-sm leading-relaxed">{error}</p>
+                                </div>
+                            )}
+
+                            {successMessage && (
+                                <div className="mb-6 p-4 bg-green-500/5 border border-green-500/30 rounded-xl text-green-400 text-sm animate-fade-in-up">
+                                    {successMessage}
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSetNewPassword} className="space-y-4">
+                                {/* Новый пароль */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-white/60 ml-1">
+                                        {t('authNewPassword')}
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
+                                            <Lock size={20} />
+                                        </div>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            placeholder="••••••••"
+                                            required
+                                            minLength={6}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gaming-textMuted hover:text-white transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Подтверждение */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-white/60 ml-1">
+                                        {t('authConfirmPassword')}
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
+                                            <Lock size={20} />
+                                        </div>
+                                        <input
+                                            type="password"
+                                            value={confirmNewPassword}
+                                            onChange={(e) => setConfirmNewPassword(e.target.value)}
+                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            placeholder="••••••••"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Кнопка */}
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-gradient-to-r from-gaming-primary to-gaming-pink hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gaming-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? <Loader2 size={20} className="animate-spin" /> : <Lock size={20} />}
+                                    {loading ? t('authProcessing') : t('authNewPasswordBtn')}
+                                </button>
+                            </form>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-2xl font-bold text-white mb-2 text-center">
+                                {isLogin ? t('authLoginTitle') : t('authRegisterTitle')}
+                            </h2>
+                            <p className="text-white/60 text-center mb-8 text-sm">
+                                {isLogin
+                                    ? (isRu ? 'Войдите, чтобы продолжить обучение' : 'Барои идомаи таълим ворид шавед')
+                                    : (isRu ? 'Присоединяйтесь к лучшей платформе' : 'Ба беҳтарин платформа ҳамроҳ шавед')
+                                }
+                            </p>
+
+                            {error && (
+                                <div className="mb-6 flex items-start gap-3 p-4 bg-red-500/5 border border-red-500/30 rounded-2xl shadow-lg shadow-red-500/5 animate-fade-in-up">
+                                    <div className="shrink-0 w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center mt-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                    </div>
+                                    <p className="text-red-400 text-sm leading-relaxed">{error}</p>
+                                </div>
+                            )}
+
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                {/* Выбор роли */}
+                                {!isLogin && (
+                                    <div className="flex bg-gaming-bg/50 p-1 rounded-xl mb-6 border border-white/10">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, role: 'student' })}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'student'
+                                                ? 'bg-gaming-card shadow-lg text-white border border-white/10'
+                                                : 'text-gaming-textMuted hover:text-white'
+                                                }`}
+                                        >
+                                            {t('authRoleStudent')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, role: 'teacher' })}
+                                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'teacher'
+                                                ? 'bg-gaming-card shadow-lg text-white border border-white/10'
+                                                : 'text-gaming-textMuted hover:text-white'
+                                                }`}
+                                        >
+                                            {t('authRoleTeacher')}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* ФИО (Только регистрация) */}
+                                {!isLogin && (
+                                    <div className="space-y-1.5 animate-fade-in-up">
+                                        <label className="text-sm font-medium text-white/60 ml-1">
+                                            {t('authFullName')}
+                                        </label>
+                                        <div className="relative group">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
+                                                <UserPlus size={20} />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={formData.fullName}
+                                                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                placeholder={isRu ? "Эшматов Тошмат" : "Алиев Вали"}
+                                                required
+                                                pattern="^[А-Яа-яЁёӢӣӮӯҲҳҶҷҒғҚқ\s-]+$"
+                                                title={t('authErrCyrillic')}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Дата рождения и Телефон (Только регистрация) */}
+                                {!isLogin && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[50ms]">
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-medium text-white/60 ml-1">
+                                                {t('authBirthDate')}
+                                            </label>
+                                            <input
+                                                type="date"
+                                                value={formData.birthDate}
+                                                onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans [color-scheme:dark]"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-medium text-white/60 ml-1">
+                                                {t('authPhone')}
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                placeholder="+992 00 000 0000"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Email */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-white/60 ml-1">
+                                        {t('authEmail')}
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
+                                            <Mail size={20} />
+                                        </div>
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            placeholder="name@example.com"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* ПОЛЯ ДЛЯ УЧЕНИКА */}
+                                {!isLogin && formData.role === 'student' && (
+                                    <>
+                                        {/* Язык и Класс */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium text-white/60 ml-1">
+                                                    {t('authLanguage')}
+                                                </label>
+                                                <select
+                                                    value={formData.language}
+                                                    onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                                                    className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 pr-10 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
+                                                >
+                                                    <option value="tj">{t('authLangTj')}</option>
+                                                    <option value="ru">{t('authLangRu')}</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium text-white/60 ml-1">
+                                                    {t('authGrade')}
+                                                </label>
+                                                <select
+                                                    value={formData.grade}
+                                                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                                                    className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 pr-10 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
+                                                >
+                                                    {[...Array(11)].map((_, i) => (
+                                                        <option key={i + 1} value={i + 1}>{i + 1}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Школа, Филиал, Группа */}
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up delay-[150ms]">
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium text-white/60 ml-1">
+                                                    {t('authSchool')}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.school}
+                                                    onChange={(e) => setFormData({ ...formData, school: e.target.value })}
+                                                    className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                    placeholder={isRu ? "№1" : "№1"}
+                                                    required={formData.role === 'student'}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                                    {t('authBranch')}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.branch}
+                                                    onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                                                    className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                    required={formData.role === 'student'}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                                    {t('authGroup')}
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.group}
+                                                    onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                                                    className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                    required={formData.role === 'student'}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* ПОЛЯ ДЛЯ УЧИТЕЛЯ */}
+                                {!isLogin && formData.role === 'teacher' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
+                                        {/* Предмет */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-medium text-white/60 ml-1">
+                                                {t('authSubject')}
+                                            </label>
+                                            <select
+                                                value={formData.subject || 'tj-lang'}
+                                                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 pr-10 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
+                                            >
+                                                <option value="tj-lang">{t('subjectNames.tj-lang')}</option>
+                                                <option value="math">{t('subjectNames.math')}</option>
+                                                <option value="phys">{t('subjectNames.phys')}</option>
+                                                <option value="chem">{t('subjectNames.chem')}</option>
+                                                <option value="bio">{t('subjectNames.bio')}</option>
+                                                <option value="geo">{t('subjectNames.geo')}</option>
+                                                <option value="hist">{t('subjectNames.hist')}</option>
+                                                <option value="eng">{t('subjectNames.eng')}</option>
+                                                <option value="lit">{t('subjectNames.lit')}</option>
+                                            </select>
+                                        </div>
+                                        {/* Филиал */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-medium text-white/60 ml-1">
+                                                {t('authBranch')}
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={formData.branch}
+                                                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                required={formData.role === 'teacher'}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Пароль */}
+                                <div className="space-y-1.5">
+                                    <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                        {t('authPassword')}
+                                    </label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
+                                            <Lock size={20} />
+                                        </div>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            value={formData.password}
+                                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                            placeholder="••••••••"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gaming-textMuted hover:text-white transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Confirm Password (только для регистрации) */}
+                                {!isLogin && (
+                                    <div className="space-y-1.5 animate-fade-in-up delay-[200ms]">
+                                        <label className="text-sm font-medium text-gaming-textMuted ml-1">
+                                            {t('authConfirmPassword')}
+                                        </label>
+                                        <div className="relative group">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
+                                                <Lock size={20} />
+                                            </div>
+                                            <input
+                                                type="password"
+                                                value={formData.confirmPassword}
+                                                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                                                className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
+                                                placeholder="••••••••"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Forgot Password (только для входа) */}
+                                {isLogin && !showForgotPassword && (
+                                    <div className="flex justify-end">
+                                        <button type="button" onClick={() => { setShowForgotPassword(true); setError(null); setSuccessMessage(null); }} className="text-xs text-gaming-primary hover:text-gaming-accent transition-colors font-medium">
+                                            {t('authForgotPass')}
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Форма сброса пароля */}
+                                {isLogin && showForgotPassword && (
+                                    <div className="p-4 bg-gaming-primary/5 border border-gaming-primary/20 rounded-xl space-y-3 animate-fade-in-up">
+                                        <p className="text-sm text-gaming-textMuted">{t('authForgotText')}</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={handleForgotPassword}
+                                                disabled={loading}
+                                                className="px-4 py-2 bg-gaming-primary text-white text-sm rounded-lg hover:bg-gaming-primary/80 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                            >
+                                                {loading && <Loader2 size={14} className="animate-spin" />}
+                                                {t('authForgotSend')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowForgotPassword(false)}
+                                                className="px-4 py-2 bg-white/5 text-gaming-textMuted text-sm rounded-lg hover:bg-white/10 transition-colors"
+                                            >
+                                                {t('creator.cancel')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Сообщение об успешной отправке */}
+                                {successMessage && (
+                                    <div className="p-4 bg-green-500/5 border border-green-500/30 rounded-xl text-green-400 text-sm animate-fade-in-up">
+                                        {successMessage}
+                                    </div>
+                                )}
+
+                                {/* Кнопка */}
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-gradient-to-r from-gaming-primary to-gaming-pink hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gaming-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? <Loader2 size={20} className="animate-spin" /> : (isLogin ? <LogIn size={20} /> : <UserPlus size={20} />)}
+                                    {loading
+                                        ? t('authProcessing')
+                                        : (isLogin ? t('authLoginBtn') : t('authRegisterBtn'))
+                                    }
+                                    {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                                </button>
+                            </form>
+
+                            {/* Переключатель входа/регистрации */}
+                            <div className="mt-8 pt-6 border-t border-white/5 text-center">
+                                <p className="text-gaming-textMuted text-sm mb-3">
+                                    {isLogin ? t('authNoAccount') : t('authHasAccount')}
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setIsLogin(!isLogin);
+                                        setError(null);
+                                    }}
+                                    className="text-white font-semibold hover:text-gaming-accent transition-colors text-sm px-4 py-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10"
+                                >
+                                    {isLogin ? t('authSwitchToRegister') : t('authSwitchToLogin')}
+                                </button>
                             </div>
-                            <p className="text-red-400 text-sm leading-relaxed">{error}</p>
-                        </div>
+                        </>
                     )}
-
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        {/* Выбор роли */}
-                        {!isLogin && (
-                            <div className="flex bg-gaming-bg/50 p-1 rounded-xl mb-6 border border-white/10">
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, role: 'student' })}
-                                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'student'
-                                        ? 'bg-gaming-card shadow-lg text-white border border-white/10'
-                                        : 'text-gaming-textMuted hover:text-white'
-                                        }`}
-                                >
-                                    {t('authRoleStudent')}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, role: 'teacher' })}
-                                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'teacher'
-                                        ? 'bg-gaming-card shadow-lg text-white border border-white/10'
-                                        : 'text-gaming-textMuted hover:text-white'
-                                        }`}
-                                >
-                                    {t('authRoleTeacher')}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ФИО (Только регистрация) */}
-                        {!isLogin && (
-                            <div className="space-y-1.5 animate-fade-in-up">
-                                <label className="text-sm font-medium text-white/60 ml-1">
-                                    {t('authFullName')}
-                                </label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
-                                        <UserPlus size={20} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        value={formData.fullName}
-                                        onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        placeholder={isRu ? "Эшматов Тошмат" : "Алиев Вали"}
-                                        required
-                                        pattern="^[А-Яа-яЁё\s]+$"
-                                        title={t('authErrCyrillic')}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Дата рождения и Телефон (Только регистрация) */}
-                        {!isLogin && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[50ms]">
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t('authBirthDate')}
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={formData.birthDate}
-                                        onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans [color-scheme:dark]"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t('authPhone')}
-                                    </label>
-                                    <input
-                                        type="tel"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        placeholder="+992 00 000 0000"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Email */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-white/60 ml-1">
-                                {t('authEmail')}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/60 group-focus-within:text-gaming-primary transition-colors">
-                                    <Mail size={20} />
-                                </div>
-                                <input
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                    placeholder="name@example.com"
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        {/* ПОЛЯ ДЛЯ УЧЕНИКА */}
-                        {!isLogin && formData.role === 'student' && (
-                            <>
-                                {/* Язык и Класс */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium text-white/60 ml-1">
-                                            {t('authLanguage')}
-                                        </label>
-                                        <select
-                                            value={formData.language}
-                                            onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
-                                        >
-                                            <option value="tj">{t('authLangTj')}</option>
-                                            <option value="ru">{t('authLangRu')}</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium text-white/60 ml-1">
-                                            {t('authGrade')}
-                                        </label>
-                                        <select
-                                            value={formData.grade}
-                                            onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
-                                        >
-                                            {[...Array(11)].map((_, i) => (
-                                                <option key={i + 1} value={i + 1}>{i + 1}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-
-                                {/* Школа, Филиал, Группа */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in-up delay-[150ms]">
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium text-white/60 ml-1">
-                                            {t('authSchool')}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.school}
-                                            onChange={(e) => setFormData({ ...formData, school: e.target.value })}
-                                            className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                            placeholder={isRu ? "№1" : "№1"}
-                                            required={formData.role === 'student'}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                            {t('authBranch')}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.branch}
-                                            onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                            required={formData.role === 'student'}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                            {t('authGroup')}
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={formData.group}
-                                            onChange={(e) => setFormData({ ...formData, group: e.target.value })}
-                                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                            required={formData.role === 'student'}
-                                        />
-                                    </div>
-                                </div>
-                            </>
-                        )}
-
-                        {/* ПОЛЯ ДЛЯ УЧИТЕЛЯ */}
-                        {!isLogin && formData.role === 'teacher' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
-                                {/* Предмет */}
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t('authSubject')}
-                                    </label>
-                                    <select
-                                        value={formData.subject || 'tj-lang'}
-                                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer"
-                                    >
-                                        <option value="tj-lang">Таджикский язык</option>
-                                        <option value="math">Математика</option>
-                                        <option value="phys">Физика</option>
-                                        <option value="chem">Химия</option>
-                                        <option value="bio">Биология</option>
-                                        <option value="geo">География</option>
-                                        <option value="hist">История</option>
-                                        <option value="eng">Английский</option>
-                                        <option value="lit">Литература</option>
-                                    </select>
-                                </div>
-                                {/* Филиал */}
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-medium text-white/60 ml-1">
-                                        {t('authBranch')}
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.branch}
-                                        onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        required={formData.role === 'teacher'}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Пароль */}
-                        <div className="space-y-1.5">
-                            <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                {t('authPassword')}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
-                                    <Lock size={20} />
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    value={formData.password}
-                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                    placeholder="••••••••"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gaming-textMuted hover:text-white transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Confirm Password (только для регистрации) */}
-                        {!isLogin && (
-                            <div className="space-y-1.5 animate-fade-in-up delay-[200ms]">
-                                <label className="text-sm font-medium text-gaming-textMuted ml-1">
-                                    {t('authConfirmPassword')}
-                                </label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gaming-textMuted group-focus-within:text-gaming-primary transition-colors">
-                                        <Lock size={20} />
-                                    </div>
-                                    <input
-                                        type="password"
-                                        value={formData.confirmPassword}
-                                        onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                        placeholder="••••••••"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Forgot Password (только для входа) */}
-                        {isLogin && (
-                            <div className="flex justify-end">
-                                <button type="button" className="text-xs text-gaming-primary hover:text-gaming-accent transition-colors font-medium">
-                                    {t('authForgotPass')}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Кнопка */}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-gradient-to-r from-gaming-primary to-gaming-pink hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-gaming-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? <Loader2 size={20} className="animate-spin" /> : (isLogin ? <LogIn size={20} /> : <UserPlus size={20} />)}
-                            {loading
-                                ? (isRu ? 'Обработка...' : ' коркард...')
-                                : (isLogin ? t('authLoginBtn') : t('authRegisterBtn'))
-                            }
-                            {!loading && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
-                        </button>
-                    </form>
-
-                    {/* Переключатель входа/регистрации */}
-                    <div className="mt-8 pt-6 border-t border-white/5 text-center">
-                        <p className="text-gaming-textMuted text-sm mb-3">
-                            {isLogin ? t('authNoAccount') : t('authHasAccount')}
-                        </p>
-                        <button
-                            onClick={() => {
-                                setIsLogin(!isLogin);
-                                setError(null);
-                            }}
-                            className="text-white font-semibold hover:text-gaming-accent transition-colors text-sm px-4 py-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/10"
-                        >
-                            {isLogin ? t('authSwitchToRegister') : t('authSwitchToLogin')}
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -515,3 +699,4 @@ const AuthPage = () => {
 };
 
 export default AuthPage;
+

@@ -172,7 +172,7 @@ const HomePage = () => {
             return t('allSubjects'); // Учитель видит только один предмет
         }
         if (isStudent && hasSelectedSubjects) {
-            return 'Мои предметы';
+            return t('mySubjects');
         }
         if (activeClusterId === 0) return t('allSubjects');
         const cluster = CLUSTERS_STRUCTURE.find(c => c.id === activeClusterId);
@@ -229,7 +229,7 @@ const HomePage = () => {
                     </div>
                 ) : (
                     <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
-                        <p className="text-white/60 text-lg">Нет доступных предметов</p>
+                        <p className="text-white/60 text-lg">{t('noSubjectsAvailable')}</p>
                     </div>
                 )}
             </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { classService } from '../../../services/classService';
+import { classService } from '../../../services/apiService';
 import { useTranslation } from 'react-i18next';
 import {
     Users, ChevronLeft, Loader2, AlertCircle, TrendingUp,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { branchService } from '../../services/branchService';
+import { branchService } from '../../services/apiService';
 import { Loader2, Trash2, MapPin, Building } from 'lucide-react';
 
 const AdminBranchesTab = () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { classService } from '../../../../services/classService';
+import { classService } from '../../../../services/apiService';
 import { Users, UserPlus, X, Search, Loader2, UserMinus } from 'lucide-react';
 import useDebounce from '../../../../hooks/useDebounce';
 

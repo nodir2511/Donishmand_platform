@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { syllabusService } from '../services/syllabusService';
+import { syllabusService } from '../services/apiService';
 
 // Контекст для хранения структуры предмета (разделы → темы → уроки)
 const SyllabusContext = createContext(null);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, supabaseAdmin } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { classService } from '../../services/classService';
+import { classService } from '../../services/apiService';
 import { ALL_SUBJECTS_LIST, SUBJECT_NAMES } from '../../constants/data';
 import {
     Loader2, Search, Shield, ShieldCheck, ShieldAlert, User, UserPlus,

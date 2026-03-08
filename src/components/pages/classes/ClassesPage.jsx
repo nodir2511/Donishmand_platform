@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
-import { classService } from '../../../services/classService';
-import { branchService } from '../../../services/branchService';
+import { classService, branchService } from '../../../services/apiService';
 import { useTranslation } from 'react-i18next';
 import {
     Users, Plus, Loader2, BookOpen, GraduationCap,

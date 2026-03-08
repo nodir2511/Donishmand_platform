@@ -4,7 +4,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { compressImage } from '../../utils/imageHelpers';
-import { translateText } from '../../services/translationService';
+import { storageService } from '../../services/apiService';
 
 const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: slide.id });
@@ -117,10 +117,10 @@ const SlidesEditor = ({ slidesRu = [], slidesTj = [], onChange, lang }) => {
         setUploading(true);
         try {
             const newSlides = await Promise.all(files.map(async (file) => {
-                const compressedBase64 = await compressImage(file);
+                const publicUrl = await storageService.uploadImage(file);
                 return {
                     id: `slide_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                    imageUrl: compressedBase64,
+                    imageUrl: publicUrl,
                     captionRu: '',
                     captionTj: ''
                 };

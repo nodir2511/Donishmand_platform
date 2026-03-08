@@ -12,8 +12,7 @@ import ProgressCard from '../viewer/ProgressCard';
 const SlidesViewer = React.lazy(() => import('../viewer/SlidesViewer'));
 const TestViewer = React.lazy(() => import('../viewer/TestViewer'));
 const TestTeacherView = React.lazy(() => import('../viewer/TestTeacherView'));
-import { syllabusService } from '../../services/syllabusService';
-import { supabase } from '../../services/supabase';
+import { syllabusService, studentService } from '../../services/apiService';
 import { renderKatex } from '../../utils/katexRenderer';
 
 // Ключи для отслеживания прогресса
@@ -105,19 +104,9 @@ const LessonPage = () => {
                     const userId = user?.id;
                     if (userId) {
                         // Прогресс по уроку
-                        const { data: progressData } = await supabase
-                            .from('user_lesson_progress')
-                            .select('*')
-                            .eq('lesson_id', lessonId)
-                            .eq('user_id', userId)
-                            .maybeSingle();
-
+                        const progressData = await studentService.getLessonProgress(userId, lessonId);
                         // Результаты тестов
-                        const { data: testData } = await supabase
-                            .from('user_test_results')
-                            .select('*')
-                            .eq('lesson_id', lessonId)
-                            .eq('user_id', userId);
+                        const testData = await studentService.getLessonTestResults(userId, lessonId);
 
                         if (progressData || testData) {
                             setProgress(prev => {
@@ -255,14 +244,7 @@ const LessonPage = () => {
         const userId = user?.id;
         if (!userId) return;
         try {
-            // Upsert (создаст или обновит запись)
-            await supabase.from('user_lesson_progress').upsert({
-                user_id: userId,
-                lesson_id: lessonId,
-                ...updates,
-                updated_at: new Date()
-            }, { onConflict: 'user_id,lesson_id' });
-
+            await studentService.saveLessonProgress(userId, lessonId, updates);
         } catch (err) {
             console.error('Failed to sync progress:', err);
         }

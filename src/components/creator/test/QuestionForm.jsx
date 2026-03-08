@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, Loader2, Image as ImageIcon, X, Check, List, ArrowLeftRight, Hash } from 'lucide-react';
-import { translateText } from '../../../services/translationService';
-import { supabase } from '../../../services/supabase';
+import { translationService, storageService } from '../../../services/apiService';
 import RichTextEditor from '../RichTextEditor';
 
 const UNITS = ['', 'м', 'см', 'мм', 'км', 'м²', 'см²', 'м³', 'кг', 'г', 'л', 'мл', 'с', 'мин', 'ч', '°', '°C', '%', 'Н', 'Дж', 'Вт'];
@@ -112,7 +111,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
         const key = fieldPath.join('_');
         setTranslating(prev => ({ ...prev, [key]: true }));
         try {
-            const translated = await translateText(text, direction === 'ru_tj' ? 'ru' : 'tj', direction === 'ru_tj' ? 'tj' : 'ru');
+            const translated = await translationService.translateText(text, direction === 'ru_tj' ? 'ru' : 'tj', direction === 'ru_tj' ? 'tj' : 'ru');
             // Вспомогательная функция для установки вложенного значения
             if (fieldPath.length === 1) {
                 updateField(fieldPath[0], translated);
@@ -133,15 +132,8 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
         if (!file) return;
         setUploading(true);
         try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `${fileName}`;
-
-            const { error: uploadError } = await supabase.storage.from('images').upload(filePath, file);
-            if (uploadError) throw uploadError;
-
-            const { data } = supabase.storage.from('images').getPublicUrl(filePath);
-            callback(data.publicUrl);
+            const publicUrl = await storageService.uploadImage(file);
+            callback(publicUrl);
         } catch (error) {
             console.error('Upload error:', error);
             alert(t('creator.uploadError'));

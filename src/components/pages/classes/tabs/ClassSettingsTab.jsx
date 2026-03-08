@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { classService } from '../../../../services/classService';
-import { branchService } from '../../../../services/branchService';
+import { classService, branchService } from '../../../../services/apiService';
 import { useAuth } from '../../../../contexts/AuthContext';
 import {
     Settings, Save, Loader2, Link as LinkIcon, Copy, RefreshCw,

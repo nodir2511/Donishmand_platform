@@ -12,12 +12,11 @@ import { SortableSection, SortableTopic, SortableLesson, MoveModal } from '../cr
 import { SUBJECT_NAMES, ALL_SUBJECTS_LIST } from '../../constants/data';
 const LessonContentEditor = React.lazy(() => import('../creator/LessonContentEditor'));
 import ComponentErrorBoundary from '../common/ComponentErrorBoundary';
-import { translateText } from '../../services/translationService';
+import { translationService, syllabusService } from '../../services/apiService';
 
 
 
 
-import { syllabusService } from '../../services/syllabusService';
 import { invalidateSyllabusCache } from '../../contexts/SyllabusContext';
 import useDebounce from '../../hooks/useDebounce';
 
@@ -657,7 +656,7 @@ const CreatorPage = () => {
     const handleAutoTranslateSectionRuToTj = async () => {
         setTranslating(prev => ({ ...prev, section: true }));
         try {
-            const translated = await translateText(newSectionTitleRu, 'ru', 'tj');
+            const translated = await translationService.translateText(newSectionTitleRu, 'ru', 'tj');
             setNewSectionTitleTj(translated);
         } finally {
             setTranslating(prev => ({ ...prev, section: false }));
@@ -667,7 +666,7 @@ const CreatorPage = () => {
     const handleAutoTranslateTopicRuToTj = async () => {
         setTranslating(prev => ({ ...prev, topic: true }));
         try {
-            const translated = await translateText(newTopicTitleRu, 'ru', 'tj');
+            const translated = await translationService.translateText(newTopicTitleRu, 'ru', 'tj');
             setNewTopicTitleTj(translated);
         } finally {
             setTranslating(prev => ({ ...prev, topic: false }));
@@ -677,7 +676,7 @@ const CreatorPage = () => {
     const handleAutoTranslateLessonRuToTj = async () => {
         setTranslating(prev => ({ ...prev, lesson: true }));
         try {
-            const translated = await translateText(newLessonTitleRu, 'ru', 'tj');
+            const translated = await translationService.translateText(newLessonTitleRu, 'ru', 'tj');
             setNewLessonTitleTj(translated);
         } finally {
             setTranslating(prev => ({ ...prev, lesson: false }));
@@ -687,7 +686,7 @@ const CreatorPage = () => {
     const handleAutoTranslateSectionTjToRu = async () => {
         setTranslating(prev => ({ ...prev, section: true }));
         try {
-            const translated = await translateText(newSectionTitleTj, 'tj', 'ru');
+            const translated = await translationService.translateText(newSectionTitleTj, 'tj', 'ru');
             setNewSectionTitleRu(translated);
         } finally {
             setTranslating(prev => ({ ...prev, section: false }));
@@ -697,7 +696,7 @@ const CreatorPage = () => {
     const handleAutoTranslateTopicTjToRu = async () => {
         setTranslating(prev => ({ ...prev, topic: true }));
         try {
-            const translated = await translateText(newTopicTitleTj, 'tj', 'ru');
+            const translated = await translationService.translateText(newTopicTitleTj, 'tj', 'ru');
             setNewTopicTitleRu(translated);
         } finally {
             setTranslating(prev => ({ ...prev, topic: false }));
@@ -707,7 +706,7 @@ const CreatorPage = () => {
     const handleAutoTranslateLessonTjToRu = async () => {
         setTranslating(prev => ({ ...prev, lesson: true }));
         try {
-            const translated = await translateText(newLessonTitleTj, 'tj', 'ru');
+            const translated = await translationService.translateText(newLessonTitleTj, 'tj', 'ru');
             setNewLessonTitleRu(translated);
         } finally {
             setTranslating(prev => ({ ...prev, lesson: false }));

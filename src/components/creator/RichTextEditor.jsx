@@ -8,7 +8,7 @@ import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import Image from '@tiptap/extension-image';
 import Mathematics from '@tiptap/extension-mathematics';
-import { supabase } from '../../services/supabase';
+import { storageService } from '../../services/apiService';
 import {
     Bold, Italic, Underline as UnderlineIcon, Strikethrough,
     List, ListOrdered,
@@ -172,22 +172,9 @@ const RichTextEditor = ({ content, onChange, placeholder, minHeight = '200px', m
         if (!file) return;
 
         try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-            const filePath = `${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('images')
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            const { data } = supabase.storage
-                .from('images')
-                .getPublicUrl(filePath);
-
+            const publicUrl = await storageService.uploadImage(file);
             if (editor) {
-                editor.chain().focus().setImage({ src: data.publicUrl }).run();
+                editor.chain().focus().setImage({ src: publicUrl }).run();
             }
         } catch (error) {
             console.error('Error uploading image:', error);

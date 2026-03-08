@@ -25,7 +25,7 @@ const CourseCardSkeleton = () => (
     </div>
 );
 import { supabase } from '../../services/supabase';
-import { syllabusService } from '../../services/syllabusService';
+import { syllabusService } from '../../services/apiService';
 
 const PROGRESS_CACHE_KEY = 'donishmand_subject_progress';
 

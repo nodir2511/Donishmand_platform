@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { statisticsService } from '../../../../services/statisticsService';
-import { syllabusService } from '../../../../services/syllabusService';
+import { statisticsService, syllabusService } from '../../../../services/apiService';
 import {
     LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid, Legend
 } from 'recharts';

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
-import { studentService } from '../../../services/studentService';
+import { studentService } from '../../../services/apiService';
 import { SUBJECT_CONFIG, SUBJECT_NAMES } from '../../../constants/data';
 import {
     TrendingUp, Award, BookOpen, ClipboardCheck, Loader2, Filter

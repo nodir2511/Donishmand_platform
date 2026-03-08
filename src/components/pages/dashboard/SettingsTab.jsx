@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
-import { supabase } from '../../../services/supabase';
-import { studentService } from '../../../services/studentService';
-import { cleanUndefined } from '../../../utils/cleanUndefined';
+import { studentService } from '../../../services/apiService';
 import { CLUSTERS_STRUCTURE, AVATAR_OPTIONS } from '../../../constants/data';
 import {
     User, Mail, Phone, Calendar, School, BookOpen,
@@ -115,12 +113,7 @@ const SettingsTab = () => {
 
             const cleanUpdates = cleanUndefined(updates);
 
-            const { error } = await supabase
-                .from('profiles')
-                .update(cleanUpdates)
-                .eq('id', user.id);
-
-            if (error) throw error;
+            await studentService.updateProfile(user.id, updates);
             setSaveStatus('success');
             setTimeout(() => setSaveStatus(null), 3000);
         } catch (error) {

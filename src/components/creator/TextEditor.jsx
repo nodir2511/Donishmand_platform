@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, FileText, Loader2 } from 'lucide-react';
-import { translateText } from '../../services/translationService';
+import { translationService } from '../../services/apiService';
 import RichTextEditor from './RichTextEditor';
 
 const TextEditor = ({ data, onChange, lang }) => {
@@ -13,7 +13,7 @@ const TextEditor = ({ data, onChange, lang }) => {
     const handleAutoTranslateTjToRu = async () => {
         setTranslating(true);
         try {
-            const translated = await translateText(data.bodyTj || '', 'tj', 'ru');
+            const translated = await translationService.translateText(data.bodyTj || '', 'tj', 'ru');
             handleChange('bodyRu', translated);
         } finally {
             setTranslating(false);
@@ -23,7 +23,7 @@ const TextEditor = ({ data, onChange, lang }) => {
     const handleAutoTranslateRuToTj = async () => {
         setTranslating(true);
         try {
-            const translated = await translateText(data.bodyRu || '', 'ru', 'tj');
+            const translated = await translationService.translateText(data.bodyRu || '', 'ru', 'tj');
             handleChange('bodyTj', translated);
         } finally {
             setTranslating(false);

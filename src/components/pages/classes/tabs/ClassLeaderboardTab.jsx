@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../../../services/supabase';
+import { statisticsService } from '../../../../services/apiService';
 import { Medal, Trophy, TrendingUp, Calendar, Loader2, Coins, Users } from 'lucide-react';
 import UserAvatar from '../../../common/UserAvatar';
 
@@ -29,76 +29,9 @@ const ClassLeaderboardTab = ({ classId }) => {
     const fetchLeaderboard = async () => {
         setLoading(true);
         try {
-            // 1. Получаем ВСЕХ учеников класса вместе с профилями
-            const { data: members, error: membersErr } = await supabase
-                .from('class_members')
-                .select(`
-                    student_id,
-                    profile:profiles!class_members_student_id_fkey (id, full_name, avatar_url, role)
-                `)
-                .eq('class_id', classId);
-
-            if (membersErr) throw membersErr;
-            if (!members || members.length === 0) {
-                setLeaderboard([]);
-                setTotalStudents(0);
-                return;
-            }
-
-            // Оставляем только учеников (не учителей)
-            const studentMembers = members.filter(
-                m => !m.profile?.role || m.profile.role === 'student'
-            );
-            setTotalStudents(studentMembers.length);
-
-            const studentIds = studentMembers.map(m => m.student_id);
-
-            // 2. Строим запрос к coin_transactions
-            let query = supabase
-                .from('coin_transactions')
-                .select('user_id, amount, created_at')
-                .in('user_id', studentIds);
-
-            // Фильтрация по времени
-            if (period !== 'all') {
-                const pastDate = new Date();
-                if (period === 'day') {
-                    pastDate.setHours(0, 0, 0, 0);
-                } else if (period === 'week') {
-                    pastDate.setDate(pastDate.getDate() - 7);
-                } else if (period === 'month') {
-                    pastDate.setMonth(pastDate.getMonth() - 1);
-                }
-                query = query.gte('created_at', pastDate.toISOString());
-            }
-
-            const { data: transactions, error: txErr } = await query;
-            if (txErr) throw txErr;
-
-            // 3. Агрегируем монеты по пользователям
-            const userTotals = {};
-            (transactions || []).forEach(tx => {
-                const uid = tx.user_id;
-                if (!userTotals[uid]) {
-                    userTotals[uid] = { coins: 0, testsCount: 0 };
-                }
-                userTotals[uid].coins += tx.amount;
-                userTotals[uid].testsCount += 1;
-            });
-
-            // 4. Составляем полный список (включая тех у кого 0 монет)
-            const fullList = studentMembers.map(m => ({
-                id: m.student_id,
-                name: m.profile?.full_name || 'Неизвестный',
-                avatar: m.profile?.avatar_url,
-                coins: userTotals[m.student_id]?.coins || 0,
-                testsCount: userTotals[m.student_id]?.testsCount || 0,
-            }));
-
-            // 5. Сортируем по убыванию монет, при равенстве — по имени
-            fullList.sort((a, b) => b.coins - a.coins || a.name.localeCompare(b.name));
-
-            setLeaderboard(fullList);
+            const data = await statisticsService.getClassLeaderboard(classId, period);
+            setLeaderboard(data);
+            setTotalStudents(data.length);
         } catch (err) {
             console.error('Ошибка загрузки лидерборда:', err);
         } finally {

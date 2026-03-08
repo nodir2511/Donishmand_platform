@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Video, Link, Loader2 } from 'lucide-react';
-import { translateText } from '../../services/translationService';
+import { translationService } from '../../services/apiService';
 
 const VideoEditor = ({ data, onChange, lang }) => {
     const [translating, setTranslating] = useState(false);
@@ -12,7 +12,7 @@ const VideoEditor = ({ data, onChange, lang }) => {
     const handleAutoTranslateDesc = async () => {
         setTranslating(true);
         try {
-            const translated = await translateText(data.descriptionRu || '', 'ru', 'tj');
+            const translated = await translationService.translateText(data.descriptionRu || '', 'ru', 'tj');
             handleChange('descriptionTj', translated);
         } finally {
             setTranslating(false);
@@ -22,7 +22,7 @@ const VideoEditor = ({ data, onChange, lang }) => {
     const handleAutoTranslateDescTjToRu = async () => {
         setTranslating(true);
         try {
-            const translated = await translateText(data.descriptionTj || '', 'tj', 'ru');
+            const translated = await translationService.translateText(data.descriptionTj || '', 'tj', 'ru');
             handleChange('descriptionRu', translated);
         } finally {
             setTranslating(false);

@@ -52,10 +52,6 @@ const ClassDetailsPage = () => {
                 if (!myClassData) {
                     throw new Error('Вы не состоите в этом классе');
                 }
-                // Если RLS заблокировал чтение teacher из getClassDetails, берем его из getStudentClasses
-                if (!data.teacher && myClassData.teacher) {
-                    data.teacher = myClassData.teacher;
-                }
             }
 
             setClassData(data);

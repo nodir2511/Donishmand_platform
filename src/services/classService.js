@@ -88,30 +88,38 @@ export const classService = {
 
         if (error) throw error;
 
-        // Формируем начальный список
-        const result = data.map(item => ({
-            ...item.classes,
-            teacher: item.classes.teacher,
-            joinedAt: item.joined_at
-        }));
+        // Формируем начальный список. Учитываем, что item.classes может быть массивом из-за особенностей join
+        const result = data.map(item => {
+            const cls = Array.isArray(item.classes) ? item.classes[0] : item.classes;
+            return {
+                ...cls,
+                teacher: Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher,
+                joinedAt: item.joined_at
+            };
+        });
 
-        // Из-за RLS у учеников профиль учителя (teacher) может вернуться пустым (null),
-        // хотя teacher_id в классе есть. В таком случае подтянем данные через RPC get_all_profiles,
-        // который выполняется с правами SECURITY DEFINER и обходит RLS.
-        const missingTeacherIds = result.filter(c => !c.teacher && c.teacher_id).map(c => c.teacher_id);
+        // Функция-помощник для проверки "пустоты" профиля (учитываем [], null, undefined)
+        const isProfileMissing = (p) => !p || (Array.isArray(p) && p.length === 0);
+
+        // Из-за RLS у учеников профиль учителя (teacher) может вернуться пустым (null или []),
+        // хотя teacher_id в классе есть. В таком случае подтянем данные через RPC get_all_profiles.
+        const missingTeacherIds = result
+            .filter(c => isProfileMissing(c.teacher) && c.teacher_id)
+            .map(c => c.teacher_id);
         
         if (missingTeacherIds.length > 0) {
             try {
                 const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
                 if (!rpcError && allProfiles) {
                     result.forEach(c => {
-                        if (!c.teacher && c.teacher_id) {
+                        if (isProfileMissing(c.teacher) && c.teacher_id) {
                             const prof = allProfiles.find(p => p.id === c.teacher_id);
                             if (prof) {
                                 c.teacher = {
                                     id: prof.id,
                                     full_name: prof.full_name,
-                                    role: prof.role
+                                    role: prof.role,
+                                    avatar_url: prof.avatar_url
                                 };
                             }
                         }
@@ -150,6 +158,36 @@ export const classService = {
             .single();
 
         if (error) throw error;
+        if (!data) return null;
+
+        // Нормализуем данные профиля (Supabase может вернуть массив или объект)
+        if (Array.isArray(data.teacher)) {
+            data.teacher = data.teacher[0];
+        }
+
+        // Проверка "пустоты" профиля (учитываем [], null, undefined)
+        const isProfileMissing = (p) => !p || (Array.isArray(p) && p.length === 0);
+
+        // Если профиль учителя пуст из-за RLS, пробуем подтянуть через RPC
+        if (isProfileMissing(data.teacher) && data.teacher_id) {
+            try {
+                const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
+                if (!rpcError && allProfiles) {
+                    const prof = allProfiles.find(p => p.id === data.teacher_id);
+                    if (prof) {
+                        data.teacher = {
+                            id: prof.id,
+                            full_name: prof.full_name,
+                            role: prof.role,
+                            avatar_url: prof.avatar_url
+                        };
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch teacher profile via RPC in getClassDetails:", err);
+            }
+        }
+
         return data;
     },
 

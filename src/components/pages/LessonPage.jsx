@@ -12,8 +12,8 @@ import ProgressCard from '../viewer/ProgressCard';
 const SlidesViewer = React.lazy(() => import('../viewer/SlidesViewer'));
 const TestViewer = React.lazy(() => import('../viewer/TestViewer'));
 const TestTeacherView = React.lazy(() => import('../viewer/TestTeacherView'));
-import { syllabusService, studentService } from '../../services/apiService';
-import { renderKatex } from '../../utils/katexRenderer';
+import { syllabusService, studentService, utilsService } from '../../services/apiService';
+const { renderKatex } = utilsService;
 
 // Ключи для отслеживания прогресса
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;

@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import katex from 'katex';
 
 // ==========================================
 // Общие утилиты
@@ -827,6 +828,151 @@ export const storageService = {
         if (uploadError) throw uploadError;
         const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
         return data.publicUrl;
+    },
+    /**
+     * Сжимает изображение до заданных размеров и качества.
+     * @param {File} file - Файл изображения.
+     * @param {number} maxWidth - Максимальная ширина/высота (px).
+     * @param {number} quality - Качество JPEG (0.0 - 1.0).
+     * @returns {Promise<string>} - Promise с Base64 строкой.
+     */
+    async compressImage(file, maxWidth = 1600, quality = 0.7) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxWidth) {
+                            width = Math.round((width * maxWidth) / height);
+                            height = maxWidth;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve(dataUrl);
+                };
+
+                img.onerror = (error) => reject(error);
+            };
+
+            reader.onerror = (error) => reject(error);
+        });
+    }
+};
+
+// ==========================================
+// 8. УТИЛИТЫ И ПОМОЩНИКИ (utils)
+// ==========================================
+export const utilsService = {
+    /**
+     * Сжимает изображение до заданных размеров и качества.
+     * @deprecated Используйте storageService.compressImage
+     */
+    compressImage: storageService.compressImage,
+
+    /**
+     * Перемешивает массив случайным образом (Алгоритм Фишера-Йетса)
+     */
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    },
+
+    /**
+     * Обрабатывает HTML-строку, находит формулы KaTeX и заменяет их на HTML.
+     */
+    renderKatex(html) {
+        if (!html || typeof html !== 'string') return html;
+        let result = html.replace(/\$\$([^$]+?)\$\$/g, (match, formula) => {
+            try {
+                return katex.renderToString(formula.trim(), {
+                    displayMode: true,
+                    throwOnError: false,
+                    output: 'html'
+                });
+            } catch (e) {
+                console.warn('Ошибка рендеринга KaTeX:', e);
+                return match;
+            }
+        });
+        result = result.replace(/\$([^$]+?)\$/g, (match, formula) => {
+            try {
+                return katex.renderToString(formula.trim(), {
+                    displayMode: false,
+                    throwOnError: false,
+                    output: 'html'
+                });
+            } catch (e) {
+                console.warn('Ошибка рендеринга KaTeX:', e);
+                return match;
+            }
+        });
+        return result;
+    }
+};
+
+// ==========================================
+// 9. ПРОГРЕСС И ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (progressService)
+// ==========================================
+export const progressService = {
+    getLessonStats(lessonId) {
+        try {
+            const history = JSON.parse(localStorage.getItem(`test_history_${lessonId}`) || '[]');
+            if (!history || history.length === 0) return null;
+            const totalAttempts = history.length;
+            const bestScore = Math.max(...history.map(h => h.score));
+            const avgScore = history.reduce((acc, curr) => acc + curr.score, 0) / totalAttempts;
+            const avgErrorRate = Math.round(100 - avgScore);
+            const lastAttemptAt = history[history.length - 1].timestamp;
+            return { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt };
+        } catch (e) {
+            console.error('Error parsing lesson stats:', e);
+            return null;
+        }
+    },
+    getContainerStats(lessonIds) {
+        if (!lessonIds || lessonIds.length === 0) return null;
+        let totalAvgScore = 0;
+        let completedLessonsCount = 0;
+        lessonIds.forEach(id => {
+            const stats = this.getLessonStats(id);
+            if (stats) {
+                totalAvgScore += stats.avgScore;
+                completedLessonsCount++;
+            }
+        });
+        if (completedLessonsCount === 0) return null;
+        const overallAvgScore = totalAvgScore / completedLessonsCount;
+        const avgErrorRate = Math.round(100 - overallAvgScore);
+        return {
+            completedLessons: completedLessonsCount,
+            totalLessons: lessonIds.length,
+            avgErrorRate
+        };
     }
 };
 
@@ -839,5 +985,7 @@ export default {
     statisticsService,
     translationService,
     storageService,
+    progressService,
+    utilsService,
     cleanUndefined
 };

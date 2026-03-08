@@ -1,7 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Eye } from 'lucide-react';
-import { renderKatex } from '../../utils/katexRenderer';
+import { utilsService } from '../../services/apiService';
+const { renderKatex } = utilsService;
 
 // Компонент отображения текстового контента урока
 const TextContent = ({ bodyText, isTextRead, isTeacher, onTextRead }) => {

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
-import { cleanUndefined } from '../../utils/cleanUndefined';
+import { cleanUndefined } from '../../services/apiService';
 import { CLUSTERS_STRUCTURE } from '../../constants/data';
 import {
     User, Mail, Phone, Calendar, School, BookOpen,

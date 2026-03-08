@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckCircle, XCircle, RotateCcw } from 'lucide-react';
-import { renderKatex } from '../../../utils/katexRenderer';
+import { utilsService } from '../../../services/apiService';
+const { renderKatex } = utilsService;
 
 // Экран результатов теста
 const TestResultsScreen = ({

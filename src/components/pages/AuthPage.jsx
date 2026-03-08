@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, UserPlus, LogIn, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabase';
-import { cleanUndefined } from '../../utils/cleanUndefined';
+import { cleanUndefined } from '../../services/apiService';
 
 const AuthPage = () => {
     const { t, i18n } = useTranslation();

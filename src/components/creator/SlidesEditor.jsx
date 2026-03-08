@@ -3,7 +3,6 @@ import { Presentation, Plus, Trash2, GripVertical, Image, Loader2, Globe } from 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { compressImage } from '../../utils/imageHelpers';
 import { storageService } from '../../services/apiService';
 
 const SortableSlide = ({ slide, index, onUpdate, onDelete, lang, editLang }) => {

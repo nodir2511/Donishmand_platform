@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { X, CheckCircle, XCircle, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
-import { shuffleArray } from '../../utils/shuffle';
-import { renderKatex } from '../../utils/katexRenderer';
+import { utilsService } from '../../services/apiService';
+const { renderKatex, shuffleArray } = utilsService;
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import MultipleChoiceQuestion from './questions/MultipleChoiceQuestion';

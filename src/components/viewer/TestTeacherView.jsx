@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, CheckCircle, Eye, EyeOff } from 'lucide-react';
-import { renderKatex } from '../../utils/katexRenderer';
+import { utilsService } from '../../services/apiService';
+const { renderKatex } = utilsService;
 
 const TestTeacherView = ({ questions, lang, onClose }) => {
     const [showAllAnswers, setShowAllAnswers] = useState(false);

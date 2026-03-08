@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { cleanUndefined } from '../utils/cleanUndefined';
 
 export const classService = {
     /**
@@ -78,6 +79,7 @@ export const classService = {
                     created_at,
                     branch_id,
                     subject_id,
+                    teacher_id,
                     branch:branches (id, name),
                     teacher:profiles!classes_teacher_id_fkey (id, full_name, role)
                 )
@@ -86,11 +88,41 @@ export const classService = {
 
         if (error) throw error;
 
-        return data.map(item => ({
+        // Формируем начальный список
+        const result = data.map(item => ({
             ...item.classes,
             teacher: item.classes.teacher,
             joinedAt: item.joined_at
         }));
+
+        // Из-за RLS у учеников профиль учителя (teacher) может вернуться пустым (null),
+        // хотя teacher_id в классе есть. В таком случае подтянем данные через RPC get_all_profiles,
+        // который выполняется с правами SECURITY DEFINER и обходит RLS.
+        const missingTeacherIds = result.filter(c => !c.teacher && c.teacher_id).map(c => c.teacher_id);
+        
+        if (missingTeacherIds.length > 0) {
+            try {
+                const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
+                if (!rpcError && allProfiles) {
+                    result.forEach(c => {
+                        if (!c.teacher && c.teacher_id) {
+                            const prof = allProfiles.find(p => p.id === c.teacher_id);
+                            if (prof) {
+                                c.teacher = {
+                                    id: prof.id,
+                                    full_name: prof.full_name,
+                                    role: prof.role
+                                };
+                            }
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to fetch missing teachers via RPC:", err);
+            }
+        }
+
+        return result;
     },
 
     /**
@@ -155,11 +187,8 @@ export const classService = {
     async updateClass(classId, updates) {
         if (!classId || !updates) throw new Error('Некорректные параметры для обновления');
 
-        // Убираем undefined
-        const cleanUpdates = Object.entries(updates).reduce((acc, [k, v]) => {
-            if (v !== undefined) acc[k] = v;
-            return acc;
-        }, {});
+        // Убираем undefined рекурсивно, чтобы избежать ошибки 406
+        const cleanUpdates = cleanUndefined(updates);
 
         const { data, error } = await supabase
             .from('classes')

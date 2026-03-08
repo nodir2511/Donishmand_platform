@@ -7,6 +7,23 @@ import ClusterSelect from '../features/ClusterSelect';
 import OnboardingSubjectsSection from '../features/OnboardingSubjectsSection';
 import { CLUSTERS_STRUCTURE, ALL_SUBJECTS_LIST } from '../../constants/data';
 import { useAuth } from '../../contexts/AuthContext';
+
+// Скелетон-заглушка для карточки курса (отображается при загрузке)
+const CourseCardSkeleton = () => (
+    <div className="block relative bg-gaming-card rounded-3xl p-6 border border-white/5 shadow-lg shadow-black/20 overflow-hidden animate-pulse">
+        <div className="flex items-start justify-between mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-white/5" />
+            <div className="w-8 h-8 rounded-full bg-white/5" />
+        </div>
+        <div className="h-6 w-3/4 bg-white/5 rounded-lg mb-4" />
+        <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1.5">
+                <div className="h-3 w-16 bg-white/5 rounded" />
+            </div>
+            <div className="w-full h-1.5 bg-white/5 rounded-full" />
+        </div>
+    </div>
+);
 import { supabase } from '../../services/supabase';
 import { syllabusService } from '../../services/syllabusService';
 
@@ -16,7 +33,7 @@ const HomePage = () => {
     const { t, i18n } = useTranslation();
     const [activeClusterId, setActiveClusterId] = useState(0);
     const lang = i18n.resolvedLanguage || 'ru';
-    const { profile } = useAuth();
+    const { profile, loading: authLoading } = useAuth();
     const location = useLocation();
 
     // SWR: мгновенная инициализация прогресса из localStorage-кеша
@@ -37,9 +54,25 @@ const HomePage = () => {
         }
     }, [location]);
 
+    // Определяем, для каких предметов нужно считать прогресс
+    // (только отображаемые, а не все 12)
+    const getSubjectsForProgress = () => {
+        if (!profile) return [];
+        // Прогресс-бар показываем только ученикам
+        if (profile.role === 'teacher' || profile.role === 'admin' || profile.role === 'super_admin') return [];
+        // Ученик — только выбранные предметы
+        if (profile.selected_subjects?.length > 0) return profile.selected_subjects;
+        // Если предметы не выбраны — прогресс не считаем (будет онбординг)
+        return [];
+    };
+
     // Фоновая загрузка актуального прогресса из Supabase (SWR: revalidate)
     useEffect(() => {
         if (!profile) return;
+
+        const subjectsForProgress = getSubjectsForProgress();
+        // Прогресс нужен только ученикам с выбранными предметами
+        if (subjectsForProgress.length === 0) return;
 
         let cancelled = false;
 
@@ -78,9 +111,9 @@ const HomePage = () => {
                     return;
                 }
 
-                // Параллельно загружаем структуры ВСЕХ предметов
+                // Загружаем структуры ТОЛЬКО отображаемых предметов (а не всех 12)
                 const structureResults = await Promise.all(
-                    ALL_SUBJECTS_LIST.map(async (subjectId) => {
+                    subjectsForProgress.map(async (subjectId) => {
                         try {
                             const structure = await syllabusService.getStructure(subjectId);
                             return { subjectId, structure };
@@ -217,7 +250,14 @@ const HomePage = () => {
                     </div>
                 </div>
 
-                {subjectsToDisplay.length > 0 ? (
+                {/* Скелетон-загрузка пока профиль не определён */}
+                {authLoading ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <CourseCardSkeleton key={`skeleton-${i}`} />
+                        ))}
+                    </div>
+                ) : subjectsToDisplay.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in-up">
                         {subjectsToDisplay.map((subjectId, index) => (
                             <CourseCard

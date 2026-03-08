@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Play, FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Clock, RotateCcw, Loader2 } from 'lucide-react';
+import { FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Loader2 } from 'lucide-react';
 import CourseLayout from '../layout/CourseLayout';
+import VideoPlayer from '../viewer/VideoPlayer';
+import TextContent from '../viewer/TextContent';
+import ProgressCard from '../viewer/ProgressCard';
 // import SlidesViewer from '../viewer/SlidesViewer';
 // import TestViewer from '../viewer/TestViewer';
 // import TestTeacherView from '../viewer/TestTeacherView';
@@ -44,7 +47,7 @@ const LessonPage = () => {
     const [showTestViewer, setShowTestViewer] = useState(false);
 
     // Определяем режим учителя
-    const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
+    const { user, isTeacher: rawIsTeacher, isAdmin } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin; // Учитель, админ или суперадмин — не сохраняет прогресс
 
     // ЗАГРУЗКА ДАННЫХ И ПРОГРЕССА
@@ -99,14 +102,14 @@ const LessonPage = () => {
 
                 // 3. Загружаем прогресс с сервера для учеников
                 if (!isTeacher) {
-                    const { data: user } = await supabase.auth.getUser();
-                    if (user?.user?.id) {
+                    const userId = user?.id;
+                    if (userId) {
                         // Прогресс по уроку
                         const { data: progressData } = await supabase
                             .from('user_lesson_progress')
                             .select('*')
                             .eq('lesson_id', lessonId)
-                            .eq('user_id', user.user.id)
+                            .eq('user_id', userId)
                             .maybeSingle();
 
                         // Результаты тестов
@@ -114,7 +117,7 @@ const LessonPage = () => {
                             .from('user_test_results')
                             .select('*')
                             .eq('lesson_id', lessonId)
-                            .eq('user_id', user.user.id);
+                            .eq('user_id', userId);
 
                         if (progressData || testData) {
                             setProgress(prev => {
@@ -169,7 +172,7 @@ const LessonPage = () => {
         };
 
         fetchLessonData();
-    }, [lessonId, lang, isTeacher]);
+    }, [lessonId, lang, isTeacher, user?.id]);
 
 
     // Определение существующего контента
@@ -246,16 +249,15 @@ const LessonPage = () => {
         }
     }, [loading, hasVideo, hasText, hasSlides]);
 
-    // Сохранение прогресса в БД
+    // Сохранение прогресса в БД (использует user из контекста, без лишнего getUser())
     const syncProgressToDb = async (updates) => {
         if (isTeacher) return;
+        const userId = user?.id;
+        if (!userId) return;
         try {
-            const { data: user } = await supabase.auth.getUser();
-            if (!user?.user?.id) return;
-
             // Upsert (создаст или обновит запись)
             await supabase.from('user_lesson_progress').upsert({
-                user_id: user.user.id,
+                user_id: userId,
                 lesson_id: lessonId,
                 ...updates,
                 updated_at: new Date()
@@ -401,108 +403,21 @@ const LessonPage = () => {
 
                 {/* Карточка прогресса (Скрыта для учителя) */}
                 {!isTeacher && (
-                    <div className="mb-8 bg-gradient-to-br from-gaming-primary/20 to-gaming-pink/20 backdrop-blur-xl border border-white/10 rounded-2xl p-6 relative overflow-hidden">
-                        <div className="relative z-10">
-                            <div className="flex justify-between items-end mb-4">
-                                <div>
-                                    <h4 className="font-bold text-lg mb-1">{t('lesson.progress')}</h4>
-                                    <p className="text-gaming-textMuted text-sm">
-                                        {completedSteps} / {totalSteps} {t('lesson.stepsCompleted')}
-                                    </p>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-3xl font-bold text-gaming-primary">{completionPercentage}%</div>
-                                </div>
-                            </div>
-
-                            {/* Прогресс бар */}
-                            <div className="w-full h-3 bg-black/30 rounded-full mb-6 overflow-hidden">
-                                <div
-                                    className="h-full bg-gradient-to-r from-gaming-primary to-gaming-pink transition-all duration-1000 ease-out"
-                                    style={{ width: `${completionPercentage}%` }}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                {hasVideo && (
-                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.videoWatched
-                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.videoWatched ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                            {progress.videoWatched ? <Check size={20} /> : <Video size={20} />}
-                                        </div>
-                                        <span className="font-medium text-sm">{t('lesson.video')}</span>
-                                    </div>
-                                )}
-
-                                {hasText && (
-                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${progress.textRead
-                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${progress.textRead ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                            {progress.textRead ? <Check size={20} /> : <FileText size={20} />}
-                                        </div>
-                                        <span className="font-medium text-sm">{t('lesson.text')}</span>
-                                    </div>
-                                )}
-
-                                {hasSlides && (
-                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${allSlidesViewed
-                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${allSlidesViewed ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                            {allSlidesViewed ? <Check size={20} /> : <Presentation size={20} />}
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <span className="font-medium text-sm">{t('lesson.slides')}</span>
-                                            <span className="text-xs opacity-70">{viewedSlidesCount}/{totalSlides}</span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {hasTest && (
-                                    <div className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors ${testStats?.isPassed
-                                        ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                        : 'bg-white/5 border-white/10 text-gaming-textMuted'}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${testStats?.isPassed ? 'bg-green-500/20' : 'bg-white/10'}`}>
-                                            {testStats?.isPassed ? <Check size={20} /> : <CheckCircle size={20} />}
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <span className="font-medium text-sm">{t('lesson.test')}</span>
-                                            {testStats && <span className="text-xs font-bold">{testStats.bestScore}%</span>}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Детальная статистика теста (если есть) */}
-                        {testStats && (
-                            <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap gap-4">
-                                <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                                    <RotateCcw size={18} className="text-gaming-gold" />
-                                    <div>
-                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{t('lesson.attempts')}</div>
-                                        <div className="font-bold text-white">{testStats.totalAttempts}</div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl border border-white/5">
-                                    <Clock size={18} className="text-gaming-primary" />
-                                    <div>
-                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider">{t('lesson.lastAttempt')}</div>
-                                        <div className="font-bold text-white">
-                                            {testStats.lastAttemptAt ? new Intl.DateTimeFormat(lang === 'tj' ? 'tg-TJ' : 'ru-RU', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            }).format(new Date(testStats.lastAttemptAt)) : '-'}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <ProgressCard
+                        hasVideo={hasVideo}
+                        hasText={hasText}
+                        hasSlides={hasSlides}
+                        hasTest={hasTest}
+                        progress={progress}
+                        allSlidesViewed={allSlidesViewed}
+                        viewedSlidesCount={viewedSlidesCount}
+                        totalSlides={totalSlides}
+                        testStats={testStats}
+                        completedSteps={completedSteps}
+                        totalSteps={totalSteps}
+                        completionPercentage={completionPercentage}
+                        lang={lang}
+                    />
                 )}
 
                 {/* Контент существует - показываем вкладки и область контента */}
@@ -539,71 +454,21 @@ const LessonPage = () => {
 
                             <div className="relative z-10">
                                 {activeTab === 'video' && hasVideo && (
-                                    <div className="aspect-video bg-black/60 rounded-xl flex flex-col items-center justify-center border border-white/10 shadow-inner overflow-hidden relative">
-                                        {videoUrl.includes('youtube') || videoUrl.includes('youtu.be') ? (() => {
-                                            // Извлекаем ID видео с поддержкой разных форматов (youtu.be, ?v=, &v=)
-                                            const videoIdMatch = videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/|.*embed\/))([^&?]*)/);
-                                            const videoId = videoIdMatch ? videoIdMatch[1] : null;
-
-                                            return videoId ? (
-                                                <iframe
-                                                    src={`https://www.youtube.com/embed/${videoId}`}
-                                                    className="w-full h-full"
-                                                    title="YouTube video player"
-                                                    frameBorder="0"
-                                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                    allowFullScreen
-                                                />
-                                            ) : (
-                                                <div className="text-white text-center p-4">
-                                                    <p>{t('videoLoadError')}</p>
-                                                    <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="text-gaming-primary hover:underline mt-2 inline-block">
-                                                        {t('openOnYoutube')}
-                                                    </a>
-                                                </div>
-                                            );
-                                        })() : (
-                                            <video
-                                                src={videoUrl}
-                                                controls
-                                                className="w-full h-full"
-                                                onEnded={handleVideoComplete}
-                                                onPlay={() => setTimeout(handleVideoComplete, 30000)}
-                                            />
-                                        )}
-                                        {!progress.videoWatched && !isTeacher && (
-                                            <button
-                                                onClick={handleVideoComplete}
-                                                className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
-                                            >
-                                                <Eye size={16} />
-                                                {t('lesson.markAsWatched')}
-                                            </button>
-                                        )}
-                                    </div>
+                                    <VideoPlayer
+                                        videoUrl={videoUrl}
+                                        isVideoWatched={progress.videoWatched}
+                                        isTeacher={isTeacher}
+                                        onVideoComplete={handleVideoComplete}
+                                    />
                                 )}
 
                                 {activeTab === 'text' && hasText && (
-                                    <div
-                                        className="prose prose-invert max-w-none prose-p:text-gaming-textMuted prose-headings:text-white prose-li:text-gaming-textMuted"
-                                        onScroll={(e) => {
-                                            const { scrollTop, scrollHeight, clientHeight } = e.target;
-                                            if (scrollTop + clientHeight >= scrollHeight - 50) handleTextRead();
-                                        }}
-                                    >
-                                        <div
-                                            dangerouslySetInnerHTML={{ __html: renderKatex(bodyText) }}
-                                        />
-                                        {!progress.textRead && !isTeacher && (
-                                            <button
-                                                onClick={handleTextRead}
-                                                className="mt-4 flex items-center gap-2 px-3 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-colors text-sm"
-                                            >
-                                                <Eye size={16} />
-                                                {t('lesson.markAsRead')}
-                                            </button>
-                                        )}
-                                    </div>
+                                    <TextContent
+                                        bodyText={bodyText}
+                                        isTextRead={progress.textRead}
+                                        isTeacher={isTeacher}
+                                        onTextRead={handleTextRead}
+                                    />
                                 )}
 
                                 {activeTab === 'slides' && hasSlides && (

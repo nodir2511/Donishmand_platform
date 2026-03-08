@@ -105,13 +105,11 @@ const splitContent = (content) => {
  */
 const mergeContent = (contentRu, contentTj) => {
     // Вспомогательные функции для восстановления текста из старых полей
-    const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
-    const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
     const pickBestText = (qObj) => {
         if (!qObj) return '';
         const variants = [qObj.question, qObj.text, qObj.title];
         for (const v of variants) {
-            if (v && !isNumeric(v)) return v;
+            if (v) return v;
         }
         return '';
     };
@@ -129,7 +127,7 @@ const mergeContent = (contentRu, contentTj) => {
             if (!recovered.textTj) {
                 const tjVariants = [q.textTj, q.question, q.text, q.title];
                 for (const v of tjVariants) {
-                    if (v && !isNumeric(v) && v !== recovered.textRu) {
+                    if (v && v !== recovered.textRu) {
                         recovered.textTj = v;
                         break;
                     }

@@ -1,17 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
     ChevronLeft, Plus, Trash2, Save, FileText, Video, ClipboardList, Presentation,
-    ChevronDown, ChevronRight, GripVertical, Edit3, ArrowRightLeft, Loader2, GraduationCap,
+    ChevronDown, ChevronRight, Edit3, ArrowRightLeft, Loader2, GraduationCap,
     FolderPlus, Book, Layers, Sparkles
 } from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableSection, SortableTopic, SortableLesson, MoveModal } from '../creator/SortableComponents';
 import { SUBJECT_NAMES, ALL_SUBJECTS_LIST } from '../../constants/data';
-// import LessonContentEditor from '../creator/LessonContentEditor'; // Используем ленивую загрузку (Lazy load)
 const LessonContentEditor = React.lazy(() => import('../creator/LessonContentEditor'));
+import ComponentErrorBoundary from '../common/ComponentErrorBoundary';
 import { translateText } from '../../services/translationService';
 
 
@@ -29,221 +29,6 @@ const LESSON_TYPES = [
 ];
 
 const STORAGE_KEY = 'donishmand_creator_syllabus';
-
-// Компонент сортируемого раздела
-const SortableSection = ({ section, sectionIndex, children, onDelete }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: section.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className="bg-gaming-bg/30 rounded-2xl border border-white/5 overflow-hidden">
-            <div className="flex items-center p-4">
-                <div {...attributes} {...listeners} className="cursor-grab mr-3 text-gaming-textMuted hover:text-white">
-                    <GripVertical size={18} />
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-};
-
-// Компонент сортируемой темы
-const SortableTopic = ({ topic, topicIndex, sectionIndex, children }) => {
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: topic.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className="bg-gaming-card/40 rounded-xl border border-white/5 overflow-hidden">
-            <div className="flex items-center p-3">
-                <div {...attributes} {...listeners} className="cursor-grab mr-2 text-gaming-textMuted hover:text-white">
-                    <GripVertical size={16} />
-                </div>
-                {children}
-            </div>
-        </div>
-    );
-};
-
-// Компонент сортируемого урока
-const SortableLesson = ({ lesson, lessonIndex, sectionIndex, topicIndex, onDelete, onEdit, getLessonIcon }) => {
-    const { t, i18n } = useTranslation();
-    const lang = i18n.resolvedLanguage || 'ru';
-    // Определяем все типы контента, которые есть в уроке
-    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
-    const contentTypes = [];
-    if (lesson.content) {
-        if (lesson.content.video?.url || lesson.content.video?.urlTj) contentTypes.push('video');
-        if ((lesson.content.slidesRu?.length || 0) > 0 || (lesson.content.slidesTj?.length || 0) > 0) contentTypes.push('presentation');
-        if ((lesson.content.test?.questions?.length || 0) > 0) contentTypes.push('test');
-        // Текст есть почти всегда, если это не чистый тест/видео, но можно проверить наличие
-        if (lesson.content.textRu || lesson.content.textTj) contentTypes.push('text');
-    }
-    // Если ничего специфичного не нашли (новый урок), показываем тип по умолчанию
-    if (contentTypes.length === 0) contentTypes.push(lesson.type || 'text');
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-        <div ref={setNodeRef} style={style} className="flex items-center justify-between gap-3 p-2 bg-gaming-bg/30 rounded-lg border border-white/5">
-            <div
-                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer group hover:bg-white/5 p-1 rounded-md transition-colors"
-                onClick={() => onEdit(lesson)}
-                title={t('creator.clickToEdit')}
-            >
-                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <GripVertical size={14} />
-                </div>
-
-                {/* Иконки типов контента */}
-                <div className="flex gap-1 shrink-0">
-                    {contentTypes.map(type => {
-                        const Icon = getLessonIcon(type);
-                        return <Icon key={type} size={14} className="text-gaming-pink/70" title={t(LESSON_TYPES.find(lt => lt.id === type)?.label)} />;
-                    })}
-                </div>
-
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm truncate block group-hover:text-gaming-primary transition-colors">
-                        {sectionIndex + 1}.{topicIndex + 1}.{lessonIndex + 1}. {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
-                    </span>
-                    <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'rename'); }}
-                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors shrink-0 sm:opacity-0 group-hover:opacity-100"
-                        title={t('creator.editTitle')}
-                    >
-                        <Edit3 size={12} />
-                    </button>
-                </div>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0">
-                {/* Кнопка перемещения */}
-                <button
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'move'); }}
-                    className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors"
-                    title={t('creator.move')}
-                >
-                    <ArrowRightLeft size={14} />
-                </button>
-
-                <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(lesson.id); }}
-                    className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
-                    title={t('creator.delete')}
-                >
-                    <Trash2 size={14} />
-                </button>
-            </div>
-        </div>
-    );
-};
-
-// Компонент модального окна перемещения
-const MoveModal = ({ item, itemType, syllabus, onMove, onClose }) => {
-    const { t, i18n } = useTranslation();
-    const lang = i18n.resolvedLanguage || 'ru';
-    const [selectedSectionId, setSelectedSectionId] = useState(item.fromSectionId || '');
-    const [selectedTopicId, setSelectedTopicId] = useState(item.fromTopicId || '');
-
-    // Получить доступные разделы (фильтруем текущий если нужно, но обычно можно оставить)
-    // Для перемещения темы: цель - раздел.
-    // Для перемещения урока: цель - тема (внутри раздела).
-
-    const sections = syllabus.sections || [];
-
-    // Получение тем на основе выбранного раздела
-    const currentSection = sections.find(s => s.id === selectedSectionId);
-    const availableTopics = currentSection?.topics || [];
-
-    const handleConfirm = () => {
-        if (itemType === 'topic') {
-            if (selectedSectionId && selectedSectionId !== item.fromSectionId) {
-                onMove(selectedSectionId);
-            }
-        } else if (itemType === 'lesson') {
-            if (selectedSectionId && selectedTopicId) {
-                // Если тема та же самая - ничего не делаем (это модальное окно для перемещения МЕЖДУ контейнерами)
-                if (selectedSectionId !== item.fromSectionId || selectedTopicId !== item.fromTopicId) {
-                    onMove(selectedSectionId, selectedTopicId);
-                }
-            }
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-            <div className="w-full max-w-md bg-gaming-card/95 backdrop-blur-xl rounded-2xl border border-white/10 p-6">
-                <h3 className="text-lg font-semibold mb-4">
-                    {t('creator.moveTo')}
-                </h3>
-
-                {/* Выбор раздела */}
-                <div className="mb-4">
-                    <label className="block text-sm text-gaming-textMuted mb-2">
-                        {t('creator.section')}
-                    </label>
-                    <select
-                        value={selectedSectionId}
-                        onChange={(e) => { setSelectedSectionId(e.target.value); setSelectedTopicId(''); }}
-                        className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white appearance-none"
-                    >
-                        <option value="">{t('creator.selectSection')}</option>
-                        {sections.map(s => (
-                            <option key={s.id} value={s.id}>{lang === 'tj' ? (s.titleTj || s.title) : s.title}</option>
-                        ))}
-                    </select>
-                </div>
-
-                {/* Выбор темы (только для уроков) */}
-                {itemType === 'lesson' && (
-                    <div className="mb-4">
-                        <label className="block text-sm text-gaming-textMuted mb-2">
-                            {t('creator.topic')}
-                        </label>
-                        <select
-                            value={selectedTopicId}
-                            onChange={(e) => setSelectedTopicId(e.target.value)}
-                            disabled={!selectedSectionId}
-                            className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl px-4 py-3 text-white appearance-none disabled:opacity-50"
-                        >
-                            <option value="">{t('creator.selectTopic')}</option>
-                            {availableTopics.map(t => (
-                                <option key={t.id} value={t.id}>{lang === 'tj' ? (t.titleTj || t.title) : t.title}</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-
-                <div className="flex gap-3 mt-6">
-                    <button
-                        onClick={handleConfirm}
-                        className="flex-1 px-4 py-2 bg-gaming-primary text-white rounded-xl hover:bg-gaming-primary/80"
-                        disabled={itemType === 'topic' ? !selectedSectionId : (!selectedSectionId || !selectedTopicId)}
-                    >
-                        {t('creator.move')}
-                    </button>
-                    <button onClick={onClose} className="px-4 py-2 text-gaming-textMuted hover:text-white">
-                        {t('creator.cancel')}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 const CreatorPage = () => {
     const { t, i18n } = useTranslation();
@@ -384,13 +169,13 @@ const CreatorPage = () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(syllabus));
     }, [syllabus]);
 
-    const currentSubjectSyllabus = syllabus[selectedSubject] || { sections: [] };
+    const currentSubjectSyllabus = useMemo(() => syllabus[selectedSubject] || { sections: [] }, [syllabus, selectedSubject]);
 
-    const toggleSection = (sectionId) => setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
-    const toggleTopic = (topicId) => setExpandedTopics(prev => ({ ...prev, [topicId]: !prev[topicId] }));
+    const toggleSection = useCallback((sectionId) => setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] })), []);
+    const toggleTopic = useCallback((topicId) => setExpandedTopics(prev => ({ ...prev, [topicId]: !prev[topicId] })), []);
 
     // ОБРАБОТЧИКИ DRAG-AND-DROP (Только сортировка)
-    const handleDragEnd = (event) => {
+    const handleDragEnd = useCallback((event) => {
         const { active, over } = event;
         // console.log(active.id, over?.id);
 
@@ -468,7 +253,7 @@ const CreatorPage = () => {
                 };
             });
         }
-    };
+    }, [selectedSubject]);
 
     // ОБРАБОТЧИКИ ДОБАВЛЕНИЯ
     const handleAddSection = () => {
@@ -533,7 +318,7 @@ const CreatorPage = () => {
     };
 
     // ОБРАБОТЧИКИ УДАЛЕНИЯ
-    const handleDeleteSection = async (sectionId) => {
+    const handleDeleteSection = useCallback(async (sectionId) => {
         if (!window.confirm('Вы точно хотите удалить этот раздел и все его уроки? Это действие нельзя отменить.')) return;
 
         try {
@@ -553,9 +338,9 @@ const CreatorPage = () => {
         } catch (error) {
             console.error('Ошибка удаления раздела: ', error);
         }
-    };
+    }, [syllabus, selectedSubject, t]);
 
-    const handleDeleteTopic = async (sectionId, topicId) => {
+    const handleDeleteTopic = useCallback(async (sectionId, topicId) => {
         if (!window.confirm('Вы точно хотите удалить эту тему и все её уроки? Это действие нельзя отменить.')) return;
 
         try {
@@ -581,9 +366,9 @@ const CreatorPage = () => {
         } catch (error) {
             console.error('Ошибка удаления темы: ', error);
         }
-    };
+    }, [syllabus, selectedSubject, t]);
 
-    const handleDeleteLesson = async (sectionId, topicId, lessonId) => {
+    const handleDeleteLesson = useCallback(async (sectionId, topicId, lessonId) => {
         if (!window.confirm(t('creator.confirmDelete'))) return;
 
         try {
@@ -609,7 +394,7 @@ const CreatorPage = () => {
             console.error('Ошибка удаления урока из БД:', error);
             alert('Не удалось полностью удалить контент урока из базы данных.');
         }
-    };
+    }, [selectedSubject, t]);
 
 
     // ОБРАБОТЧИКИ ПЕРЕМЕЩЕНИЯ
@@ -954,10 +739,10 @@ const CreatorPage = () => {
         </div>
     );
 
-    const getLessonIcon = (type) => {
+    const getLessonIcon = useCallback((type) => {
         const found = LESSON_TYPES.find(lt => lt.id === type);
         return found ? found.icon : FileText;
-    };
+    }, []);
 
     // Получить все темы для модального окна перемещения
     const getAllTopics = () => currentSubjectSyllabus.sections.flatMap(s => s.topics.map(t => ({ ...t, sectionTitle: s.title })));
@@ -1301,5 +1086,10 @@ const CreatorPage = () => {
         </div>
     );
 };
-
-export default CreatorPage;
+export default function WrappedCreatorPage(props) {
+    return (
+        <ComponentErrorBoundary>
+            <CreatorPage {...props} />
+        </ComponentErrorBoundary>
+    );
+}

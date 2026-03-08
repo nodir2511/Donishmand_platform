@@ -12,6 +12,7 @@ import {
     Trophy, Target, Filter, Calendar, User, Percent, BarChart3,
     FileSpreadsheet, FileText, HelpCircle
 } from 'lucide-react';
+import UserAvatar from '../../../common/UserAvatar';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -224,12 +225,33 @@ const ClassStatisticsTab = ({ classData }) => {
         if (rows.length === 0) { alert('Нет данных для экспорта'); return; }
 
         const doc = new jsPDF();
+        
+        // Подгружаем кириллический шрифт (Roboto)
+        try {
+            const fontUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf';
+            const response = await fetch(fontUrl);
+            const buffer = await response.arrayBuffer();
+            
+            let binary = '';
+            const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const base64Font = window.btoa(binary);
+            
+            doc.addFileToVFS('Roboto-Regular.ttf', base64Font);
+            doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+            doc.setFont('Roboto');
+        } catch (err) {
+            console.error('Ошибка загрузки шрифта для PDF:', err);
+        }
+
         const headers = Object.keys(rows[0]);
         const body = rows.map(r => headers.map(h => String(r[h])));
 
         // Заголовок документа
         doc.setFontSize(16);
-        doc.text(`${classData.name} — Statistika`, 14, 20);
+        doc.text(`${classData.name} — Статистика`, 14, 20);
         doc.setFontSize(10);
         doc.text(new Date().toLocaleDateString('ru-RU'), 14, 28);
 
@@ -238,7 +260,7 @@ const ClassStatisticsTab = ({ classData }) => {
             head: [headers],
             body,
             startY: 34,
-            styles: { fontSize: 9, cellPadding: 3 },
+            styles: { font: 'Roboto', fontSize: 9, cellPadding: 3 },
             headStyles: { fillColor: [108, 93, 211] }
         });
 
@@ -506,13 +528,12 @@ const SummaryView = ({ data, timeDynamics, topStudents, courseProgress, difficul
                                     </div>
 
                                     {/* Аватар */}
-                                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold text-xs sm:text-sm border border-gaming-primary/30 shrink-0">
-                                        {student.avatar ? (
-                                            <img src={student.avatar} alt={student.name} className="w-full h-full rounded-full object-cover" />
-                                        ) : (
-                                            student.name[0]?.toUpperCase()
-                                        )}
-                                    </div>
+                                    <UserAvatar
+                                        avatarUrl={student.avatar}
+                                        name={student.name}
+                                        size="sm"
+                                        className="w-8 h-8 sm:w-9 sm:h-9 text-xs sm:text-sm"
+                                    />
 
                                     {/* Имя и статистика */}
                                     <div className="flex-1 min-w-0">
@@ -718,13 +739,12 @@ const StudentsDetailedView = ({ data, lessonTitles }) => {
                                 {idx + 1}
                             </div>
                             {/* Аватар */}
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold text-xs sm:text-base border border-gaming-primary/30 shrink-0">
-                                {student.avatar ? (
-                                    <img src={student.avatar} alt={student.name} className="w-full h-full rounded-full object-cover" />
-                                ) : (
-                                    student.name[0]?.toUpperCase()
-                                )}
-                            </div>
+                            <UserAvatar
+                                avatarUrl={student.avatar}
+                                name={student.name}
+                                size="md"
+                                className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-base border border-white/5"
+                            />
                             <div className="text-left min-w-0">
                                 <div className="font-medium text-white text-sm sm:text-base truncate">{student.name}</div>
                                 <div className="text-[10px] sm:text-xs text-gray-400 mt-0.5 sm:mt-1 flex items-center gap-1.5 sm:gap-3 flex-wrap">

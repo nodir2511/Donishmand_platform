@@ -21,6 +21,11 @@ const forceCleanup = () => {
     });
 };
 
+// Безопасные роли, которым можно доверять из кеша.
+// Привилегированные роли (teacher, admin, super_admin) НЕ доверяются кешу —
+// они будут подтверждены сервером при initAuth().
+const SAFE_CACHED_ROLES = new Set(['student', 'user']);
+
 export const AuthProvider = ({ children }) => {
     // --- SWR: Синхронная инициализация из localStorage ---
     const getInitialState = () => {
@@ -38,10 +43,19 @@ export const AuthProvider = ({ children }) => {
 
                 // Простая валидация (время жизни кеша, например 24 часа)
                 if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+                    // Защита от cache poisoning: если роль привилегированная,
+                    // понижаем до student и ждём подтверждения от сервера
+                    const cachedProfile = parsed.profile ? { ...parsed.profile } : null;
+                    const roleIsPrivileged = cachedProfile && !SAFE_CACHED_ROLES.has(cachedProfile.role);
+                    if (roleIsPrivileged) {
+                        cachedProfile.role = 'student';
+                    }
+
                     return {
                         user: { id: parsed.userId }, // Минимальный объект юзера
-                        profile: parsed.profile,
-                        permissions: parsed.permissions || [],
+                        profile: cachedProfile,
+                        // Привилегированные права не доверяем из кеша
+                        permissions: roleIsPrivileged ? [] : (parsed.permissions || []),
                         loading: false
                     };
                 }
@@ -268,8 +282,12 @@ export const AuthProvider = ({ children }) => {
 
     const signOut = async () => {
         forceCleanup();
+        // Явно удаляем кеш профиля и прогресса
+        localStorage.removeItem('sb-profile-cache');
+        localStorage.removeItem('donishmand_subject_progress');
         setUser(null);
         setProfile(null);
+        setPermissions([]);
         try {
             await Promise.race([
                 supabase.auth.signOut(),

@@ -1,5 +1,35 @@
 import React from 'react';
 
+// Локализованные строки для Error Boundary.
+// i18next может быть недоступен при ошибке, поэтому язык читаем напрямую из localStorage.
+const TEXTS = {
+    ru: {
+        chunkTitle: 'Обновление приложения...',
+        errorTitle: 'Что-то пошло не так :(',
+        chunkMessage: 'Приложение было обновлено. Перезагрузите страницу для получения новой версии.',
+        errorMessage: 'Произошла ошибка при отрисовке приложения.',
+        reload: 'Перезагрузить страницу',
+        clearCache: 'Сбросить кэш и перезагрузить',
+    },
+    tj: {
+        chunkTitle: 'Навсозии барнома...',
+        errorTitle: 'Хатогӣ рух дод :(',
+        chunkMessage: 'Барнома навсозӣ шуд. Саҳифаро аз нав боркунӣ кунед.',
+        errorMessage: 'Ҳангоми кор хатогӣ рух дод.',
+        reload: 'Саҳифаро аз нав боркунӣ кунед',
+        clearCache: 'Кэшро тоза карда аз нав боркунӣ кунед',
+    },
+};
+
+// Получить текущий язык из localStorage (без зависимости от i18next)
+function getLocale() {
+    try {
+        const stored = localStorage.getItem('i18nextLng');
+        if (stored && stored.startsWith('tj')) return 'tj';
+    } catch { /* localStorage может быть недоступен */ }
+    return 'ru';
+}
+
 // Определяем, является ли ошибка ошибкой загрузки чанка (после деплоя)
 function isChunkLoadError(error) {
     const message = error?.message || '';
@@ -47,6 +77,7 @@ class GlobalErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
+            const t = TEXTS[getLocale()];
             return (
                 <div style={{
                     padding: '2rem',
@@ -61,13 +92,13 @@ class GlobalErrorBoundary extends React.Component {
                 }}>
                     <h1 style={{ color: '#ff49db', marginBottom: '1rem' }}>
                         {this.state.isChunkError
-                            ? 'Обновление приложения...'
-                            : 'Что-то пошло не так :('}
+                            ? t.chunkTitle
+                            : t.errorTitle}
                     </h1>
                     <p style={{ marginBottom: '2rem', opacity: 0.8 }}>
                         {this.state.isChunkError
-                            ? 'Приложение было обновлено. Перезагрузите страницу для получения новой версии.'
-                            : 'Произошла ошибка при отрисовке приложения.'}
+                            ? t.chunkMessage
+                            : t.errorMessage}
                     </p>
 
                     {!this.state.isChunkError && (
@@ -110,7 +141,7 @@ class GlobalErrorBoundary extends React.Component {
                             fontWeight: 'bold'
                         }}
                     >
-                        Перезагрузить страницу
+                        {t.reload}
                     </button>
                     <button
                         onClick={() => {
@@ -129,7 +160,7 @@ class GlobalErrorBoundary extends React.Component {
                             fontSize: '0.9rem'
                         }}
                     >
-                        Сбросить кэш и перезагрузить
+                        {t.clearCache}
                     </button>
                 </div>
             );

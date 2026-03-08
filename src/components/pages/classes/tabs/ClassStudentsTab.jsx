@@ -107,7 +107,8 @@ const ClassStudentsTab = ({ classId }) => {
                 </div>
             ) : (
                 <div className="bg-gaming-card/40 border border-white/10 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left whitespace-nowrap min-w-max">
                         <thead className="bg-white/5 border-b border-white/10 text-gaming-textMuted text-sm">
                             <tr>
                                 <th className="px-6 py-4 font-medium">Ученик</th>
@@ -148,7 +149,8 @@ const ClassStudentsTab = ({ classId }) => {
                                 </tr>
                             ))}
                         </tbody>
-                    </table>
+                        </table>
+                    </div>
                 </div>
             )}
 

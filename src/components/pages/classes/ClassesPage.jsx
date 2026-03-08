@@ -305,7 +305,7 @@ const ClassesPage = () => {
                                 ) : (
                                     <div className="flex items-center gap-2">
                                         <Users size={16} />
-                                        <span>Учитель: <strong className="text-white">{cls.teacher?.full_name || 'Неизвестен'}</strong></span>
+                                        <span>Учитель: <strong className="text-white">{(Array.isArray(cls.teacher) ? cls.teacher[0]?.full_name : cls.teacher?.full_name) || 'Неизвестен'}</strong></span>
                                     </div>
                                 )}
                                 {cls.branch && (

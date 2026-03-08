@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Maximize2, Check } from 'lucide-react';
 
 const SlidesViewer = ({ slides, lessonId, onClose, onSlideView }) => {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const containerRef = React.useRef(null);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -53,16 +53,15 @@ const SlidesViewer = ({ slides, lessonId, onClose, onSlideView }) => {
 
         // Попытка автоматического входа в полноэкранный режим при открытии
         if (containerRef.current) {
-            containerRef.current.requestFullscreen().catch(err => {
-                console.log('Auto-fullscreen blocked:', err);
-                // Если авто-блокировка, мы все равно показываем UI, но isFullscreen будет false
+            containerRef.current.requestFullscreen().catch(() => {
+                // Игнорируем ошибку авто-блокировки
             });
         }
 
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             if (document.fullscreenElement) {
-                document.exitFullscreen().catch(err => console.log('Exit fullscreen error:', err));
+                document.exitFullscreen().catch(() => {});
             }
         };
     }, []);
@@ -93,9 +92,9 @@ const SlidesViewer = ({ slides, lessonId, onClose, onSlideView }) => {
     const goToNext = () => setCurrentIndex(prev => (prev < slides.length - 1 ? prev + 1 : prev));
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
-            containerRef.current?.requestFullscreen().catch(err => console.log(err));
+            containerRef.current?.requestFullscreen().catch(() => {});
         } else {
-            document.exitFullscreen().catch(err => console.log(err));
+            document.exitFullscreen().catch(() => {});
         }
     };
 
@@ -132,7 +131,7 @@ const SlidesViewer = ({ slides, lessonId, onClose, onSlideView }) => {
                         <button
                             onClick={toggleFullscreen}
                             className="p-2 text-white/70 hover:text-white transition-colors rounded-lg hover:bg-white/10"
-                            title="Fullscreen (F)"
+                            title={t('viewer.fullscreen', 'Fullscreen (F)')}
                         >
                             <Maximize2 size={20} />
                         </button>

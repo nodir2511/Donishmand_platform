@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Sparkles, Mail, Lock, Eye, EyeOff, ArrowRight, UserPlus, LogIn, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { supabase } from '../../services/supabase';
+import { cleanUndefined } from '../../utils/cleanUndefined';
 
 const AuthPage = () => {
     const { t, i18n } = useTranslation();
@@ -30,7 +31,7 @@ const AuthPage = () => {
         fullName: '',
         birthDate: '',
         phone: '',
-        role: 'student', // По умолчанию ученик
+        role: 'student', // Роль всегда student при самостоятельной регистрации (учителей создаёт админ)
         language: 'tj',
         grade: '1',
         school: '',
@@ -136,6 +137,7 @@ const AuthPage = () => {
                 }
 
                 // Создаем пользователя в Auth с metadata (триггер создаст базовый профиль)
+                // Роль всегда student — учителей/админов создаёт только админ через AdminPage
                 const { data: authData, error: authError } = await Promise.race([
                     supabase.auth.signUp({
                         email: formData.email,
@@ -143,7 +145,7 @@ const AuthPage = () => {
                         options: {
                             data: {
                                 full_name: formData.fullName,
-                                role: formData.role,
+                                role: 'student',
                             }
                         }
                     }),
@@ -161,26 +163,19 @@ const AuthPage = () => {
                         phone: formData.phone || null,
                         branch: formData.branch || null,
                         updated_at: new Date().toISOString(),
+                        school: formData.school || null,
+                        grade: formData.grade ? parseInt(formData.grade) : null,
+                        group_name: formData.group || null,
+                        language: formData.language || 'tj',
                     };
 
-                    // Поля для ученика
-                    if (formData.role === 'student') {
-                        profileUpdates.school = formData.school || null;
-                        profileUpdates.grade = formData.grade ? parseInt(formData.grade) : null;
-                        profileUpdates.group_name = formData.group || null;
-                        profileUpdates.language = formData.language || 'tj';
-                    }
-
-                    // Поля для учителя
-                    if (formData.role === 'teacher') {
-                        profileUpdates.subject = formData.subject || null;
-                    }
+                    const cleanProfileUpdates = cleanUndefined(profileUpdates);
 
                     // Обновляем существующий профиль (который только что создал триггер)
                     // Используем update вместо upsert, чтобы подтвердить существование записи
                     const { error: profileError } = await supabase
                         .from('profiles')
-                        .update(profileUpdates)
+                        .update(cleanProfileUpdates)
                         .eq('id', authData.user.id);
 
                     if (profileError) {
@@ -188,13 +183,13 @@ const AuthPage = () => {
                         // Если профиль вдруг не найден (триггер не сработал), пробуем создать вручную (fallback)
                         if (profileError.code === 'PGRST116' || profileError.details?.includes('0 rows')) {
                             console.warn('Профиль не найден, создаем вручную (fallback)...');
-                            await supabase.from('profiles').insert({
+                            await supabase.from('profiles').insert(cleanUndefined({
                                 id: authData.user.id,
                                 full_name: formData.fullName,
-                                role: formData.role,
+                                role: 'student',
                                 email: formData.email,
                                 ...profileUpdates
-                            });
+                            }));
                         }
                     }
 
@@ -352,31 +347,8 @@ const AuthPage = () => {
                             )}
 
                             <form onSubmit={handleSubmit} className="space-y-4">
-                                {/* Выбор роли */}
-                                {!isLogin && (
-                                    <div className="flex bg-gaming-bg/50 p-1 rounded-xl mb-6 border border-white/10">
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, role: 'student' })}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'student'
-                                                ? 'bg-gaming-card shadow-lg text-white border border-white/10'
-                                                : 'text-gaming-textMuted hover:text-white'
-                                                }`}
-                                        >
-                                            {t('authRoleStudent')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, role: 'teacher' })}
-                                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${formData.role === 'teacher'
-                                                ? 'bg-gaming-card shadow-lg text-white border border-white/10'
-                                                : 'text-gaming-textMuted hover:text-white'
-                                                }`}
-                                        >
-                                            {t('authRoleTeacher')}
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Роль при самостоятельной регистрации всегда student.
+                               Учителей создаёт админ через AdminPage. */}
 
                                 {/* ФИО (Только регистрация) */}
                                 {!isLogin && (
@@ -453,8 +425,8 @@ const AuthPage = () => {
                                     </div>
                                 </div>
 
-                                {/* ПОЛЯ ДЛЯ УЧЕНИКА */}
-                                {!isLogin && formData.role === 'student' && (
+                                {/* Поля ученика (при самостоятельной регистрации роль всегда student) */}
+                                {!isLogin && (
                                     <>
                                         {/* Язык и Класс */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
@@ -499,7 +471,7 @@ const AuthPage = () => {
                                                     onChange={(e) => setFormData({ ...formData, school: e.target.value })}
                                                     className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
                                                     placeholder={isRu ? "№1" : "№1"}
-                                                    required={formData.role === 'student'}
+                                                    required
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
@@ -511,7 +483,7 @@ const AuthPage = () => {
                                                     value={formData.branch}
                                                     onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
                                                     className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                                    required={formData.role === 'student'}
+                                                    required
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
@@ -523,51 +495,11 @@ const AuthPage = () => {
                                                     value={formData.group}
                                                     onChange={(e) => setFormData({ ...formData, group: e.target.value })}
                                                     className="w-full bg-gaming-bg/50 border border-white/10 rounded-xl py-3.5 px-4 text-white placeholder-white/20 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                                    required={formData.role === 'student'}
+                                                    required
                                                 />
                                             </div>
                                         </div>
                                     </>
-                                )}
-
-                                {/* ПОЛЯ ДЛЯ УЧИТЕЛЯ */}
-                                {!isLogin && formData.role === 'teacher' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in-up delay-[100ms]">
-                                        {/* Предмет */}
-                                        <div className="space-y-1.5">
-                                            <label className="text-sm font-medium text-white/60 ml-1">
-                                                {t('authSubject')}
-                                            </label>
-                                            <select
-                                                value={formData.subject || 'tj-lang'}
-                                                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 pr-10 text-white focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%239ca3af%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px] bg-[right_12px_center] bg-no-repeat"
-                                            >
-                                                <option value="tj-lang">{t('subjectNames.tj-lang')}</option>
-                                                <option value="math">{t('subjectNames.math')}</option>
-                                                <option value="phys">{t('subjectNames.phys')}</option>
-                                                <option value="chem">{t('subjectNames.chem')}</option>
-                                                <option value="bio">{t('subjectNames.bio')}</option>
-                                                <option value="geo">{t('subjectNames.geo')}</option>
-                                                <option value="hist">{t('subjectNames.hist')}</option>
-                                                <option value="eng">{t('subjectNames.eng')}</option>
-                                                <option value="lit">{t('subjectNames.lit')}</option>
-                                            </select>
-                                        </div>
-                                        {/* Филиал */}
-                                        <div className="space-y-1.5">
-                                            <label className="text-sm font-medium text-white/60 ml-1">
-                                                {t('authBranch')}
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={formData.branch}
-                                                onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                                                className="w-full bg-gaming-bg/50 border border-white/20 rounded-xl py-3.5 px-4 text-white placeholder-white/50 focus:outline-none focus:border-gaming-primary/50 focus:ring-1 focus:ring-gaming-primary/50 transition-all font-sans"
-                                                required={formData.role === 'teacher'}
-                                            />
-                                        </div>
-                                    </div>
                                 )}
 
                                 {/* Пароль */}

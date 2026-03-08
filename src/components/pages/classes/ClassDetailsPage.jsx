@@ -48,8 +48,13 @@ const ClassDetailsPage = () => {
             // Если ученик, проверим состоит ли он в классе
             if (isStudent) {
                 const myClasses = await classService.getStudentClasses(user.id);
-                if (!myClasses.find(c => c.id === classId)) {
+                const myClassData = myClasses.find(c => c.id === classId);
+                if (!myClassData) {
                     throw new Error('Вы не состоите в этом классе');
+                }
+                // Если RLS заблокировал чтение teacher из getClassDetails, берем его из getStudentClasses
+                if (!data.teacher && myClassData.teacher) {
+                    data.teacher = myClassData.teacher;
                 }
             }
 
@@ -141,7 +146,7 @@ const ClassDetailsPage = () => {
                         </div>
                         <div className="text-gaming-textMuted flex items-center gap-2">
                             <Users size={16} />
-                            <span>{isTeacherOrAdmin ? `${classData.class_members?.[0]?.count || 0} учеников` : `Учитель: ${classData.teacher?.full_name || 'Неизвестно'}`}</span>
+                            <span>{isTeacherOrAdmin ? `${classData.class_members?.[0]?.count || 0} учеников` : `Учитель: ${(Array.isArray(classData.teacher) ? classData.teacher[0]?.full_name : classData.teacher?.full_name) || 'Неизвестно'}`}</span>
                         </div>
                     </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../../services/supabase';
 import { Medal, Trophy, TrendingUp, Calendar, Loader2, Coins, Users } from 'lucide-react';
+import UserAvatar from '../../../common/UserAvatar';
 
 // Иконка монеты (нет в базовом наборе lucide)
 const CoinIcon = ({ size = 16, className = '' }) => (
@@ -11,23 +12,7 @@ const CoinIcon = ({ size = 16, className = '' }) => (
     </svg>
 );
 
-// Добавим локальный компонент для аватара
-const AvatarImage = ({ src, name }) => {
-    const [hasError, setHasError] = useState(false);
 
-    if (!src || hasError) {
-        return <>{name?.[0]?.toUpperCase() || '?'}</>;
-    }
-
-    return (
-        <img
-            src={src}
-            alt={name || ""}
-            className="w-9 h-9 rounded-full object-cover"
-            onError={() => setHasError(true)}
-        />
-    );
-};
 
 const ClassLeaderboardTab = ({ classId }) => {
     const [period, setPeriod] = useState('day'); // 'day', 'week', 'month', 'all'
@@ -251,9 +236,7 @@ const ClassLeaderboardTab = ({ classId }) => {
 
                                         {/* Имя + аватар */}
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className="w-9 h-9 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold text-sm shrink-0 overflow-hidden">
-                                                <AvatarImage src={student.avatar} name={student.name} />
-                                            </div>
+                                            <UserAvatar avatarUrl={student.avatar} name={student.name} size="sm" />
                                             <span className={`font-medium truncate ${student.coins > 0 ? 'text-white' : 'text-gaming-textMuted'}`}>
                                                 {student.name}
                                             </span>

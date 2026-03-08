@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
+import { cleanUndefined } from '../../utils/cleanUndefined';
 import { CLUSTERS_STRUCTURE } from '../../constants/data';
 import {
     User, Mail, Phone, Calendar, School, BookOpen,
@@ -65,21 +66,23 @@ const ProfilePage = () => {
         setSaving(true);
         setSaveStatus(null);
         try {
+            const updates = cleanUndefined({
+                full_name: formData.full_name,
+                phone: formData.phone || null,
+                birth_date: formData.birth_date || null,
+                school: formData.school || null,
+                grade: formData.grade ? parseInt(formData.grade) : null,
+                branch: formData.branch || null,
+                group_name: formData.group_name || null,
+                language: formData.language,
+                subject: formData.subject || null,
+                cluster_id: formData.cluster_id ? parseInt(formData.cluster_id) : null,
+                updated_at: new Date().toISOString()
+            });
+
             const { error } = await supabase
                 .from('profiles')
-                .update({
-                    full_name: formData.full_name,
-                    phone: formData.phone || null,
-                    birth_date: formData.birth_date || null,
-                    school: formData.school || null,
-                    grade: formData.grade ? parseInt(formData.grade) : null,
-                    branch: formData.branch || null,
-                    group_name: formData.group_name || null,
-                    language: formData.language,
-                    subject: formData.subject || null,
-                    cluster_id: formData.cluster_id ? parseInt(formData.cluster_id) : null,
-                    updated_at: new Date().toISOString()
-                })
+                .update(updates)
                 .eq('id', user.id);
 
             if (error) throw error;

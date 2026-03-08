@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { AVATAR_OPTIONS } from '../../constants/data';
+import UserAvatar from '../common/UserAvatar';
 import {
     BarChart3, History, Settings, User
 } from 'lucide-react';
@@ -35,13 +35,6 @@ const StudentDashboardPage = () => {
         return <Navigate to="/profile" replace />;
     }
 
-    // Инициалы для аватара (fallback)
-    const userInitials = profile?.full_name
-        ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-        : user?.email?.[0].toUpperCase() || 'U';
-
-    const currentAvatar = AVATAR_OPTIONS.find(a => a.id === profile?.avatar_url);
-
     return (
         <div className="min-h-screen pb-12 px-4 container mx-auto max-w-6xl">
             {/* Шапка профиля */}
@@ -49,15 +42,12 @@ const StudentDashboardPage = () => {
                 <div className="flex flex-col sm:flex-row items-center gap-6">
                     {/* Аватар */}
                     <div className="relative">
-                        {currentAvatar ? (
-                            <div className={`w-24 h-24 rounded-2xl bg-gradient-to-br ${currentAvatar.gradient} flex items-center justify-center text-4xl shadow-xl shadow-gaming-primary/20 border-2 border-white/10`}>
-                                {currentAvatar.emoji}
-                            </div>
-                        ) : (
-                            <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-gaming-primary via-gaming-purple to-gaming-pink flex items-center justify-center text-white font-heading font-bold text-3xl shadow-xl shadow-gaming-primary/20 border-2 border-white/10">
-                                {userInitials}
-                            </div>
-                        )}
+                        <UserAvatar
+                            avatarUrl={profile?.avatar_url}
+                            name={profile?.full_name || user?.email}
+                            size="xl"
+                            className="shadow-xl shadow-gaming-primary/20 border-2 border-white/10"
+                        />
                         <div className="absolute -bottom-2 -right-2 p-1.5 rounded-lg border border-gaming-primary/50 bg-gaming-primary/10">
                             <User className="text-gaming-primary" size={18} />
                         </div>

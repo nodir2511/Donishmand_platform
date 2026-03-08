@@ -24,20 +24,14 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, lang }) => {
 
     const Icon = QUESTION_ICONS[question.type] || List;
 
-    // Улучшенное определение текста вопроса с поддержкой устаревших данных
-    // Мы ИСКЛЮЧАЕМ устаревшие поля, если они содержат только числа (старые ID/последовательности/ответы вроде 25, 1234)
     const getQuestionText = () => {
-        const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
-        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
-
-        // Новые поля (textRu, textTj) - выводим как есть (не фильтруя через isNumeric, так как там может быть любой текст)
+        // Новые поля (textRu, textTj) - выводим как есть
         const primaryText = currentLang === 'tj' ? question.textTj : question.textRu;
         const secondaryText = currentLang === 'tj' ? question.textRu : question.textTj;
 
-        if (primaryText && stripHtmlTags(primaryText).length > 0) return primaryText;
-        if (secondaryText && stripHtmlTags(secondaryText).length > 0) return secondaryText;
+        if (primaryText) return primaryText;
+        if (secondaryText) return secondaryText;
 
-        // Для устаревших полей применяем фильтрацию isNumeric
         const legacyVariants = [
             question.question,
             question.text,
@@ -45,7 +39,7 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, lang }) => {
         ];
 
         for (const v of legacyVariants) {
-            if (v && !isNumeric(v)) return v;
+            if (v) return v;
         }
 
         return '';
@@ -53,7 +47,6 @@ const SortableQuestionItem = ({ question, index, onEdit, onDelete, lang }) => {
 
     const questionText = getQuestionText();
 
-    // Безопасное удаление HTML-тегов с использованием DOMParser или регулярных выражений
     const stripHtml = (html) => {
         if (!html) return '';
         // Заменяем блочные теги пробелом для предотвращения слипания слов

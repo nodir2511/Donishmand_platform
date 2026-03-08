@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { X, CheckCircle, XCircle, ArrowRight, ChevronLeft, ChevronRight, Trophy, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
+import { X, CheckCircle, XCircle, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
 import { shuffleArray } from '../../utils/shuffle';
 import { renderKatex } from '../../utils/katexRenderer';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import MultipleChoiceQuestion from './questions/MultipleChoiceQuestion';
+import MatchingQuestion from './questions/MatchingQuestion';
+import NumericQuestion from './questions/NumericQuestion';
+import TestResultsScreen from './questions/TestResultsScreen';
+import ComponentErrorBoundary from '../common/ComponentErrorBoundary';
 
 // Очистка объекта от undefined (PostgREST падает с ошибкой 400, если есть undefined)
 // Сохраняем Date объекты нетронутыми
@@ -207,9 +212,9 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     }, [answers, lockedQuestions, currentIndex, randomizedQuestions, showResults]);
 
     // Проверка заблокирован ли ответ на вопрос (блокируется только после перехода)
-    const isQuestionLocked = (questionId) => {
+    const isQuestionLocked = useCallback((questionId) => {
         return lockedQuestions.has(questionId);
-    };
+    }, [lockedQuestions]);
 
     // Заблокировать текущий вопрос (если ответ дан)
     const lockCurrentQuestion = () => {
@@ -222,9 +227,9 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     };
 
     // Обработка ответа для различных типов вопросов
-    const handleAnswer = (questionId, answer) => {
+    const handleAnswer = useCallback((questionId, answer) => {
         // Если ответ уже заблокирован — не разрешаем менять
-        if (isQuestionLocked(questionId)) return;
+        if (lockedQuestions.has(questionId)) return;
         setAnswers(prev => {
             const newAnswers = { ...prev, [questionId]: answer };
 
@@ -235,7 +240,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
             return newAnswers;
         });
-    };
+    }, [lockedQuestions]);
 
     // Навигация
     const goNext = () => {
@@ -386,7 +391,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     };
 
     // Перезапустить тест
-    const handleRestart = () => {
+    const handleRestart = useCallback(() => {
         localStorage.removeItem(progressKey); // Очищаем сохранённый прогресс
         setCurrentIndex(0);
         setAnswers({});
@@ -396,17 +401,17 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         setResults(null);
         setShowResults(false);
         setTestVersion(v => v + 1); // Перемешиваем заново при перезапуске
-    };
+    }, [progressKey]);
 
     // Получить текст вопроса в зависимости от языка (с поддержкой KaTeX-формул)
-    const getQuestionText = (q) => {
+    const getQuestionText = useCallback((q) => {
         const text = lang === 'tj' ? (q.textTj || q.textRu) : q.textRu;
         return renderKatex(text || '');
-    };
-    const getOptionText = (opt) => {
+    }, [lang]);
+    const getOptionText = useCallback((opt) => {
         const text = lang === 'tj' ? (opt.textTj || opt.textRu) : opt.textRu;
         return renderKatex(text || '');
-    };
+    }, [lang]);
 
     // Вспомогательный компонент для рендеринга текста с KaTeX
     const KatexText = ({ html, className = '', tag = 'span' }) => {
@@ -430,141 +435,14 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     // Экран результатов
     if (showResults && results) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-                <div className="w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 my-8">
-                    {/* Заголовок */}
-                    <div className="p-6 border-b border-white/10 text-center relative overflow-hidden">
-                        {results.isPassed ? (
-                            <>
-                                <div className="absolute inset-0 bg-green-500/10" />
-                                <div className="relative z-10">
-                                    <div className="w-24 h-24 mx-auto mb-4 bg-yellow-400 rounded-full flex items-center justify-center shadow-[0_0_30px_rgba(250,204,21,0.6)] animate-bounce">
-                                        <div className="w-20 h-20 border-4 border-yellow-600 rounded-full flex items-center justify-center bg-yellow-300">
-                                            <span className="text-4xl font-bold text-yellow-700">$</span>
-                                        </div>
-                                    </div>
-                                    <h2 className="text-3xl font-bold mb-2 text-green-400">
-                                        {lang === 'ru' ? 'Тест сдан!' : 'Тест супорида шуд!'}
-                                    </h2>
-                                    <p className="text-green-300/80 mb-2">
-                                        {lang === 'ru' ? '+1 монета в копилку' : '+1 танга ба хазина'}
-                                    </p>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <div className="absolute inset-0 bg-red-500/10" />
-                                <div className="relative z-10">
-                                    <XCircle size={64} className="mx-auto mb-4 text-red-500" />
-                                    <h2 className="text-3xl font-bold mb-2 text-red-400">
-                                        {lang === 'ru' ? 'Тест не сдан' : 'Тест супорида нашуд'}
-                                    </h2>
-                                    <p className="text-red-300/80 mb-2">
-                                        {lang === 'ru' ? `Нужно набрать минимум ${PASS_THRESHOLD}%` : `Бояд ҳадди аққал ${PASS_THRESHOLD}% гиред`}
-                                    </p>
-                                </div>
-                            </>
-                        )}
-
-                        <div className={`text-5xl font-bold mb-2 relative z-10 ${results.isPassed ? 'text-green-400' : 'text-red-400'}`}>
-                            {results.score}%
-                        </div>
-                        <p className="text-gaming-textMuted relative z-10">
-                            {results.correct} / {results.total} {lang === 'ru' ? 'правильных ответов' : 'ҷавоби дуруст'}
-                        </p>
-                    </div>
-
-                    {/* Детали ответов */}
-                    <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
-                        {results.details.map((detail, idx) => {
-                            // Поддержка двух форматов: серверного (is_correct, question.text)
-                            // и локального (isCorrect, question.textRu) — для режима учителя
-                            const isCorrect = detail.isCorrect ?? detail.is_correct ?? false;
-                            const q = detail.question || {};
-
-                            // Текст вопроса: новый формат (textRu/textTj) или серверный (text)
-                            const questionText = renderKatex(
-                                lang === 'tj'
-                                    ? (q.textTj || q.textRu || q.text || '')
-                                    : (q.textRu || q.text || '')
-                            );
-
-                            // Текст варианта ответа: аналогичный fallback
-                            const getOptText = (opt) => {
-                                if (!opt) return '';
-                                return renderKatex(
-                                    lang === 'tj'
-                                        ? (opt.textTj || opt.textRu || opt.text || '')
-                                        : (opt.textRu || opt.text || '')
-                                );
-                            };
-
-                            return (
-                                <div key={q.id || idx} className={`p-4 rounded-xl border ${isCorrect ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
-                                    <div className="flex items-start gap-3">
-                                        {isCorrect
-                                            ? <CheckCircle className="text-green-400 mt-1 shrink-0" size={20} />
-                                            : <XCircle className="text-red-400 mt-1 shrink-0" size={20} />
-                                        }
-                                        <div className="flex-1 min-w-0">
-                                            {/* Текст вопроса */}
-                                            <div className="font-medium mb-2 flex gap-1">
-                                                <span className="shrink-0">{idx + 1}.</span>
-                                                <div dangerouslySetInnerHTML={{ __html: questionText }} className="[&>p]:inline [&>p]:m-0" />
-                                            </div>
-
-                                            {/* Правильный ответ (только для неправильных) */}
-                                            {!isCorrect && (
-                                                <div className="text-sm text-green-400 mt-1">
-                                                    {q.type === 'multiple_choice' && (() => {
-                                                        const correctOpt = (q.options || []).find(o => o.id === q.correctId);
-                                                        return correctOpt ? (
-                                                            <div className="flex flex-wrap gap-1">
-                                                                <span>{lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}</span>
-                                                                <span className="font-semibold" dangerouslySetInnerHTML={{ __html: getOptText(correctOpt) }} />
-                                                            </div>
-                                                        ) : null;
-                                                    })()}
-
-                                                    {q.type === 'numeric' && (() => {
-                                                        const correctVal = (q.digits || []).join('');
-                                                        return correctVal ? (
-                                                            <span>
-                                                                {lang === 'ru' ? 'Правильный ответ: ' : 'Ҷавоби дуруст: '}
-                                                                <span className="font-bold font-mono">{correctVal}{q.unit ? ` ${q.unit}` : ''}</span>
-                                                            </span>
-                                                        ) : null;
-                                                    })()}
-
-                                                    {q.type === 'matching' && (
-                                                        <span className="text-gaming-textMuted text-xs italic">
-                                                            {lang === 'ru' ? 'Соответствие не совпало' : 'Мувофиқат дуруст набуд'}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Действия */}
-                    <div className="p-6 border-t border-white/10 flex gap-4 justify-center">
-                        <button onClick={handleRestart} className="flex items-center gap-2 px-6 py-3 bg-white/10 text-white rounded-xl hover:bg-white/20">
-                            <RotateCcw size={18} />
-                            {lang === 'ru' ? 'Пройти заново' : 'Аз нав'}
-                        </button>
-                        {results.isPassed && (
-                            <button onClick={() => { if (onComplete) onComplete(results); onClose(); }} className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 shadow-[0_0_15px_rgba(22,163,74,0.5)]">
-                                <CheckCircle size={18} />
-                                {lang === 'ru' ? 'Забрать награду' : 'Гирифтани мукофот'}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <TestResultsScreen
+                results={results}
+                lang={lang}
+                PASS_THRESHOLD={PASS_THRESHOLD}
+                onRestart={handleRestart}
+                onComplete={onComplete}
+                onClose={onClose}
+            />
         );
     }
 
@@ -652,186 +530,39 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                     )}
 
                     {/* Один из многих (выбор варианта) */}
-                    {currentQuestion.type === 'multiple_choice' && (() => {
-                        const locked = isQuestionLocked(currentQuestion.id);
-                        return (
-                            <div className="space-y-3">
-                                {locked && (
-                                    <div className="flex items-center gap-2 px-3 py-2 bg-white/5 rounded-lg text-sm text-gaming-textMuted">
-                                        <Lock size={14} />
-                                        <span>{lang === 'ru' ? 'Ответ зафиксирован' : 'Ҷавоб қайд шуд'}</span>
-                                    </div>
-                                )}
-                                {currentQuestion.options.map((opt, idx) => {
-                                    const isSelected = answers[currentQuestion.id] === opt.id;
-                                    return (
-                                        <button
-                                            key={opt.id}
-                                            onClick={() => handleAnswer(currentQuestion.id, opt.id)}
-                                            disabled={locked}
-                                            className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all text-left ${isSelected
-                                                ? 'bg-gaming-primary/20 border-gaming-primary'
-                                                : locked
-                                                    ? 'bg-white/5 border-white/5 opacity-40 cursor-not-allowed'
-                                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                                                }`}
-                                        >
-                                            <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 ${isSelected ? 'bg-gaming-primary text-white' : 'bg-white/10'}`}>
-                                                {String.fromCharCode(65 + idx)}
-                                            </span>
-                                            <div className="flex flex-col gap-2 w-full">
-                                                <span dangerouslySetInnerHTML={{ __html: getOptionText(opt) }} />
-                                                {opt.image && (
-                                                    <div className="rounded-lg overflow-hidden border border-white/10 bg-black/20 max-w-[200px]">
-                                                        <img src={opt.image} alt="Option" className="w-full h-auto object-cover" />
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {isSelected && locked && <Lock size={16} className="text-gaming-textMuted shrink-0" />}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        );
-                    })()}
+                    {currentQuestion.type === 'multiple_choice' && (
+                        <MultipleChoiceQuestion
+                            question={currentQuestion}
+                            answer={answers[currentQuestion.id]}
+                            isLocked={isQuestionLocked(currentQuestion.id)}
+                            lang={lang}
+                            onAnswer={handleAnswer}
+                            getOptionText={getOptionText}
+                        />
+                    )}
 
                     {/* Установление соответствия */}
                     {currentQuestion.type === 'matching' && (
-                        <div className="space-y-6">
-                            {/* Списки определений (Варианты) */}
-                            <div className="grid grid-cols-2 gap-4 pb-4 border-b border-white/10">
-                                <div className="space-y-2">
-                                    <p className="text-xs font-bold text-gaming-pink uppercase tracking-wider mb-2">
-                                        {lang === 'ru' ? 'Группа 1' : 'Гурӯҳи 1'}
-                                    </p>
-                                    {currentQuestion.leftItems.map((left, idx) => (
-                                        <div key={left.id} className="text-sm flex gap-2 items-baseline">
-                                            <span className="font-bold text-gaming-pink min-w-[20px]">{String.fromCharCode(65 + idx)})</span>
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(left) }} />
-                                                {left.image && (
-                                                    <img src={left.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="space-y-2">
-                                    <p className="text-xs font-bold text-gaming-accent uppercase tracking-wider mb-2">
-                                        {lang === 'ru' ? 'Группа 2' : 'Гурӯҳи 2'}
-                                    </p>
-                                    {currentQuestion.rightItems.map((right, idx) => (
-                                        <div key={right.id} className="text-sm flex gap-2 items-baseline">
-                                            <span className="font-bold text-gaming-accent min-w-[20px]">{idx + 1})</span>
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-gaming-textMuted leading-tight" dangerouslySetInnerHTML={{ __html: getOptionText(right) }} />
-                                                {right.image && (
-                                                    <img src={right.image} alt="Item" className="w-24 h-24 object-cover rounded-lg border border-white/10" />
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <p className="text-sm text-gaming-textMuted text-center">{lang === 'ru' ? 'Выберите соответствия в сетке:' : 'Мувофиқатро дар ҷадвал интихоб кунед:'}</p>
-
-                            {/* Сетка (Матрица) - уменьшенная */}
-                            <div className="flex justify-center">
-                                <div className="overflow-x-auto max-w-full pb-2">
-                                    <table className="border-separate border-spacing-1">
-                                        <thead>
-                                            <tr>
-                                                <th className="w-8"></th>
-                                                {currentQuestion.rightItems.map((right, idx) => (
-                                                    <th key={right.id} className="text-center font-bold text-gaming-accent text-sm p-1">
-                                                        {idx + 1}
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {currentQuestion.leftItems.map((left, idx) => (
-                                                <tr key={left.id}>
-                                                    <td className="text-center font-bold text-gaming-pink text-sm p-1">
-                                                        {String.fromCharCode(65 + idx)}
-                                                    </td>
-                                                    {currentQuestion.rightItems.map(right => {
-                                                        const isSelected = answers[currentQuestion.id]?.[left.id] === right.id;
-                                                        const matchingLocked = isQuestionLocked(currentQuestion.id);
-                                                        return (
-                                                            <td key={right.id} className="text-center p-0.5">
-                                                                <button
-                                                                    onClick={() => handleAnswer(currentQuestion.id, {
-                                                                        ...(answers[currentQuestion.id] || {}),
-                                                                        [left.id]: right.id
-                                                                    })}
-                                                                    disabled={matchingLocked}
-                                                                    className={`w-8 h-8 rounded-full border-2 transition-all flex items-center justify-center
-                                                                        ${isSelected
-                                                                            ? 'bg-gaming-primary border-gaming-primary'
-                                                                            : matchingLocked
-                                                                                ? 'bg-white/5 border-white/10 opacity-30 cursor-not-allowed'
-                                                                                : 'bg-white/5 border-white/20 hover:border-white/40'}`}
-                                                                >
-                                                                    {isSelected && <div className="w-3 h-3 bg-white rounded-full" />}
-                                                                </button>
-                                                            </td>
-                                                        );
-                                                    })}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
+                        <MatchingQuestion
+                            question={currentQuestion}
+                            answer={answers[currentQuestion.id]}
+                            isLocked={isQuestionLocked(currentQuestion.id)}
+                            lang={lang}
+                            onAnswer={handleAnswer}
+                            getOptionText={getOptionText}
+                        />
                     )}
 
                     {/* Числовой ответ */}
-                    {currentQuestion.type === 'numeric' && (() => {
-                        const numericLocked = isQuestionLocked(currentQuestion.id);
-                        return (
-                            <div className="space-y-4">
-                                <p className="text-sm text-gaming-textMuted">
-                                    {numericLocked
-                                        ? <span className="flex items-center gap-2"><Lock size={14} /> {lang === 'ru' ? 'Ответ зафиксирован' : 'Ҷавоб қайд шуд'}</span>
-                                        : (lang === 'ru' ? 'Введите ответ:' : 'Ҷавобро ворид кунед:')}
-                                </p>
-                                <div className="flex items-center justify-center gap-2">
-                                    {[0, 1, 2, 3].map(idx => (
-                                        <input
-                                            key={idx}
-                                            type="text"
-                                            maxLength={1}
-                                            disabled={numericLocked}
-                                            value={(answers[currentQuestion.id] || '')[idx] || ''}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val && !/^\d$/.test(val)) return;
-                                                const current = answers[currentQuestion.id] || '';
-                                                const arr = current.split('');
-                                                arr[idx] = val;
-                                                handleAnswer(currentQuestion.id, arr.join(''));
-                                                // Автофокус на следующий ввод
-                                                if (val && idx < 3) {
-                                                    const next = e.target.nextElementSibling;
-                                                    if (next) next.focus();
-                                                }
-                                            }}
-                                            className={`w-14 h-14 text-center text-2xl font-bold rounded-lg text-white focus:outline-none ${numericLocked
-                                                ? 'bg-gaming-bg/50 border-2 border-gaming-primary/30 opacity-70 cursor-not-allowed'
-                                                : 'bg-gaming-bg/50 border-2 border-white/20 focus:border-gaming-primary'
-                                                }`}
-                                        />
-                                    ))}
-                                    {currentQuestion.unit && (
-                                        <span className="text-xl text-gaming-textMuted ml-2">{currentQuestion.unit}</span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    {currentQuestion.type === 'numeric' && (
+                        <NumericQuestion
+                            question={currentQuestion}
+                            answer={answers[currentQuestion.id]}
+                            isLocked={isQuestionLocked(currentQuestion.id)}
+                            lang={lang}
+                            onAnswer={handleAnswer}
+                        />
+                    )}
                 </div>
 
                 {/* Подвал */}
@@ -881,5 +612,10 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         </div>
     );
 };
-
-export default TestViewer;
+export default function WrappedTestViewer(props) {
+    return (
+        <ComponentErrorBoundary>
+            <TestViewer {...props} />
+        </ComponentErrorBoundary>
+    );
+}

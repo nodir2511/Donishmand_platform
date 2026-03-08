@@ -14,13 +14,12 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
     // Локальное состояние формы с поддержкой устаревших данных
     const [q, setQ] = useState(() => {
         const stripHtmlTags = (val) => val ? val.toString().replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim() : '';
-        const isNumeric = (val) => { const s = stripHtmlTags(val); return s !== '' && /^\d+$/.test(s); };
         const getValidLegacyText = (qObj) => {
             if (!qObj) return '';
-            // Проверяем все возможные поля на наличие нечислового текста
+            // Проверяем все возможные резервные поля
             const variants = [qObj.question, qObj.text, qObj.title];
             for (const v of variants) {
-                if (v && !isNumeric(v)) return v;
+                if (v) return v;
             }
             return '';
         };

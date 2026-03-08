@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../contexts/AuthContext';
 import { supabase } from '../../../services/supabase';
 import { studentService } from '../../../services/studentService';
+import { cleanUndefined } from '../../../utils/cleanUndefined';
 import { CLUSTERS_STRUCTURE, AVATAR_OPTIONS } from '../../../constants/data';
 import {
     User, Mail, Phone, Calendar, School, BookOpen,
     Save, Loader2, CheckCircle, AlertCircle, GraduationCap,
     Languages, Lock, Eye, EyeOff, Image, ShieldCheck, Info
 } from 'lucide-react';
+import UserAvatar from '../../common/UserAvatar';
 
 // Поля, которые блокируются после заполнения (ученик вводит 1 раз)
 const LOCKED_FIELDS = ['full_name', 'phone', 'birth_date', 'school', 'grade', 'branch', 'cluster_id'];
@@ -111,9 +113,11 @@ const SettingsTab = () => {
             updates.language = formData.language;
             updates.group_name = formData.group_name || null;
 
+            const cleanUpdates = cleanUndefined(updates);
+
             const { error } = await supabase
                 .from('profiles')
-                .update(updates)
+                .update(cleanUpdates)
                 .eq('id', user.id);
 
             if (error) throw error;
@@ -167,12 +171,6 @@ const SettingsTab = () => {
             setAvatarSaving(false);
         }
     };
-
-    const userInitials = profile?.full_name
-        ? profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-        : user?.email?.[0].toUpperCase() || 'U';
-
-    const currentAvatar = AVATAR_OPTIONS.find(a => a.id === selectedAvatar);
 
     // Вспомогательная функция для рендера инпута с логикой блокировки
     const renderInput = ({ fieldName, type = 'text', placeholder, icon: Icon, label, children }) => {
@@ -276,15 +274,12 @@ const SettingsTab = () => {
                     </h2>
 
                     <div className="flex items-center gap-4 mb-4">
-                        {currentAvatar ? (
-                            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${currentAvatar.gradient} flex items-center justify-center text-3xl shadow-lg border-2 border-white/10`}>
-                                {currentAvatar.emoji}
-                            </div>
-                        ) : (
-                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gaming-primary to-gaming-pink flex items-center justify-center text-white font-bold text-xl shadow-lg border-2 border-white/10">
-                                {userInitials}
-                            </div>
-                        )}
+                        <UserAvatar
+                            avatarUrl={selectedAvatar}
+                            name={profile?.full_name || user?.email}
+                            size="lg"
+                            className="shadow-lg border-2 border-white/10"
+                        />
 
                         <button
                             onClick={() => setShowAvatarPicker(!showAvatarPicker)}

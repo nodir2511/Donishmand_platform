@@ -242,34 +242,36 @@ const ClassSettingsTab = ({ classData, onUpdate }) => {
                         <p className="text-xs text-gaming-textMuted mb-3">
                             Ученики и другие преподаватели могут использовать этот код на странице "Классы", чтобы автоматически присоединиться к этому классу.
                         </p>
-                        <div className="flex items-center gap-3">
-                            <div className="relative flex-1 max-w-sm">
-                                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                <input
-                                    type="text"
-                                    value={inviteCode || 'Нет кода'}
-                                    readOnly
-                                    className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-gaming-primary font-bold tracking-wider focus:outline-none"
-                                />
-                            </div>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                            <div className="flex gap-2 w-full sm:flex-1 max-w-sm">
+                                <div className="relative flex-1">
+                                    <LinkIcon className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                    <input
+                                        type="text"
+                                        value={inviteCode || 'Нет кода'}
+                                        readOnly
+                                        className="w-full bg-black/50 border border-white/10 rounded-xl py-3 pl-10 sm:pl-12 pr-2 sm:pr-4 text-gaming-primary font-bold tracking-wider focus:outline-none text-center sm:text-left"
+                                    />
+                                </div>
 
-                            {inviteCode && (
-                                <button
-                                    type="button"
-                                    onClick={handleCopyCode}
-                                    className="p-3 bg-white/5 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors"
-                                    title="Скопировать"
-                                >
-                                    <Copy size={20} />
-                                </button>
-                            )}
+                                {inviteCode && (
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyCode}
+                                        className="p-3 bg-white/5 text-gray-300 hover:text-white rounded-xl hover:bg-white/10 transition-colors shrink-0"
+                                        title="Скопировать"
+                                    >
+                                        <Copy size={20} />
+                                    </button>
+                                )}
+                            </div>
 
                             {canEditSettings && (
                                 <button
                                     type="button"
                                     onClick={handleGenerateCode}
                                     disabled={isSaving}
-                                    className="px-4 py-3 bg-gaming-primary/10 text-gaming-primary hover:bg-gaming-primary hover:text-white rounded-xl transition-colors font-medium flex items-center gap-2"
+                                    className="px-4 py-3 bg-gaming-primary/10 text-gaming-primary hover:bg-gaming-primary hover:text-white rounded-xl transition-colors font-medium flex justify-center items-center gap-2 w-full sm:w-auto shrink-0"
                                 >
                                     <RefreshCw size={18} className={isSaving ? 'animate-spin' : ''} />
                                     {inviteCode ? 'Сгенерировать новый' : 'Создать код'}
@@ -335,11 +337,11 @@ const ClassSettingsTab = ({ classData, onUpdate }) => {
                         <div className="bg-white/5 border border-gaming-primary/30 rounded-xl p-4 flex items-center justify-between">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-full bg-gaming-primary/20 flex items-center justify-center text-gaming-primary font-bold">
-                                    {classData.teacher?.full_name?.[0]?.toUpperCase() || 'T'}
+                                    {(Array.isArray(classData.teacher) ? classData.teacher[0]?.full_name : classData.teacher?.full_name)?.[0]?.toUpperCase() || 'T'}
                                 </div>
                                 <div>
                                     <div className="font-medium flex items-center gap-2">
-                                        {classData.teacher?.full_name || 'Неизвестный'}
+                                        {(Array.isArray(classData.teacher) ? classData.teacher[0]?.full_name : classData.teacher?.full_name) || 'Неизвестный'}
                                         <span className="px-2 py-0.5 bg-gaming-primary/20 text-gaming-primary text-xs rounded-full flex items-center gap-1 border border-gaming-primary/30">
                                             <Shield size={12} /> Создатель
                                         </span>

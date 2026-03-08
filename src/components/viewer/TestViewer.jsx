@@ -340,7 +340,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 // Сбор монет в localStorage для мгновенного отображения
                 if (serverResults.isPassed) {
                     const currentCoins = parseInt(localStorage.getItem('user_coins') || '0');
-                    localStorage.setItem('user_coins', (currentCoins + 1).toString());
+                    localStorage.setItem('user_coins', (currentCoins + 3).toString());
                 }
 
                 // Локальная история для графика успеваемости

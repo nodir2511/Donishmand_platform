@@ -41,6 +41,7 @@ const ClassDetailsPage = lazyWithRetry(() => import('./components/pages/classes/
 
 const ProfilePage = lazyWithRetry(() => import('./components/pages/ProfilePage'));
 const StudentDashboardPage = lazyWithRetry(() => import('./components/pages/StudentDashboardPage'));
+const LeaderboardPage = lazyWithRetry(() => import('./components/pages/LeaderboardPage'));
 const AboutPage = lazyWithRetry(() => import('./components/pages/AboutPage'));
 const NotFoundPage = lazyWithRetry(() => import('./components/pages/NotFoundPage'));
 
@@ -128,6 +129,16 @@ function AppContent() {
                             element={
                                 <ProtectedRoute>
                                     <StudentDashboardPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        {/* Лидерборд */}
+                        <Route
+                            path="/leaderboard"
+                            element={
+                                <ProtectedRoute>
+                                    <LeaderboardPage />
                                 </ProtectedRoute>
                             }
                         />

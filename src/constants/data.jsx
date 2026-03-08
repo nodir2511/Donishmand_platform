@@ -58,7 +58,13 @@ export const CLUSTERS_STRUCTURE = [
     { id: 2, titleRu: "Экономика и Гео.", titleTj: "Иқтисод ва География", subjects: ['tj-lang', 'math', 'geo', 'eng', 'fra', 'ger', 'ara'] },
     { id: 3, titleRu: "Филология и Искусство", titleTj: "Филология ва Санъат", subjects: ['tj-lang', 'hist', 'lit', 'eng', 'fra', 'ger', 'ara'] },
     { id: 4, titleRu: "Общество и Право", titleTj: "Ҷомеашиносӣ ва Ҳуқуқ", subjects: ['tj-lang', 'hist', 'eng', 'fra', 'ger', 'ara'] },
-    { id: 5, titleRu: "Медицина и Биология", titleTj: "Тиб ва Биология", subjects: ['tj-lang', 'bio', 'chem', 'phys'] }
+    { id: 5, titleRu: "Медицина и Биология", titleTj: "Тиб ва Биология", subjects: ['tj-lang', 'chem', 'bio', 'phys'] },
 ];
+
+export const SUBJECTS_DATA = Object.entries(SUBJECT_NAMES).map(([id, names]) => ({
+    id,
+    nameRu: names.ru,
+    nameTj: names.tj,
+}));
 
 export const ALL_SUBJECTS_LIST = Object.keys(SUBJECT_CONFIG);

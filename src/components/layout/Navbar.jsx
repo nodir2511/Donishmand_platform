@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sparkles, User, LogOut, ChevronDown, BarChart3 } from 'lucide-react';
+import { Menu, X, Sparkles, User, LogOut, ChevronDown, BarChart3, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import UserAvatar from '../common/UserAvatar';
@@ -93,6 +93,14 @@ const Navbar = () => {
                             {t('navAbout')}
                             <span className={`absolute bottom-1 left-1/2 h-0.5 bg-gaming-accent -translate-x-1/2 transition-all duration-300 ${isActive('/about') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
                         </Link>
+
+                        {/* Ссылка Лидерборд */}
+                        {user && (
+                            <Link to="/leaderboard" className={`px-5 py-2 text-sm font-medium transition-colors relative group border-l border-white/10 ml-2 pl-6 flex items-center gap-1.5 ${isActive('/leaderboard') ? 'text-yellow-400' : 'text-gaming-textMuted hover:text-yellow-400'}`}>
+                                <Trophy className="w-4 h-4" /> Лидерборд
+                                <span className={`absolute bottom-1 left-1/2 h-0.5 bg-yellow-400 -translate-x-1/2 transition-all duration-300 ${isActive('/leaderboard') ? 'w-1/2' : 'w-0 group-hover:w-1/2'}`}></span>
+                            </Link>
+                        )}
 
                         {/* Ссылка Классы: для всех авторизованных (Ученики видят "Мой класс", учителя "Классы") */}
                         {user && (
@@ -224,6 +232,13 @@ const Navbar = () => {
                         <Link to="/about" onClick={() => setIsOpen(false)} className={`font-medium px-4 py-2 rounded-lg transition-colors ${isActive('/about') ? 'text-white bg-white/5' : 'text-white/80 hover:text-white hover:bg-white/5'}`}>
                             {t('navAbout')}
                         </Link>
+
+                        {/* Ссылка Лидерборд (мобильное) */}
+                        {user && (
+                            <Link to="/leaderboard" onClick={() => setIsOpen(false)} className={`flex items-center gap-2 font-medium px-4 py-2 rounded-lg transition-colors border-l-2 border-yellow-500 ml-2 ${isActive('/leaderboard') ? 'text-yellow-400 bg-white/5' : 'text-white/80 hover:text-yellow-400 hover:bg-white/5'}`}>
+                                <Trophy className="w-4 h-4" /> Лидерборд
+                            </Link>
+                        )}
 
                         {/* Ссылка Классы (мобильное) */}
                         {user && (

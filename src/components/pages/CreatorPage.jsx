@@ -747,7 +747,7 @@ const CreatorPage = () => {
     const getAllTopics = () => currentSubjectSyllabus.sections.flatMap(s => s.topics.map(t => ({ ...t, sectionTitle: s.title })));
 
     return (
-        <div className="min-h-screen bg-gaming-bg font-sans text-white p-6">
+        <div className="min-h-screen bg-gaming-bg font-sans text-white p-3 sm:p-6">
             {/* Шапка */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
                 <button onClick={() => navigate('/')} className="flex items-center gap-2 text-gaming-textMuted hover:text-white transition-colors self-start">
@@ -803,7 +803,7 @@ const CreatorPage = () => {
             </div>
 
             {/* Область контента */}
-            <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-3xl p-4 sm:p-6">
+            <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Layers className="text-gaming-primary" size={24} />
@@ -845,10 +845,17 @@ const CreatorPage = () => {
                                 {currentSubjectSyllabus.sections.map((section, sectionIndex) => (
                                     <SortableSection key={section.id} section={section} sectionIndex={sectionIndex} lang={lang} onDelete={handleDeleteSection}>
                                         <div className="flex-1">
-                                            <div className="flex items-center justify-between group/row">
-                                                <div className="flex-1 flex items-center gap-3 cursor-pointer" onClick={() => toggleSection(section.id)}>
-                                                    {expandedSections[section.id] ? <ChevronDown size={20} className="text-gaming-primary" /> : <ChevronRight size={20} className="text-gaming-textMuted" />}
-                                                    <span className="text-lg font-semibold">{sectionIndex + 1}. {lang === 'tj' ? (section.titleTj || section.title) : section.title}</span>
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between group/row gap-2 sm:gap-2">
+                                                <div className="flex-1 flex items-start sm:items-center gap-2 sm:gap-3 cursor-pointer min-w-0" onClick={() => toggleSection(section.id)}>
+                                                    <div className="mt-1 sm:mt-0 shrink-0">
+                                                        {expandedSections[section.id] ? <ChevronDown size={20} className="text-gaming-primary" /> : <ChevronRight size={20} className="text-gaming-textMuted" />}
+                                                    </div>
+                                                    <span className="text-base sm:text-lg font-semibold break-words leading-tight flex-1">
+                                                        {sectionIndex + 1}. {lang === 'tj' ? (section.titleTj || section.title) : section.title}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-end w-full sm:w-auto gap-2 shrink-0 border-t border-white/5 sm:border-none pt-2 sm:pt-0 mt-2 sm:mt-0 text-xs sm:text-sm text-gaming-textMuted">
+                                                    <span className="mr-2">({section.topics?.length || 0} {t('creator.themes')})</span>
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();
@@ -859,23 +866,20 @@ const CreatorPage = () => {
                                                                 titleTj: section.titleTj || ''
                                                             });
                                                         }}
-                                                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
+                                                        className="p-1.5 sm:p-2 text-gaming-textMuted hover:text-gaming-accent sm:opacity-0 group-hover/row:opacity-100 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded-lg"
                                                         title={t('creator.editTitle')}
                                                     >
                                                         <Edit3 size={16} />
                                                     </button>
-                                                    <span className="text-sm text-gaming-textMuted">({section.topics?.length || 0} {t('creator.themes')})</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }} className="p-2 text-gaming-textMuted hover:text-red-400 transition-colors">
-                                                        <Trash2 size={18} />
+                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSection(section.id); }} className="p-1.5 sm:p-2 text-gaming-textMuted hover:text-red-400 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded-lg">
+                                                        <Trash2 size={16} sm:size={18} />
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {expandedSections[section.id] && (
-                                                <div className="mt-4 ml-8">
-                                                    <button onClick={() => setShowAddTopic(section.id)} className="flex items-center gap-2 px-3 py-2 mb-4 text-sm text-gaming-accent hover:bg-gaming-accent/10 rounded-lg transition-colors">
+                                                <div className="mt-3 sm:mt-4 ml-3 sm:ml-8 pl-3 sm:pl-0 border-l border-white/5 sm:border-none">
+                                                    <button onClick={() => setShowAddTopic(section.id)} className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 mb-4 text-sm bg-gaming-accent/5 sm:bg-transparent text-gaming-accent hover:bg-gaming-accent/10 rounded-xl sm:rounded-lg transition-colors w-full sm:w-auto mt-2 sm:mt-0">
                                                         <Plus size={16} />{t('creator.addTopic')}
                                                     </button>
 
@@ -901,11 +905,18 @@ const CreatorPage = () => {
                                                             <div className="space-y-3">
                                                                 {section.topics.map((topic, topicIndex) => (
                                                                     <SortableTopic key={topic.id} topic={topic} topicIndex={topicIndex} sectionIndex={sectionIndex}>
-                                                                        <div className="flex-1">
-                                                                            <div className="flex items-center justify-between group/row">
-                                                                                <div className="flex-1 flex items-center gap-2 cursor-pointer" onClick={() => toggleTopic(topic.id)}>
-                                                                                    {expandedTopics[topic.id] ? <ChevronDown size={16} className="text-gaming-accent" /> : <ChevronRight size={16} className="text-gaming-textMuted" />}
-                                                                                    <span className="font-medium">{sectionIndex + 1}.{topicIndex + 1}. {lang === 'tj' ? (topic.titleTj || topic.title) : topic.title}</span>
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between group/row gap-2">
+                                                                                <div className="flex-1 flex items-start sm:items-center gap-2 cursor-pointer min-w-0" onClick={() => toggleTopic(topic.id)}>
+                                                                                    <div className="mt-0.5 sm:mt-0 shrink-0">
+                                                                                        {expandedTopics[topic.id] ? <ChevronDown size={16} className="text-gaming-accent" /> : <ChevronRight size={16} className="text-gaming-textMuted" />}
+                                                                                    </div>
+                                                                                    <span className="font-medium text-sm sm:text-base break-words line-clamp-2 leading-tight flex-1">
+                                                                                        {sectionIndex + 1}.{topicIndex + 1}. {lang === 'tj' ? (topic.titleTj || topic.title) : topic.title}
+                                                                                    </span>
+                                                                                </div>
+                                                                                <div className="flex items-center justify-end w-full sm:w-auto gap-2 shrink-0 border-t border-white/5 sm:border-none pt-2 sm:pt-0 mt-1 sm:mt-0">
+                                                                                    <span className="text-xs text-gaming-textMuted mr-1 sm:mr-2">({topic.lessons?.length || 0} {t('creator.lessons')})</span>
                                                                                     <button
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
@@ -917,26 +928,23 @@ const CreatorPage = () => {
                                                                                                 titleTj: topic.titleTj || ''
                                                                                             });
                                                                                         }}
-                                                                                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors sm:opacity-0 group-hover/row:opacity-100"
+                                                                                        className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-gaming-accent sm:opacity-0 group-hover/row:opacity-100 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded"
                                                                                         title={t('creator.editTitle')}
                                                                                     >
                                                                                         <Edit3 size={14} />
                                                                                     </button>
-                                                                                    <span className="text-xs text-gaming-textMuted">({topic.lessons?.length || 0} {t('creator.lessons')})</span>
-                                                                                </div>
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <button onClick={(e) => { e.stopPropagation(); setMoveModal({ type: 'topic', id: topic.id, fromSectionId: section.id }); }} className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors" title={t('creator.move')}>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); setMoveModal({ type: 'topic', id: topic.id, fromSectionId: section.id }); }} className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-gaming-accent transition-colors bg-gaming-bg/50 sm:bg-transparent rounded" title={t('creator.move')}>
                                                                                         <ArrowRightLeft size={14} />
                                                                                     </button>
-                                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTopic(section.id, topic.id); }} className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors">
+                                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTopic(section.id, topic.id); }} className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-red-400 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded">
                                                                                         <Trash2 size={16} />
                                                                                     </button>
                                                                                 </div>
                                                                             </div>
 
                                                                             {expandedTopics[topic.id] && (
-                                                                                <div className="mt-3 ml-6">
-                                                                                    <button onClick={() => setShowAddLesson({ sectionId: section.id, topicId: topic.id })} className="flex items-center gap-2 px-2 py-1 mb-3 text-xs text-gaming-pink hover:bg-gaming-pink/10 rounded-lg transition-colors">
+                                                                                <div className="mt-2 sm:mt-3 ml-2 sm:ml-6 pl-2 sm:pl-0 border-l border-white/5 sm:border-none">
+                                                                                    <button onClick={() => setShowAddLesson({ sectionId: section.id, topicId: topic.id })} className="flex items-center justify-center sm:justify-start gap-2 px-3 py-2.5 mb-3 text-sm bg-gaming-pink/5 sm:bg-transparent text-gaming-pink hover:bg-gaming-pink/10 rounded-xl sm:rounded-lg transition-colors w-full sm:w-auto mt-2 sm:mt-0">
                                                                                         <Plus size={14} />{t('creator.addLesson')}
                                                                                     </button>
 

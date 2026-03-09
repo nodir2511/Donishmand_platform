@@ -24,9 +24,9 @@ export const SortableSection = ({ section, sectionIndex, children, onDelete }) =
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="bg-gaming-bg/30 rounded-2xl border border-white/5 overflow-hidden">
-            <div className="flex items-center p-4">
-                <div {...attributes} {...listeners} className="cursor-grab mr-3 text-gaming-textMuted hover:text-white">
+        <div ref={setNodeRef} style={style} className="bg-gaming-bg/30 rounded-2xl sm:rounded-2xl border border-white/5 overflow-hidden">
+            <div className="flex items-start sm:items-center p-2 sm:p-4 gap-2 sm:gap-3">
+                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0 mt-1 sm:mt-0">
                     <GripVertical size={18} />
                 </div>
                 {children}
@@ -46,9 +46,9 @@ export const SortableTopic = ({ topic, topicIndex, sectionIndex, children }) => 
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="bg-gaming-card/40 rounded-xl border border-white/5 overflow-hidden">
-            <div className="flex items-center p-3">
-                <div {...attributes} {...listeners} className="cursor-grab mr-2 text-gaming-textMuted hover:text-white">
+        <div ref={setNodeRef} style={style} className="bg-gaming-card/40 rounded-xl border border-white/5 overflow-hidden w-full">
+            <div className="flex items-start sm:items-center p-1.5 sm:p-3 gap-2 sm:gap-2">
+                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0 mt-1 sm:mt-0 block">
                     <GripVertical size={16} />
                 </div>
                 {children}
@@ -78,42 +78,42 @@ const SortableLessonInner = ({ lesson, lessonIndex, sectionIndex, topicIndex, on
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="flex items-center justify-between gap-3 p-2 bg-gaming-bg/30 rounded-lg border border-white/5">
+        <div ref={setNodeRef} style={style} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-1.5 sm:p-2 bg-gaming-bg/30 rounded-lg border border-white/5 group">
             <div
-                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer group hover:bg-white/5 p-1 rounded-md transition-colors"
+                className="flex-1 min-w-0 flex items-start sm:items-center gap-1.5 sm:gap-2 cursor-pointer hover:bg-white/5 p-1 rounded-md transition-colors"
                 onClick={() => onEdit(lesson)}
                 title={t('creator.clickToEdit')}
             >
-                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0" onClick={(e) => e.stopPropagation()}>
+                <div {...attributes} {...listeners} className="cursor-grab text-gaming-textMuted hover:text-white shrink-0 mt-0.5 sm:mt-0" onClick={(e) => e.stopPropagation()}>
                     <GripVertical size={14} />
                 </div>
 
                 {/* Иконки типов контента */}
-                <div className="flex gap-1 shrink-0">
+                <div className="flex gap-1 shrink-0 mt-0.5 sm:mt-0">
                     {contentTypes.map(type => {
                         const Icon = getLessonIcon(type);
                         return <Icon key={type} size={14} className="text-gaming-pink/70" title={t(LESSON_TYPES.find(lt => lt.id === type)?.label)} />;
                     })}
                 </div>
 
-                <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-sm truncate block group-hover:text-gaming-primary transition-colors">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-sm font-medium break-words line-clamp-2 leading-tight w-full hover:text-gaming-primary transition-colors">
                         {sectionIndex + 1}.{topicIndex + 1}.{lessonIndex + 1}. {lang === 'tj' ? (lesson.titleTj || lesson.title) : lesson.title}
                     </span>
-                    <button
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'rename'); }}
-                        className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors shrink-0 sm:opacity-0 group-hover:opacity-100"
-                        title={t('creator.editTitle')}
-                    >
-                        <Edit3 size={12} />
-                    </button>
                 </div>
             </div>
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center justify-end w-full sm:w-auto gap-2 shrink-0 bg-transparent sm:bg-transparent px-1 sm:px-0 py-1 sm:py-0 border-t border-white/5 sm:border-none pt-2 sm:pt-0 mt-1 sm:mt-0">
+                <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'rename'); }}
+                    className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-gaming-accent sm:opacity-0 group-hover:opacity-100 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded"
+                    title={t('creator.editTitle')}
+                >
+                    <Edit3 size={14} />
+                </button>
                 <button
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(lesson, 'move'); }}
-                    className="p-1 text-gaming-textMuted hover:text-gaming-accent transition-colors"
+                    className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-gaming-accent transition-colors bg-gaming-bg/50 sm:bg-transparent rounded"
                     title={t('creator.move')}
                 >
                     <ArrowRightLeft size={14} />
@@ -121,7 +121,7 @@ const SortableLessonInner = ({ lesson, lessonIndex, sectionIndex, topicIndex, on
 
                 <button
                     onClick={(e) => { e.stopPropagation(); onDelete(lesson.id); }}
-                    className="p-1 text-gaming-textMuted hover:text-red-400 transition-colors"
+                    className="p-1 sm:p-1.5 text-gaming-textMuted hover:text-red-400 transition-colors bg-gaming-bg/50 sm:bg-transparent rounded"
                     title={t('creator.delete')}
                 >
                     <Trash2 size={14} />

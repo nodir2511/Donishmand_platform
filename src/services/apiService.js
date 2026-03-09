@@ -110,14 +110,15 @@ export const classService = {
 
         const result = data.map(item => {
             const cls = Array.isArray(item.classes) ? item.classes[0] : item.classes;
+            const th = Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher;
             return {
                 ...cls,
-                teacher: Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher,
+                teacher: th,
                 joinedAt: item.joined_at
             };
         });
 
-        const isProfileMissing = (p) => !p || (Array.isArray(p) && p.length === 0);
+        const isProfileMissing = (p) => !p || Object.keys(p).length === 0 || !p.full_name;
         const missingTeacherIds = result.filter(c => isProfileMissing(c.teacher) && c.teacher_id).map(c => c.teacher_id);
 
         if (missingTeacherIds.length > 0) {
@@ -150,8 +151,10 @@ export const classService = {
             .single();
         if (error) throw error;
         if (!data) return null;
+        
         if (Array.isArray(data.teacher)) data.teacher = data.teacher[0];
-        const isProfileMissing = (p) => !p || (Array.isArray(p) && p.length === 0);
+
+        const isProfileMissing = (p) => !p || Object.keys(p).length === 0 || !p.full_name;
         if (isProfileMissing(data.teacher) && data.teacher_id) {
             try {
                 const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');

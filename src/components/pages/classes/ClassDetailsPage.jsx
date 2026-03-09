@@ -142,7 +142,7 @@ const ClassDetailsPage = () => {
                         </div>
                         <div className="text-gaming-textMuted flex items-center gap-2">
                             <Users size={16} />
-                            <span>{isTeacherOrAdmin ? `${classData.class_members?.[0]?.count || 0} учеников` : `Учитель: ${(Array.isArray(classData.teacher) ? classData.teacher[0]?.full_name : classData.teacher?.full_name) || 'Неизвестно'}`}</span>
+                            <span>{isTeacherOrAdmin ? `${classData.class_members?.[0]?.count || 0} учеников` : `Учитель: ${classData.teacher?.full_name || 'Неизвестен'}`}</span>
                         </div>
                     </div>
 

@@ -210,7 +210,7 @@ const ClassDetailsPage = () => {
                     {/* Контент активной вкладки */}
                     <div className="animate-fade-in">
                         {activeTab === 'grades' && (
-                            <ClassGradesTab classId={classId} isStudent={isStudent} studentId={isStudent ? user.id : null} />
+                            <ClassGradesTab classId={classId} classData={classData} isStudent={isStudent} studentId={isStudent ? user.id : null} />
                         )}
 
                         {activeTab === 'students' && isTeacherOrAdmin && (

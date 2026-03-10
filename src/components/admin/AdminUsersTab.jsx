@@ -58,6 +58,11 @@ const AdminUsersTab = () => {
         class_id: ''
     });
 
+    // Состояния модального окна удаления
+    const [userToDelete, setUserToDelete] = useState(null);
+    const [deletingUser, setDeletingUser] = useState(false);
+    const [deleteError, setDeleteError] = useState('');
+
     const [availableClasses, setAvailableClasses] = useState([]);
 
     // Состояния модального окна редактирования
@@ -151,29 +156,34 @@ const AdminUsersTab = () => {
         }
     };
 
-    const handleDeleteUser = async (user) => {
+    const handleDeleteUserRequest = (user) => {
         if (!isSuperAdmin) {
             alert('Только супер-администратор может удалять пользователей');
             return;
         }
-        if (!window.confirm(`Вы уверены, что хотите удалить пользователя ${user.email}? Это действие необратимо и удалит все связанные данные (если настроено каскадное удаление).`)) {
-            return;
-        }
+        setUserToDelete(user);
+        setDeleteError('');
+    };
 
-        setUpdating(user.id);
+    const confirmDeleteUser = async () => {
+        if (!userToDelete) return;
+        setDeletingUser(true);
+        setDeleteError('');
+
         try {
             const { error } = await supabase.rpc('admin_delete_user', {
-                target_user_id: user.id
+                target_user_id: userToDelete.id
             });
 
             if (error) throw error;
 
-            setUsers(users.filter(u => u.id !== user.id));
+            setUsers(users.filter(u => u.id !== userToDelete.id));
+            setUserToDelete(null); // Закрываем модалку при успехе
         } catch (error) {
             console.error('Ошибка удаления пользователя:', error);
-            alert('Не удалось удалить пользователя. Возможно, функция admin_delete_user не установлена в Supabase.');
+            setDeleteError('Не удалось удалить пользователя. Возможно, функция admin_delete_user не установлена в Supabase.');
         } finally {
-            setUpdating(null);
+            setDeletingUser(false);
         }
     };
 
@@ -571,7 +581,7 @@ const AdminUsersTab = () => {
                                                         {/* Кнопка «Удалить» для Супер-Админа */}
                                                         {isSuperAdmin && (
                                                             <button
-                                                                onClick={() => handleDeleteUser(user)}
+                                                                onClick={() => handleDeleteUserRequest(user)}
                                                                 title="Удалить пользователя"
                                                                 className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 hover:bg-red-500/20 transition-all hover:scale-105 active:scale-95"
                                                             >
@@ -1094,6 +1104,83 @@ const AdminUsersTab = () => {
                                 className="bg-gaming-primary hover:bg-gaming-primary-hover text-white px-6 py-2 rounded-xl transition-colors disabled:opacity-50"
                             >
                                 {savingPerms ? 'Сохранение...' : 'Сохранить'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ========== МОДАЛКА: Подтверждение удаления ========== */}
+            {userToDelete && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+                    <div
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        onClick={() => !deletingUser && setUserToDelete(null)}
+                    />
+                    <div className="relative bg-gaming-card border border-red-500/30 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-red-500/20 animate-fade-in-up">
+                        <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-red-500/10 text-red-500 rounded-xl border border-red-500/30">
+                                    <ShieldAlert size={28} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-heading font-bold text-white">Удаление пользователя</h2>
+                                    <p className="text-sm text-gaming-textMuted mt-1">Это действие необратимо</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setUserToDelete(null)}
+                                disabled={deletingUser}
+                                className="text-gray-400 hover:text-white transition-colors p-1"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="bg-black/30 border border-white/5 rounded-xl p-4 mb-6">
+                            <p className="text-white font-medium mb-1">
+                                {userToDelete.full_name || 'Без имени'}
+                            </p>
+                            <p className="text-sm text-gaming-textMuted truncate">
+                                {userToDelete.email}
+                            </p>
+                            <div className="mt-2 text-sm text-red-400">
+                                Будут удалены все связанные данные: классы, тесты, монеты.
+                            </div>
+                        </div>
+
+                        {deleteError && (
+                            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm flex items-start gap-2">
+                                <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                                <span>{deleteError}</span>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setUserToDelete(null)}
+                                disabled={deletingUser}
+                                className="flex-1 py-2.5 px-4 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 hover:text-white transition-all disabled:opacity-50"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={confirmDeleteUser}
+                                disabled={deletingUser}
+                                className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 text-white font-medium hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                            >
+                                {deletingUser ? (
+                                    <>
+                                        <Loader2 size={18} className="animate-spin" />
+                                        Удаление...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Trash2 size={18} />
+                                        Да, удалить
+                                    </>
+                                )}
                             </button>
                         </div>
                     </div>

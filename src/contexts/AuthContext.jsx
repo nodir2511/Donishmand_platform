@@ -56,7 +56,8 @@ export const AuthProvider = ({ children }) => {
                         profile: cachedProfile,
                         // Привилегированные права не доверяем из кеша
                         permissions: roleIsPrivileged ? [] : (parsed.permissions || []),
-                        loading: false
+                        // Если роль понизили в целях защиты, заставляем роуты ждать подтверждения с сервера
+                        loading: roleIsPrivileged
                     };
                 }
             }

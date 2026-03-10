@@ -27,11 +27,11 @@ const ClassSettingsTab = ({ classData, onUpdate }) => {
     // Жестко заданный список предметов
     const availableSubjects = [
         { id: 'math', name: 'Математика', icon: '📐' },
-        { id: 'physics', name: 'Физика', icon: '⚡' },
+        { id: 'phys', name: 'Физика', icon: '⚡' },
         { id: 'dt', name: 'Design and Technology', icon: '🛠️' },
-        { id: 'biology', name: 'Биология', icon: '🧬' },
-        { id: 'chemistry', name: 'Химия', icon: '🧪' },
-        { id: 'history', name: 'История', icon: '📜' }
+        { id: 'bio', name: 'Биология', icon: '🧬' },
+        { id: 'chem', name: 'Химия', icon: '🧪' },
+        { id: 'hist', name: 'История', icon: '📜' }
     ];
 
     const [branches, setBranches] = useState([]);

@@ -995,6 +995,55 @@ export const progressService = {
     }
 };
 
+// ==========================================
+// 10. СЕРВИС ОЦЕНИВАНИЯ (tripleGradingService)
+// ==========================================
+export const tripleGradingService = {
+    /**
+     * Запрашивает предварительный расчет оценок у БД
+     */
+    async calculateSystemGrades(classId, topicId, lessonIds) {
+        if (!classId || !topicId || !lessonIds?.length) return [];
+        const { data, error } = await supabase.rpc('calculate_system_grades', {
+            p_class_id: classId,
+            p_topic_id: topicId,
+            p_lesson_ids: lessonIds
+        });
+        if (error) throw error;
+        return data || [];
+    },
+
+    /**
+     * Массовое сохранение оценок за тему для всего класса
+     */
+    async saveTopicGrades(classId, topicId, gradesArray) {
+        if (!classId || !topicId || !gradesArray?.length) return false;
+        
+        // Очищаем от возможных undefined, так как RPC упадет с 406
+        const cleanArray = cleanUndefined(gradesArray);
+        
+        const { error } = await supabase.rpc('save_topic_grades', {
+            p_class_id: classId,
+            p_topic_id: topicId,
+            p_grades_array: cleanArray
+        });
+        if (error) throw error;
+        return true;
+    },
+
+    /**
+     * Получает общую матрицу всех сохраненных оценок класса
+     */
+    async getTripleGradesMatrix(classId) {
+        if (!classId) return [];
+        const { data, error } = await supabase.rpc('get_topic_grades_matrix', {
+            p_class_id: classId
+        });
+        if (error) throw error;
+        return data || [];
+    }
+};
+
 // Единый экспорт для удобства
 export default {
     branchService,
@@ -1006,5 +1055,6 @@ export default {
     storageService,
     progressService,
     utilsService,
+    tripleGradingService,
     cleanUndefined
 };

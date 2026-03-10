@@ -116,6 +116,21 @@ CREATE TABLE IF NOT EXISTS public.coin_transactions (
     created_at timestamptz DEFAULT now()
 );
 
+-- 1.10 TOPIC_GRADES (Итоговые оценки за тему)
+CREATE TABLE IF NOT EXISTS public.topic_grades (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    student_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    class_id uuid REFERENCES public.classes(id) ON DELETE CASCADE NOT NULL,
+    topic_id text NOT NULL,
+    system_grade numeric,
+    teacher_grade text,
+    review_grade numeric,
+    comment text,
+    teacher_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    updated_at timestamptz DEFAULT now(),
+    UNIQUE(student_id, class_id, topic_id)
+);
+
 
 -- ========================================================================================
 -- 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ (RPC)
@@ -320,6 +335,49 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_confirm_user_email(uuid) TO authenticated;
 
+-- 4.6.1 Полное удаление пользователя и всех связанных данных (RPC для Super Admin)
+-- 4.6.1 Полное удаление пользователя и всех связанных данных (RPC для Super Admin)
+CREATE OR REPLACE FUNCTION public.admin_delete_user(target_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  caller_role text;
+BEGIN
+  -- Только super_admin может удалять пользователей
+  SELECT role INTO caller_role FROM public.profiles WHERE id = auth.uid();
+  IF caller_role NOT IN ('super_admin') THEN 
+    RAISE EXCEPTION 'Только Супер-Администратор может удалять пользователей'; 
+  END IF;
+
+  -- Ручное удаление зависимостей (на случай, если в БД не настроен ON DELETE CASCADE)
+  DELETE FROM public.coin_transactions WHERE user_id = target_user_id;
+  DELETE FROM public.user_test_results WHERE user_id = target_user_id;
+  DELETE FROM public.user_lesson_progress WHERE user_id = target_user_id;
+  DELETE FROM public.subject_permissions WHERE user_id = target_user_id OR granted_by = target_user_id;
+  DELETE FROM public.class_members WHERE student_id = target_user_id;
+  DELETE FROM public.class_teachers WHERE teacher_id = target_user_id;
+  DELETE FROM public.classes WHERE teacher_id = target_user_id;
+  DELETE FROM public.topic_grades WHERE student_id = target_user_id;
+
+  -- Удаляем сам профиль
+  DELETE FROM public.profiles WHERE id = target_user_id;
+
+  -- Удаляем идентификаторы auth-схемы
+  DELETE FROM auth.identities WHERE user_id = target_user_id;
+  DELETE FROM auth.sessions WHERE user_id = target_user_id;
+
+  -- Удаляем из корневой таблицы
+  DELETE FROM auth.users WHERE id = target_user_id;
+END;
+$$;
+-- Права на вызов
+GRANT EXECUTE ON FUNCTION public.admin_delete_user(uuid) TO authenticated;
+-- ВОТ КЛЮЧЕВОЕ РЕШЕНИЕ ПРОТИВ 403 (FORBIDDEN) ПРИ УДАЛЕНИИ AUTH.USERS
+ALTER FUNCTION public.admin_delete_user(uuid) OWNER TO postgres;
+
 -- 4.7 Пагинация списка пользователей (со статусом confirmed)
 DROP FUNCTION IF EXISTS public.get_users_paginated(int, int, text);
 CREATE OR REPLACE FUNCTION public.get_users_paginated(
@@ -504,6 +562,174 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_global_leaderboard(text, text, text) TO authenticated;
 
+-- ========================================================================================
+-- 4.10 TRIPLE GRADING SYSTEM: Расчет системных баллов
+-- ========================================================================================
+CREATE OR REPLACE FUNCTION public.calculate_system_grades(
+    p_class_id uuid,
+    p_topic_id text,
+    p_lesson_ids text[]
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_result JSONB := '[]'::jsonb;
+    v_student record;
+    v_stats record;
+    v_system_grade numeric;
+    v_error_pct numeric;
+    v_total_q int;
+    v_total_err int;
+    v_expected_lessons int;
+BEGIN
+    v_expected_lessons := COALESCE(array_length(p_lesson_ids, 1), 0);
+
+    FOR v_student IN
+        SELECT p.id, p.full_name, p.avatar_url
+        FROM public.class_members cm
+        JOIN public.profiles p ON p.id = cm.student_id
+        WHERE cm.class_id = p_class_id
+    LOOP
+        -- Агрегируем результаты тестов для ученика по заданным урокам темы
+        SELECT 
+            COUNT(DISTINCT lesson_id) as lessons_taken,
+            COALESCE(SUM(total_questions), 0) as total_questions,
+            COALESCE(SUM(total_questions - correct_count), 0) as total_errors
+        INTO v_stats
+        FROM public.user_test_results
+        WHERE user_id = v_student.id AND lesson_id = ANY(p_lesson_ids);
+
+        v_total_q := v_stats.total_questions;
+        v_total_err := v_stats.total_errors;
+
+        -- Если ожидаются уроки, но ученик прошел не все
+        IF v_expected_lessons > 0 AND v_stats.lessons_taken < v_expected_lessons THEN
+            v_system_grade := 1;
+        ELSIF v_total_q > 0 THEN
+            v_error_pct := (v_total_err::numeric / v_total_q::numeric) * 100.0;
+            v_system_grade := ROUND(10.0 - (v_error_pct / 10.0));
+            IF v_system_grade < 0 THEN v_system_grade := 0; END IF;
+        ELSE
+            v_system_grade := NULL; -- Нет пройденных тестов и нет ожидаемых
+        END IF;
+
+        v_result := v_result || jsonb_build_object(
+            'student_id', v_student.id,
+            'full_name', v_student.full_name,
+            'avatar_url', v_student.avatar_url,
+            'total_questions', v_total_q,
+            'total_errors', v_total_err,
+            'system_grade', v_system_grade
+        );
+    END LOOP;
+
+    RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.calculate_system_grades(uuid, text, text[]) TO authenticated;
+
+-- ========================================================================================
+-- 4.11 TRIPLE GRADING SYSTEM: Получение журнала оценок
+-- ========================================================================================
+CREATE OR REPLACE FUNCTION public.get_topic_grades_matrix(
+    p_class_id uuid
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_result JSONB := '[]'::jsonb;
+    v_student record;
+    v_grades JSONB;
+BEGIN
+    FOR v_student IN
+        SELECT p.id, p.full_name, p.avatar_url
+        FROM public.class_members cm
+        JOIN public.profiles p ON p.id = cm.student_id
+        WHERE cm.class_id = p_class_id
+        ORDER BY p.full_name ASC
+    LOOP
+        SELECT COALESCE(jsonb_agg(
+            jsonb_build_object(
+                'topic_id', tg.topic_id,
+                'system_grade', tg.system_grade,
+                'teacher_grade', tg.teacher_grade,
+                'review_grade', tg.review_grade,
+                'comment', tg.comment
+            )
+        ), '[]'::jsonb)
+        INTO v_grades
+        FROM public.topic_grades tg
+        WHERE tg.student_id = v_student.id AND tg.class_id = p_class_id;
+
+        v_result := v_result || jsonb_build_object(
+            'student_id', v_student.id,
+            'full_name', v_student.full_name,
+            'avatar_url', v_student.avatar_url,
+            'grades', v_grades
+        );
+    END LOOP;
+
+    RETURN v_result;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_topic_grades_matrix(uuid) TO authenticated;
+
+-- ========================================================================================
+-- 4.12 TRIPLE GRADING SYSTEM: Массовое сохранение оценок (UPSERT)
+-- ========================================================================================
+CREATE OR REPLACE FUNCTION public.save_topic_grades(
+    p_class_id uuid,
+    p_topic_id text,
+    p_grades_array JSONB
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_item JSONB;
+    v_teacher_id uuid;
+BEGIN
+    v_teacher_id := auth.uid();
+
+    -- Перебираем массив оценок
+    FOR v_item IN SELECT * FROM jsonb_array_elements(p_grades_array)
+    LOOP
+        INSERT INTO public.topic_grades (
+            student_id, class_id, topic_id, system_grade, teacher_grade, comment, teacher_id, updated_at
+        ) VALUES (
+            (v_item->>'student_id')::uuid,
+            p_class_id,
+            p_topic_id,
+            (v_item->>'system_grade')::numeric,
+            v_item->>'teacher_grade',
+            v_item->>'comment',
+            v_teacher_id,
+            now()
+        )
+        ON CONFLICT (student_id, class_id, topic_id) 
+        DO UPDATE SET 
+            system_grade = COALESCE(EXCLUDED.system_grade, public.topic_grades.system_grade),
+            teacher_grade = COALESCE(EXCLUDED.teacher_grade, public.topic_grades.teacher_grade),
+            comment = COALESCE(EXCLUDED.comment, public.topic_grades.comment),
+            teacher_id = CASE 
+                WHEN EXCLUDED.teacher_grade IS NOT NULL OR EXCLUDED.comment IS NOT NULL OR EXCLUDED.system_grade IS NOT NULL 
+                THEN EXCLUDED.teacher_id 
+                ELSE public.topic_grades.teacher_id 
+            END,
+            updated_at = now();
+    END LOOP;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.save_topic_grades(uuid, text, JSONB) TO authenticated;
+
 
 -- ========================================================================================
 -- 5. RLS ПОЛИТИКИ И ДОСТУПЫ
@@ -518,7 +744,7 @@ BEGIN
         WHERE tablename IN (
             'profiles', 'branches', 'classes', 'class_teachers', 'class_members', 
             'subject_permissions', 'user_lesson_progress', 'user_test_results', 
-            'coin_transactions', 'lessons', 'subject_syllabus', 'tests', 'questions'
+            'coin_transactions', 'lessons', 'subject_syllabus', 'tests', 'questions', 'topic_grades'
         ) 
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol, tab);
@@ -535,6 +761,7 @@ ALTER TABLE public.subject_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_lesson_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_test_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coin_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.topic_grades ENABLE ROW LEVEL SECURITY;
 
 -- Подстраховка для контент-таблиц (создавались в других скриптах, но мы страхуем их политики)
 DO $$
@@ -630,6 +857,14 @@ CREATE POLICY "Admins can view all lesson progress" ON public.user_lesson_progre
 CREATE POLICY "Teachers can view class students lesson progress" ON public.user_lesson_progress FOR SELECT
 USING (EXISTS (SELECT 1 FROM public.class_members cm JOIN public.classes c ON c.id = cm.class_id 
   LEFT JOIN public.class_teachers ct ON ct.class_id = c.id WHERE cm.student_id = user_lesson_progress.user_id AND (c.teacher_id = auth.uid() OR ct.teacher_id = auth.uid())));
+
+-- ----------------------------------------------------------------------------------------
+-- 5.8.1 TOPIC_GRADES (Оценки за темы)
+-- ----------------------------------------------------------------------------------------
+CREATE POLICY "Users can view own topic grades" ON public.topic_grades FOR SELECT USING (auth.uid() = student_id);
+CREATE POLICY "Teachers can manage class topic grades" ON public.topic_grades FOR ALL 
+USING (EXISTS (SELECT 1 FROM public.classes c LEFT JOIN public.class_teachers ct ON ct.class_id = c.id WHERE c.id = topic_grades.class_id AND (c.teacher_id = auth.uid() OR ct.teacher_id = auth.uid())));
+CREATE POLICY "Admins can view and manage all topic grades" ON public.topic_grades FOR ALL USING (is_admin_or_above());
 
 -- ----------------------------------------------------------------------------------------
 -- 5.9 КОНТЕНТ (Уроки, Программы курсов, Тесты, Вопросы)

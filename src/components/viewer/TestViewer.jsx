@@ -9,6 +9,8 @@ import MatchingQuestion from './questions/MatchingQuestion';
 import NumericQuestion from './questions/NumericQuestion';
 import TestResultsScreen from './questions/TestResultsScreen';
 import ComponentErrorBoundary from '../common/ComponentErrorBoundary';
+import { useEngagementTimer } from '../../hooks/useEngagementTimer';
+import { Clock } from 'lucide-react';
 
 // Очистка объекта от undefined (PostgREST падает с ошибкой 400, если есть undefined)
 // Сохраняем Date объекты нетронутыми
@@ -41,6 +43,12 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin;
 
+    // ТАЙМЕР ТЕСТА
+    const studyTime = useEngagementTimer(
+        `test_${lessonId}`, // Используем префикс для изоляции от общего прогресса (хотя он удален)
+        0, // Всегда начинаем с 0 для новой попытки
+        null // Нам не нужна периодическая синхронизация, отправим всё в конце
+    );
     // --- НОВЫЙ АНТИЧИТ НАЧАЛО ---
     const [swapNotification, setSwapNotification] = useState(false);
 
@@ -60,40 +68,39 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
 
             if (unansweredQs.length === 0) return prev; // Все отвечено
 
+            // ОЧИСТКА ОТВЕТОВ для незаблокированных вопросов
+            setAnswers(prevAnswers => {
+                const newAnswers = { ...prevAnswers };
+                unansweredQs.forEach(q => {
+                    delete newAnswers[q.id];
+                });
+                return newAnswers;
+            });
+
             // Доступные вопросы из базы, которых еще НЕТ в текущем тесте
             let availableQs = questions.filter(q => !currentIds.has(q.id));
             availableQs = shuffleArray(availableQs);
 
-            const newUnansweredQs = unansweredQs.map((oldQ, index) => {
-                // Если есть доступный новый вопрос - берем его
-                if (index < availableQs.length) {
-                    const newQ = availableQs[index];
-                    if (newQ.type === 'multiple_choice') return { ...newQ, options: shuffleArray(newQ.options) };
-                    if (newQ.type === 'matching') return { ...newQ, leftItems: shuffleArray(newQ.leftItems), rightItems: shuffleArray(newQ.rightItems) };
-                    return newQ;
+            const pool = [...unansweredQs, ...availableQs].map(q => {
+                const newQ = { ...q };
+                if (newQ.type === 'multiple_choice') newQ.options = shuffleArray(newQ.options);
+                if (newQ.type === 'matching') {
+                    newQ.leftItems = shuffleArray(newQ.leftItems);
+                    newQ.rightItems = shuffleArray(newQ.rightItems);
                 }
-                // Если новых вопросов не хватает (н-р всего 10 вопросов в БД),
-                // просто заново перемешиваем варианты ответов в текущем вопросе
-                const shuffledOldQ = { ...oldQ };
-                if (shuffledOldQ.type === 'multiple_choice') shuffledOldQ.options = shuffleArray(shuffledOldQ.options);
-                if (shuffledOldQ.type === 'matching') {
-                    shuffledOldQ.leftItems = shuffleArray(shuffledOldQ.leftItems);
-                    shuffledOldQ.rightItems = shuffleArray(shuffledOldQ.rightItems);
-                }
-                return shuffledOldQ;
+                return newQ;
             });
+
+            const shuffledPool = shuffleArray(pool);
 
             // Показываем уведомление
             setSwapNotification(true);
             setTimeout(() => setSwapNotification(false), 5000);
 
-            // Собираем новый список, сохраняя порядок: сначала отвеченные (или по их индексам),
-            // но проще просто склеить отвеченные и новые в том же порядке.
-            // Чтобы сохранить позиции, пройдемся по оригинальному массиву `prev`:
-            let newIndex = 0;
+            let poolIndex = 0;
             return prev.map(q => {
                 if (lockedIds.has(q.id)) return q;
-                return newUnansweredQs[newIndex++];
+                return shuffledPool[poolIndex++];
             });
         });
     }, [isTeacher, lockedQuestions, questions]);
@@ -120,6 +127,14 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         };
     }, [swapUnansweredQuestions, showResults]);
     // --- НОВЫЙ АНТИЧИТ КОНЕЦ ---
+    
+    // Блокировка прокрутки фона
+    useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
 
     const progressKey = `test_progress_v2_${lessonId}`; // v2 принудительно начинает сначала
 
@@ -328,11 +343,12 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 const cleanedAnswers = cleanUndefined(answers);
                 const cleanedIds = cleanUndefined(assignedIds);
 
-                // Если ученик, вызываем безопасную серверную функцию RPM
+                // Если ученик, вызываем безопасную серверную функцию RPC с учетом времени
                 const { data: serverResults, error } = await supabase.rpc('evaluate_test', {
                     p_lesson_id: lessonId,
                     p_user_answers: cleanedAnswers,
-                    p_question_ids: cleanedIds
+                    p_question_ids: cleanedIds,
+                    p_time_spent: studyTime // Передаем время прохождения
                 });
 
                 if (error) throw error;
@@ -473,7 +489,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 </div>
             )}
 
-            <div className={`w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 flex flex-col max-h-[90vh]`}>
+            <div className={`w-[95%] h-[90vh] bg-gaming-card/95 rounded-3xl border border-white/10 overflow-hidden relative transition-all duration-300 flex flex-col`}>
 
                 {/* ВОДЯНОЙ ЗНАК */}
                 <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden opacity-[0.03] flex flex-wrap content-center justify-center gap-8 rotate-12 scale-150">
@@ -490,6 +506,14 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                         <span className="text-lg font-semibold">
                             {lang === 'ru' ? 'Вопрос' : 'Савол'} {currentIndex + 1} / {totalQuestions}
                         </span>
+                        {!isTeacher && (
+                            <div className="flex items-center gap-1.5 px-3 py-1 bg-gaming-accent/10 text-gaming-accent rounded-xl border border-gaming-accent/20">
+                                <Clock size={16} />
+                                <span className="font-mono text-sm font-bold">
+                                    {Math.floor(studyTime / 60)}м {studyTime % 60}с
+                                </span>
+                            </div>
+                        )}
                         <div className="flex gap-1">
                             {randomizedQuestions.map((q, idx) => {
                                 const hasAnswer = (() => {

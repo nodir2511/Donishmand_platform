@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { FileText, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CardSkeleton, Skeleton } from '../common/Skeleton';
 import CourseLayout from '../layout/CourseLayout';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../services/supabase';
+import { studentService } from '../../services/apiService';
 
 // Ключ кеша (общий с TopicPage)
 const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
@@ -26,46 +27,11 @@ const saveCachedStats = (statsMap) => {
     } catch { /* ignore */ }
 };
 
-const computeStatsFromResults = (testResults) => {
-    const byLesson = {};
-    for (const r of testResults) {
-        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
-        byLesson[r.lesson_id].push(r);
-    }
-
-    const stats = {};
-    for (const [lessonId, results] of Object.entries(byLesson)) {
-        const totalAttempts = results.length;
-        const bestScore = Math.max(...results.map(r => r.score));
-        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
-        const avgErrorRate = Math.round(100 - avgScore);
-        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore };
-    }
-    return stats;
-};
-
 /**
- * Рассчитать агрегированную статистику по массиву lesson IDs.
+ * Получить статистику из мапы по ID
  */
-const getAggregateStats = (lessonIds, lessonStats) => {
-    let completedCount = 0;
-    let totalAvgScore = 0;
-
-    for (const lid of lessonIds) {
-        const s = lessonStats[lid];
-        if (s) {
-            completedCount++;
-            totalAvgScore += s.avgScore;
-        }
-    }
-
-    if (completedCount === 0) return null;
-
-    return {
-        completedLessons: completedCount,
-        totalLessons: lessonIds.length,
-        avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
-    };
+const getEntityStats = (entityId, statsMap) => {
+    return statsMap[entityId] || null;
 };
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
@@ -74,10 +40,13 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
-    if (loading) {
+    if (loading && !subjectData) {
         return (
-            <div className="flex items-center justify-center min-h-[40vh]">
-                <Loader2 size={40} className="text-gaming-primary animate-spin" />
+            <div className="max-w-5xl">
+                <div className="h-10 w-2/3 bg-white/5 animate-pulse rounded-lg mb-8" />
+                <div className="space-y-4">
+                    {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+                </div>
             </div>
         );
     }
@@ -99,8 +68,7 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
     // Агрегированная статистика по всему разделу
-    const allLessonIds = sectionData.topics.flatMap(topic => topic.lessons.map(l => l.id));
-    const sectionStats = getAggregateStats(allLessonIds, lessonStats);
+    const sectionStats = getEntityStats(sectionId, lessonStats);
 
     return (
         <div className="max-w-5xl">
@@ -128,7 +96,7 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats
                         <FileText size={32} />
                     </div>
                     <div>
-                        <div className="text-3xl font-bold text-white mb-1">{sectionStats.avgErrorRate}%</div>
+                        <div className="text-3xl font-bold text-white mb-1">{100 - sectionStats.avgScore}%</div>
                         <div className="text-gaming-textMuted text-sm">
                             {lang === 'ru' ? 'Средний % ошибок по разделу' : 'Миёна % хатогиҳо дар бахш'}
                         </div>
@@ -141,43 +109,46 @@ const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats
                 </div>
             )}
 
-            <div className="space-y-4">
-                {sectionData.topics.map((topic, index) => {
-                    const lessonIds = topic.lessons.map(l => l.id);
-                    const stats = getAggregateStats(lessonIds, lessonStats);
+                <div className="space-y-4">
+                    {sectionData.topics.map((topic, index) => {
+                        const stats = getEntityStats(topic.id, lessonStats);
 
-                    return (
-                        <Link
-                            key={topic.id}
-                            to={`/subject/${subjectId}/section/${sectionId}/topic/${topic.id}`}
-                            className="group flex items-center gap-4 bg-gaming-card/40 backdrop-blur-xl border border-white/5 p-5 rounded-2xl hover:border-gaming-accent/50 transition-all duration-300 hover:bg-gaming-card/60"
-                        >
-                            <div className="w-12 h-12 rounded-xl bg-gaming-accent/10 flex items-center justify-center text-gaming-accent group-hover:scale-110 transition-transform">
-                                <FileText size={24} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h3 className="text-lg font-bold group-hover:text-gaming-accent transition-colors truncate">
-                                    {sectionIndex + 1}.{index + 1}. {getTitle(topic)}
-                                </h3>
-                                <p className="text-sm text-gaming-textMuted">
-                                    {topic.lessons.length} {t('lessonsCount')}
-                                </p>
-                            </div>
-
-                            {stats && !isTeacher && (
-                                <div className="mr-2 text-right">
-                                    <div className="text-xl font-bold text-white leading-none">{stats.avgErrorRate}%</div>
-                                    <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
-                                        {lang === 'ru' ? 'ошибок' : 'хато'}
-                                    </div>
+                        return (
+                            <Link
+                                key={topic.id}
+                                to={`/subject/${subjectId}/section/${sectionId}/topic/${topic.id}`}
+                                className="group flex items-center gap-4 bg-gaming-card/40 backdrop-blur-xl border border-white/5 p-5 rounded-2xl hover:border-gaming-accent/50 transition-all duration-300 hover:bg-gaming-card/60"
+                            >
+                                <div className="w-12 h-12 rounded-xl bg-gaming-accent/10 flex items-center justify-center text-gaming-accent group-hover:scale-110 transition-transform">
+                                    <FileText size={24} />
                                 </div>
-                            )}
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-lg font-bold group-hover:text-gaming-accent transition-colors truncate">
+                                        {sectionIndex + 1}.{index + 1}. {getTitle(topic)}
+                                    </h3>
+                                    <p className="text-sm text-gaming-textMuted">
+                                        {topic.lessons.length} {t('lessonsCount')}
+                                    </p>
+                                </div>
 
-                            <ArrowRight className="text-white/20 group-hover:text-gaming-accent transition-colors shrink-0" />
-                        </Link>
-                    );
-                })}
-            </div>
+                                {stats ? (
+                                    stats.avgScore !== null && !isTeacher && (
+                                        <div className="mr-2 text-right">
+                                            <div className="text-xl font-bold text-white leading-none">{100 - stats.avgScore}%</div>
+                                            <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
+                                                {lang === 'ru' ? 'ошибок' : 'хато'}
+                                            </div>
+                                        </div>
+                                    )
+                                ) : (!isTeacher && (
+                                    <Skeleton className="w-16 h-10 rounded-lg mr-2" />
+                                ))}
+
+                                <ArrowRight className="text-white/20 group-hover:text-gaming-accent transition-colors shrink-0" />
+                            </Link>
+                        );
+                    })}
+                </div>
         </div>
     );
 };
@@ -198,24 +169,19 @@ const SectionPage = () => {
 
         const fetchStats = async () => {
             try {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser?.id || cancelled) return;
+                const data = await studentService.getDashboardStats([subjectId]);
+                if (cancelled || !data) return;
 
-                const { data: testResults, error } = await supabase
-                    .from('user_test_results')
-                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
-                    .eq('user_id', authUser.id);
-
-                if (error || !testResults || cancelled) return;
-
-                const computed = computeStatsFromResults(testResults);
+                const lessonsStats = data.lessonStats || {};
+                const hierarchyStats = data.statsMap || {};
+                const fullStatsMap = { ...lessonsStats, ...hierarchyStats };
 
                 if (!cancelled) {
-                    setLessonStats(computed);
-                    saveCachedStats(computed);
+                    setLessonStats(fullStatsMap);
+                    saveCachedStats(fullStatsMap);
                 }
             } catch (err) {
-                console.error('Ошибка загрузки статистики раздела:', err);
+                console.error('Ошибка загрузки статистики раздела через RPC:', err);
             }
         };
 

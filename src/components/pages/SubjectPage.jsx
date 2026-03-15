@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Book, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { Book, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CardSkeleton } from '../common/Skeleton';
 import { SUBJECT_NAMES } from '../../constants/data';
 import CourseLayout from '../layout/CourseLayout';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../services/supabase';
+import { studentService } from '../../services/apiService';
 
 // Ключ кеша (общий с TopicPage и SectionPage)
 const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
@@ -27,46 +28,11 @@ const saveCachedStats = (statsMap) => {
     } catch { /* ignore */ }
 };
 
-const computeStatsFromResults = (testResults) => {
-    const byLesson = {};
-    for (const r of testResults) {
-        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
-        byLesson[r.lesson_id].push(r);
-    }
-
-    const stats = {};
-    for (const [lessonId, results] of Object.entries(byLesson)) {
-        const totalAttempts = results.length;
-        const bestScore = Math.max(...results.map(r => r.score));
-        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
-        const avgErrorRate = Math.round(100 - avgScore);
-        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore };
-    }
-    return stats;
-};
-
 /**
- * Рассчитать агрегированную статистику по массиву lesson IDs.
+ * Получить статистику из мапы по ID (урок/тема/раздел)
  */
-const getAggregateStats = (lessonIds, lessonStats) => {
-    let completedCount = 0;
-    let totalAvgScore = 0;
-
-    for (const lid of lessonIds) {
-        const s = lessonStats[lid];
-        if (s) {
-            completedCount++;
-            totalAvgScore += s.avgScore;
-        }
-    }
-
-    if (completedCount === 0) return null;
-
-    return {
-        completedLessons: completedCount,
-        totalLessons: lessonIds.length,
-        avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
-    };
+const getEntityStats = (entityId, statsMap) => {
+    return statsMap[entityId] || null;
 };
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
@@ -75,10 +41,13 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonSta
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
-    if (loading) {
+    if (loading && !subjectData) {
         return (
-            <div className="flex items-center justify-center min-h-[40vh]">
-                <Loader2 size={40} className="text-gaming-primary animate-spin" />
+            <div className="max-w-5xl">
+                <div className="h-10 w-48 bg-white/5 animate-pulse rounded-lg mb-8" />
+                <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map(i => <CardSkeleton key={i} />)}
+                </div>
             </div>
         );
     }
@@ -127,8 +96,7 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonSta
                         </p>
                     </div>
                 ) : subjectData.sections.map((section, index) => {
-                    const allLessonIds = section.topics.flatMap(t => t.lessons.map(l => l.id));
-                    const stats = getAggregateStats(allLessonIds, lessonStats);
+                    const stats = getEntityStats(section.id, lessonStats);
 
                     return (
                         <Link
@@ -148,9 +116,9 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonSta
                                 </p>
                             </div>
 
-                            {stats && !isTeacher && (
+                             {stats && !isTeacher && stats.avgScore !== null && (
                                 <div className="mr-2 text-right">
-                                    <div className="text-xl font-bold text-white leading-none">{stats.avgErrorRate}%</div>
+                                    <div className="text-xl font-bold text-white leading-none">{100 - stats.avgScore}%</div>
                                     <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
                                         {lang === 'ru' ? 'ошибок' : 'хато'}
                                     </div>
@@ -185,24 +153,21 @@ const SubjectPage = () => {
 
         const fetchStats = async () => {
             try {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser?.id || cancelled) return;
+                // Вызываем серверную агрегацию для текущего предмета
+                const data = await studentService.getDashboardStats([subjectId]);
+                
+                if (cancelled || !data) return;
 
-                const { data: testResults, error } = await supabase
-                    .from('user_test_results')
-                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
-                    .eq('user_id', authUser.id);
-
-                if (error || !testResults || cancelled) return;
-
-                const computed = computeStatsFromResults(testResults);
+                const lessonsStats = data.lessonStats || {};
+                const hierarchyStats = data.statsMap || {};
+                const fullStatsMap = { ...lessonsStats, ...hierarchyStats };
 
                 if (!cancelled) {
-                    setLessonStats(computed);
-                    saveCachedStats(computed);
+                    setLessonStats(fullStatsMap);
+                    saveCachedStats(fullStatsMap);
                 }
             } catch (err) {
-                console.error('Ошибка загрузки статистики предмета:', err);
+                console.error('Ошибка загрузки статистики предмета через RPC:', err);
             }
         };
 

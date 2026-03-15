@@ -525,59 +525,23 @@ export const studentService = {
         return results;
     },
     async getMyTimeDynamics(filters = {}) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Пользователь не авторизован');
-        let start = null;
-        if (filters.period && filters.period !== 'all') {
-            const now = new Date();
-            if (filters.period === 'week') start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            else if (filters.period === 'month') start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        }
-        let query = supabase.from('user_test_results').select('lesson_id, score, is_passed, created_at').eq('user_id', user.id).order('created_at', { ascending: true });
-        if (start) query = query.gte('created_at', start.toISOString());
-        const { data, error } = await query;
-        if (error) throw error;
-        if (!data || data.length === 0) return [];
-        let filtered = data;
-        if (filters.subjectId) {
-            const subjectLessonIds = await this._getSubjectLessonIds(filters.subjectId);
-            filtered = data.filter(r => subjectLessonIds.has(r.lesson_id));
-        }
-        if (filtered.length === 0) return [];
-        const groups = {};
-        filtered.forEach(r => {
-            const d = new Date(r.created_at);
-            const key = `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}`;
-            if (!groups[key]) groups[key] = { scores: [], passed: 0, total: 0 };
-            groups[key].scores.push(r.score); groups[key].total++; if (r.is_passed) groups[key].passed++;
+        // Рекомендуется использовать getDashboardStats, так как он возвращает dynamics с сервера.
+        // Оставляем этот метод для совместимости, но вызываем RPC внутри.
+        const stats = await this.getDashboardStats([], filters);
+        return stats.dynamics || [];
+    },
+    async getDashboardStats(selectedSubjects = [], filters = {}) {
+        const { period = 'all' } = filters;
+        const { data, error } = await supabase.rpc('get_student_dashboard_stats', {
+            p_subject_ids: selectedSubjects,
+            p_period: period
         });
-        return Object.entries(groups).map(([date, g]) => ({ date, avgScore: Math.round(g.scores.reduce((a, b) => a + b, 0) / g.scores.length), passRate: Math.round((g.passed / g.total) * 100), testsCount: g.total }));
+        if (error) throw error;
+        return data;
     },
     async getMyProgressSummary(selectedSubjects = []) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Пользователь не авторизован');
-        const [progressRes, testRes] = await Promise.all([
-            supabase.from('user_lesson_progress').select('lesson_id').eq('user_id', user.id),
-            supabase.from('user_test_results').select('lesson_id, score').eq('user_id', user.id),
-        ]);
-        const completedLessons = new Set();
-        if (progressRes.data) progressRes.data.forEach(p => completedLessons.add(p.lesson_id));
-        if (testRes.data) testRes.data.forEach(t => completedLessons.add(t.lesson_id));
-        const scoresByLesson = {};
-        if (testRes.data) testRes.data.forEach(t => { if (!scoresByLesson[t.lesson_id]) scoresByLesson[t.lesson_id] = []; scoresByLesson[t.lesson_id].push(t.score); });
-        const subjectStats = [];
-        let tLA = 0, cLA = 0, allS = [];
-        for (const sId of selectedSubjects) {
-            try {
-                const structure = await syllabusService.getStructure(sId);
-                if (!structure?.sections) continue;
-                let total = 0, comp = 0, sScores = [];
-                for (const sec of structure.sections) for (const top of sec.topics || []) for (const les of top.lessons || []) { total++; if (completedLessons.has(les.id)) comp++; if (scoresByLesson[les.id]) sScores.push(...scoresByLesson[les.id]); }
-                tLA += total; cLA += comp; allS.push(...sScores);
-                subjectStats.push({ subjectId: sId, totalLessons: total, completedLessons: comp, progress: total > 0 ? Math.round((comp / total) * 100) : 0, avgScore: sScores.length > 0 ? Math.round(sScores.reduce((a, b) => a + b, 0) / sScores.length) : null, testsCount: sScores.length });
-            } catch { }
-        }
-        return { subjects: subjectStats, summary: { totalTests: testRes.data?.length || 0, avgScore: allS.length > 0 ? Math.round(allS.reduce((a, b) => a + b, 0) / allS.length) : 0, bestScore: allS.length > 0 ? Math.max(...allS) : 0, completedLessons: cLA, totalLessons: tLA } };
+        // Устаревший метод, заменяем на RPC версию для обратной совместимости
+        return this.getDashboardStats(selectedSubjects);
     },
     async changePassword(newPassword) { const { error } = await supabase.auth.updateUser({ password: newPassword }); if (error) throw error; },
     async updateAvatar(avatarUrl) {
@@ -650,55 +614,35 @@ const getClassStudents = async (classId) => {
 };
 
 export const statisticsService = {
-    async getClassSummaryStats(classId, filters = {}) {
+    async getClassAnalyticsFull(classId, filters = {}) {
         const { period = 'all', studentId = null } = filters;
-        const start = getPeriodStartDate(period);
-        const { students } = await getClassStudents(classId);
-        if (students.length === 0) return { studentsCount: 0, averageTestScore: 0, totalTestsTaken: 0, averageProgress: 0, testsBreakdown: [], passRate: 0 };
-        const target = studentId ? [studentId] : students;
-        let testQuery = supabase.from('user_test_results').select('*').in('user_id', target);
-        if (start) testQuery = testQuery.gte('created_at', start);
-        const { data: testResults, error: testsError } = await testQuery;
-        if (testsError) return null;
-        const { data: lessonProgress } = await supabase.from('user_lesson_progress').select('*').in('user_id', target);
-        let totalScore = 0, passedCount = 0; const testsByLesson = {};
-        (testResults || []).forEach(tr => {
-            totalScore += tr.score || 0; if (tr.is_passed) passedCount++;
-            if (!testsByLesson[tr.lesson_id]) testsByLesson[tr.lesson_id] = { totalScore: 0, count: 0, fails: 0, lessonId: tr.lesson_id };
-            testsByLesson[tr.lesson_id].totalScore += tr.score || 0; testsByLesson[tr.lesson_id].count += 1; if (!tr.is_passed) testsByLesson[tr.lesson_id].fails += 1;
+        const { data, error } = await supabase.rpc('get_class_analytics_stats', {
+            p_class_id: classId,
+            p_period: period,
+            p_student_id: studentId
         });
-        const testsLen = (testResults || []).length;
-        const testsBreakdown = Object.keys(testsByLesson).map(lId => { const t = testsByLesson[lId]; return { lessonId: lId, averageScore: (t.totalScore / t.count).toFixed(1), failRate: ((t.fails / t.count) * 100).toFixed(1), attemptsCount: t.count }; });
-        testsBreakdown.sort((a, b) => Number(a.averageScore) - Number(b.averageScore));
-        return { studentsCount: studentId ? 1 : students.length, averageTestScore: testsLen > 0 ? Number((totalScore / testsLen).toFixed(1)) : 0, totalTestsTaken: testsLen, passRate: testsLen > 0 ? Math.round((passedCount / testsLen) * 100) : 0, lessonsOpened: (lessonProgress || []).length, testsBreakdown };
+        if (error) throw error;
+        return data;
+    },
+    async getClassSummaryStats(classId, filters = {}) {
+        const data = await this.getClassAnalyticsFull(classId, filters);
+        return data;
     },
     async getClassTimeDynamics(classId, filters = {}) {
-        const { period = 'all', studentId = null } = filters;
-        const start = getPeriodStartDate(period);
-        const { students } = await getClassStudents(classId);
-        if (students.length === 0) return [];
-        const target = studentId ? [studentId] : students;
-        let query = supabase.from('user_test_results').select('score, created_at, is_passed').in('user_id', target).order('created_at', { ascending: true });
-        if (start) query = query.gte('created_at', start);
-        const { data, error } = await query;
-        if (error || !data || data.length === 0) return [];
-        const byDay = {};
-        data.forEach(r => {
-            const day = new Date(r.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-            if (!byDay[day]) byDay[day] = { totalScore: 0, count: 0, passed: 0 };
-            byDay[day].totalScore += r.score || 0; byDay[day].count += 1; if (r.is_passed) byDay[day].passed += 1;
-        });
-        return Object.entries(byDay).map(([date, d]) => ({ date, avgScore: Math.round(d.totalScore / d.count), tests: d.count, passRate: d.count > 0 ? Math.round((d.passed / d.count) * 100) : 0 }));
+        const data = await this.getClassAnalyticsFull(classId, filters);
+        return data.dynamics || [];
     },
     async getTopStudents(classId, limit = 5) {
-        const { students, members } = await getClassStudents(classId);
-        if (students.length === 0) return [];
-        const { data: testResults } = await supabase.from('user_test_results').select('user_id, score').in('user_id', students);
-        const byStudent = {};
-        (testResults || []).forEach(r => { if (!byStudent[r.user_id]) byStudent[r.user_id] = { totalScore: 0, count: 0 }; byStudent[r.user_id].totalScore += r.score || 0; byStudent[r.user_id].count += 1; });
-        return Object.entries(byStudent).map(([uId, d]) => { const m = members.find(mem => mem.student_id === uId); return { id: uId, name: m?.profile?.full_name || 'Ученик', avatar: m?.profile?.avatar_url, avgScore: Math.round(d.totalScore / d.count), testsCount: d.count }; }).sort((a, b) => b.avgScore - a.avgScore).slice(0, limit);
+        const data = await this.getClassAnalyticsFull(classId);
+        return (data.topStudents || []).slice(0, limit);
     },
     async getCourseProgressStats(classId, totalLessonsInCourse) {
+        // Используем новый единый RPC вызов для аналитики класса
+        const data = await this.getClassAnalyticsFull(classId);
+        if (data.courseProgress) {
+            return data.courseProgress;
+        }
+        // Фолбек на старую версию (на случай если RPC не вернул прогресс)
         const { students, members } = await getClassStudents(classId);
         if (students.length === 0) return { averagePercent: 0, studentsProgress: [] };
         const { data: progress } = await supabase.from('user_lesson_progress').select('user_id, lesson_id').in('user_id', students);
@@ -731,23 +675,8 @@ export const statisticsService = {
         return titles;
     },
     async getDifficultQuestions(classId, filters = {}) {
-        const start = getPeriodStartDate(filters.period || 'all');
-        const { students } = await getClassStudents(classId);
-        if (students.length === 0) return [];
-        let query = supabase.from('user_test_results').select('lesson_id, answers_detail').in('user_id', students).not('answers_detail', 'is', null);
-        if (start) query = query.gte('created_at', start);
-        const { data } = await query;
-        if (!data || data.length === 0) return [];
-        const qStats = {};
-        data.forEach(res => {
-            if (!Array.isArray(res.answers_detail)) return;
-            res.answers_detail.forEach(d => {
-                const qId = d.question_id; if (!qId) return;
-                if (!qStats[qId]) qStats[qId] = { question_id: qId, question_text: d.question_text || 'Неизвестный вопрос', type: d.type || 'unknown', lesson_id: res.lesson_id, total: 0, errors: 0 };
-                qStats[qId].total += 1; if (!d.is_correct) qStats[qId].errors += 1;
-            });
-        });
-        return Object.values(qStats).filter(q => q.total >= 2).map(q => ({ ...q, errorRate: Math.round((q.errors / q.total) * 100) })).sort((a, b) => b.errorRate - a.errorRate).slice(0, 15);
+        const data = await this.getClassAnalyticsFull(classId, filters);
+        return data.difficultQuestions || [];
     },
     async getClassLeaderboard(classId, period = 'day') {
         const { students, members } = await getClassStudents(classId);
@@ -957,43 +886,7 @@ export const utilsService = {
 // ==========================================
 // 9. ПРОГРЕСС И ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (progressService)
 // ==========================================
-export const progressService = {
-    getLessonStats(lessonId) {
-        try {
-            const history = JSON.parse(localStorage.getItem(`test_history_${lessonId}`) || '[]');
-            if (!history || history.length === 0) return null;
-            const totalAttempts = history.length;
-            const bestScore = Math.max(...history.map(h => h.score));
-            const avgScore = history.reduce((acc, curr) => acc + curr.score, 0) / totalAttempts;
-            const avgErrorRate = Math.round(100 - avgScore);
-            const lastAttemptAt = history[history.length - 1].timestamp;
-            return { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt };
-        } catch (e) {
-            console.error('Error parsing lesson stats:', e);
-            return null;
-        }
-    },
-    getContainerStats(lessonIds) {
-        if (!lessonIds || lessonIds.length === 0) return null;
-        let totalAvgScore = 0;
-        let completedLessonsCount = 0;
-        lessonIds.forEach(id => {
-            const stats = this.getLessonStats(id);
-            if (stats) {
-                totalAvgScore += stats.avgScore;
-                completedLessonsCount++;
-            }
-        });
-        if (completedLessonsCount === 0) return null;
-        const overallAvgScore = totalAvgScore / completedLessonsCount;
-        const avgErrorRate = Math.round(100 - overallAvgScore);
-        return {
-            completedLessons: completedLessonsCount,
-            totalLessons: lessonIds.length,
-            avgErrorRate
-        };
-    }
-};
+// Очищено: progressService удален, так как статистика теперь рассчитывается на сервере.
 
 // ==========================================
 // 10. СЕРВИС ОЦЕНИВАНИЯ (tripleGradingService)
@@ -1053,7 +946,6 @@ export default {
     statisticsService,
     translationService,
     storageService,
-    progressService,
     utilsService,
     tripleGradingService,
     cleanUndefined

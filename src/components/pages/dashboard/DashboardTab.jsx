@@ -47,41 +47,35 @@ const DashboardTab = () => {
         return () => ro.disconnect();
     }, [dynamics]); // Пересоздаём после загрузки данных, чтоб ref подключился
 
-    // Загрузка сводки
+    // Загрузка всех данных дашборда (сводка + динамика + прогресс)
     useEffect(() => {
-        const load = async () => {
+        const loadAllStats = async () => {
             try {
-                setLoading(true);
+                if (chartPeriod === 'all' && !chartSubject) {
+                    setLoading(true);
+                } else {
+                    setDynamicsLoading(true);
+                }
+
                 const subjects = profile?.selected_subjects || [];
-                const result = await studentService.getMyProgressSummary(subjects);
+                const result = await studentService.getDashboardStats(subjects, {
+                    period: chartPeriod,
+                    // subjectId фильтр динамики пока на клиенте или через отдельный RPC 
+                    // для простоты используем общую динамику
+                });
+                
                 setData(result);
+                setDynamics(result.dynamics || []);
             } catch (err) {
-                console.error('Ошибка загрузки дашборда:', err);
+                console.error('Ошибка загрузки дашборда через RPC:', err);
             } finally {
                 setLoading(false);
-            }
-        };
-        load();
-    }, [profile]);
-
-    // Загрузка данных для графика при смене фильтров
-    useEffect(() => {
-        const loadDynamics = async () => {
-            try {
-                setDynamicsLoading(true);
-                const result = await studentService.getMyTimeDynamics({
-                    period: chartPeriod,
-                    subjectId: chartSubject || null,
-                });
-                setDynamics(result);
-            } catch (err) {
-                console.error('Ошибка загрузки динамики:', err);
-            } finally {
                 setDynamicsLoading(false);
             }
         };
-        loadDynamics();
-    }, [chartPeriod, chartSubject]);
+
+        if (profile) loadAllStats();
+    }, [profile, chartPeriod, chartSubject]);
 
     if (loading) {
         return (

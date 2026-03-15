@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { PlayCircle, FileText, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
+import { PlayCircle, FileText, ArrowRight, ArrowLeft } from 'lucide-react';
+import { CardSkeleton, LessonSkeleton, Skeleton } from '../common/Skeleton';
 import CourseLayout from '../layout/CourseLayout';
 import { useTranslation } from 'react-i18next';
 import { useSyllabus } from '../../contexts/SyllabusContext';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase } from '../../services/supabase';
+import { studentService } from '../../services/apiService';
 
 // Ключ кеша статистики по темам
 const TOPIC_STATS_CACHE_KEY = 'donishmand_topic_stats';
@@ -40,24 +41,11 @@ const saveCachedStats = (statsMap) => {
  * @param {Array} testResults - массив записей из user_test_results
  * @returns {Object} lessonsStats — { lessonId: { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt } }
  */
-const computeStatsFromResults = (testResults) => {
-    const byLesson = {};
-    for (const r of testResults) {
-        if (!byLesson[r.lesson_id]) byLesson[r.lesson_id] = [];
-        byLesson[r.lesson_id].push(r);
-    }
-
-    const stats = {};
-    for (const [lessonId, results] of Object.entries(byLesson)) {
-        const totalAttempts = results.length;
-        const bestScore = Math.max(...results.map(r => r.score));
-        const avgScore = results.reduce((acc, r) => acc + r.score, 0) / totalAttempts;
-        const avgErrorRate = Math.round(100 - avgScore);
-        const lastAttemptAt = Math.max(...results.map(r => new Date(r.created_at).getTime()));
-
-        stats[lessonId] = { totalAttempts, bestScore, avgErrorRate, avgScore, lastAttemptAt };
-    }
-    return stats;
+/**
+ * Получить статистику из мапы по ID
+ */
+const getEntityStats = (entityId, statsMap) => {
+    return statsMap[entityId] || null;
 };
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
@@ -66,10 +54,13 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, less
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
 
-    if (loading) {
+    if (loading && !subjectData) {
         return (
-            <div className="flex items-center justify-center min-h-[40vh]">
-                <Loader2 size={40} className="text-gaming-primary animate-spin" />
+            <div className="max-w-5xl">
+                <div className="h-10 w-2/3 bg-white/5 animate-pulse rounded-lg mb-8" />
+                <div className="space-y-4">
+                    {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+                </div>
             </div>
         );
     }
@@ -93,27 +84,7 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, less
     const getTitle = (item) => (lang === 'tj' && item.titleTj) ? item.titleTj : item.title;
 
     // Считаем агрегированную статистику по теме из серверных данных
-    const topicStats = (() => {
-        const lessonIds = topicData.lessons.map(l => l.id);
-        let completedCount = 0;
-        let totalAvgScore = 0;
-
-        for (const lid of lessonIds) {
-            const s = lessonStats[lid];
-            if (s) {
-                completedCount++;
-                totalAvgScore += s.avgScore;
-            }
-        }
-
-        if (completedCount === 0) return null;
-
-        return {
-            completedLessons: completedCount,
-            totalLessons: lessonIds.length,
-            avgErrorRate: Math.round(100 - (totalAvgScore / completedCount)),
-        };
-    })();
+    const topicStats = getEntityStats(topicId, lessonStats);
 
     return (
         <div className="max-w-5xl">
@@ -141,7 +112,7 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, less
                         <FileText size={32} />
                     </div>
                     <div>
-                        <div className="text-3xl font-bold text-white mb-1">{topicStats.avgErrorRate}%</div>
+                        <div className="text-3xl font-bold text-white mb-1">{100 - topicStats.avgScore}%</div>
                         <div className="text-gaming-textMuted text-sm">
                             {lang === 'ru' ? 'Средний % ошибок по теме' : 'Миёна % хатогиҳо дар мавзӯъ'}
                         </div>
@@ -176,16 +147,20 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, less
                                 </span>
                             </div>
 
-                            {stats && !isTeacher && (
-                                <div className="mr-2 text-right">
-                                    <div className="text-xl font-bold text-white leading-none">{stats.avgErrorRate}%</div>
-                                    <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
-                                        {lang === 'ru' ? 'ошибок' : 'хато'}
-                                    </div>
-                                </div>
-                            )}
+                                {stats ? (
+                                    stats.avgScore !== null && !isTeacher && (
+                                        <div className="mr-2 text-right">
+                                            <div className="text-xl font-bold text-white leading-none">{100 - stats.avgScore}%</div>
+                                            <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
+                                                {lang === 'ru' ? 'ошибок' : 'хато'}
+                                            </div>
+                                        </div>
+                                    )
+                                ) : (!isTeacher && (
+                                    <Skeleton className="w-16 h-10 rounded-lg mr-2" />
+                                ))}
 
-                            <ArrowRight className="text-white/20 group-hover:text-gaming-pink transition-colors shrink-0" />
+                                <ArrowRight className="text-white/20 group-hover:text-gaming-pink transition-colors shrink-0" />
                         </Link>
                     );
                 })}
@@ -210,24 +185,19 @@ const TopicPage = () => {
 
         const fetchStats = async () => {
             try {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser?.id || cancelled) return;
+                const data = await studentService.getDashboardStats([subjectId]);
+                if (cancelled || !data) return;
 
-                const { data: testResults, error } = await supabase
-                    .from('user_test_results')
-                    .select('lesson_id, score, correct_count, total_questions, is_passed, created_at')
-                    .eq('user_id', authUser.id);
-
-                if (error || !testResults || cancelled) return;
-
-                const computed = computeStatsFromResults(testResults);
+                const lessonsStats = data.lessonStats || {};
+                const hierarchyStats = data.statsMap || {};
+                const fullStatsMap = { ...lessonsStats, ...hierarchyStats };
 
                 if (!cancelled) {
-                    setLessonStats(computed);
-                    saveCachedStats(computed);
+                    setLessonStats(fullStatsMap);
+                    saveCachedStats(fullStatsMap);
                 }
             } catch (err) {
-                console.error('Ошибка загрузки статистики темы:', err);
+                console.error('Ошибка загрузки статистики темы через RPC:', err);
             }
         };
 

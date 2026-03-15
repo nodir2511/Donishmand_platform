@@ -25,7 +25,7 @@ const CourseCardSkeleton = () => (
     </div>
 );
 import { supabase } from '../../services/supabase';
-import { syllabusService } from '../../services/apiService';
+import { studentService } from '../../services/apiService';
 
 const PROGRESS_CACHE_KEY = 'donishmand_subject_progress';
 
@@ -78,87 +78,31 @@ const HomePage = () => {
 
         const loadProgress = async () => {
             try {
-                const { data: { user: authUser } } = await supabase.auth.getUser();
-                if (!authUser?.id || cancelled) return;
+                // Вызываем новую серверную функцию, которая делает всё за один раз
+                const data = await studentService.getDashboardStats(subjectsForProgress);
+                
+                if (cancelled || !data) return;
 
-                // Параллельно загружаем прогресс уроков и результаты тестов
-                const [progressRes, testRes] = await Promise.all([
-                    supabase
-                        .from('user_lesson_progress')
-                        .select('lesson_id')
-                        .eq('user_id', authUser.id),
-                    supabase
-                        .from('user_test_results')
-                        .select('lesson_id')
-                        .eq('user_id', authUser.id),
-                ]);
-
-                if (progressRes.error) console.warn('Ошибка загрузки lesson_progress:', progressRes.error);
-                if (testRes.error) console.warn('Ошибка загрузки test_results:', testRes.error);
-
-                // Объединяем уникальные lesson_id
-                const completedLessons = new Set();
-                if (progressRes.data) progressRes.data.forEach(p => completedLessons.add(p.lesson_id));
-                if (testRes.data) testRes.data.forEach(t => completedLessons.add(t.lesson_id));
-
-                if (cancelled) return;
-
-                if (completedLessons.size === 0) {
-                    // Если прогресса нет — очищаем кеш
-                    const empty = {};
-                    setSubjectProgress(empty);
-                    localStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(empty));
-                    return;
-                }
-
-                // Загружаем структуры ТОЛЬКО отображаемых предметов (а не всех 12)
-                const structureResults = await Promise.all(
-                    subjectsForProgress.map(async (subjectId) => {
-                        try {
-                            const structure = await syllabusService.getStructure(subjectId);
-                            return { subjectId, structure };
-                        } catch {
-                            return { subjectId, structure: null };
-                        }
-                    })
-                );
-
-                if (cancelled) return;
-
-                // Считаем прогресс по каждому предмету
+                // Извлекаем прогресс по предметам
                 const progressMap = {};
+                (data.subjects || []).forEach(s => {
+                    progressMap[s.subjectId] = s.progress;
+                });
 
-                for (const { subjectId, structure } of structureResults) {
-                    if (!structure?.sections) continue;
-
-                    let totalLessons = 0;
-                    let completedCount = 0;
-
-                    for (const section of structure.sections) {
-                        if (!section.topics) continue;
-                        for (const topic of section.topics) {
-                            if (!topic.lessons) continue;
-                            for (const lesson of topic.lessons) {
-                                totalLessons++;
-                                if (completedLessons.has(lesson.id)) {
-                                    completedCount++;
-                                }
-                            }
-                        }
-                    }
-
-                    if (totalLessons > 0) {
-                        progressMap[subjectId] = Math.round((completedCount / totalLessons) * 100);
-                    }
+                // Сохраняем расширенную статистику (уроки, темы, разделы) в глобальный кеш
+                // Это ускорит загрузку SubjectPage, SectionPage и TopicPage
+                if (data.statsMap || data.lessonStats) {
+                    const lessonsStats = data.lessonStats || {};
+                    const hierarchyStats = data.statsMap || {};
+                    // Объединяем их для совместимости
+                    const fullStatsMap = { ...lessonsStats, ...hierarchyStats };
+                    localStorage.setItem('donishmand_topic_stats', JSON.stringify(fullStatsMap));
                 }
 
-                if (cancelled) return;
-
-                // Обновляем состояние и сохраняем в кеш для следующего визита
                 setSubjectProgress(progressMap);
                 localStorage.setItem(PROGRESS_CACHE_KEY, JSON.stringify(progressMap));
             } catch (err) {
-                console.error('Ошибка загрузки прогресса:', err);
+                console.error('Ошибка загрузки прогресса через RPC:', err);
             }
         };
 

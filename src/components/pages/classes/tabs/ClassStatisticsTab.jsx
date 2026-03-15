@@ -84,26 +84,26 @@ const ClassStatisticsTab = ({ classData }) => {
 
         try {
             if (viewMode === 'summary') {
-                // Параллельная загрузка всех данных
-                const [summary, dynamics, top, progress, difficult] = await Promise.all([
-                    statisticsService.getClassSummaryStats(classData.id, filters),
-                    statisticsService.getClassTimeDynamics(classData.id, filters),
-                    statisticsService.getTopStudents(classData.id),
-                    totalLessonsCount > 0
-                        ? statisticsService.getCourseProgressStats(classData.id, totalLessonsCount)
-                        : Promise.resolve(null),
-                    statisticsService.getDifficultQuestions(classData.id, filters)
-                ]);
+                // Используем новый единый RPC вызов
+                const data = await statisticsService.getClassAnalyticsFull(classData.id, filters);
 
-                setSummaryData(summary);
-                setTimeDynamics(dynamics);
-                setTopStudents(top);
-                setCourseProgress(progress);
-                setDifficultQuestions(difficult || []);
+                setSummaryData(data.summary);
+                setTimeDynamics(data.dynamics);
+                setTopStudents(data.topStudents);
+                setDifficultQuestions(data.difficultQuestions || []);
+                
+                // Прогресс курса (соотношение открытых уроков)
+                if (totalLessonsCount > 0 && data.courseProgress) {
+                    setCourseProgress(data.courseProgress);
+                } else if (totalLessonsCount > 0) {
+                     // Фолбек если в RPC нет, но мы имеем totalLessonsCount
+                    const progress = await statisticsService.getCourseProgressStats(classData.id, totalLessonsCount);
+                    setCourseProgress(progress);
+                }
 
                 // Дозагрузка названий тестов, если их нет в lessonTitles
-                if (summary?.testsBreakdown?.length > 0) {
-                    const missingIds = summary.testsBreakdown
+                if (data.summary?.testsBreakdown?.length > 0) {
+                    const missingIds = data.summary.testsBreakdown
                         .map(t => t.lessonId)
                         .filter(id => id && !lessonTitles[id]);
                     if (missingIds.length > 0) {

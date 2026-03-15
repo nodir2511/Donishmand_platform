@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle, XCircle, RotateCcw } from 'lucide-react';
+import { CheckCircle, XCircle, RotateCcw, Clock } from 'lucide-react';
 import { utilsService } from '../../../services/apiService';
 const { renderKatex } = utilsService;
 
@@ -12,6 +12,13 @@ const TestResultsScreen = ({
     onComplete,
     onClose,
 }) => {
+    // Блокировка прокрутки фона
+    React.useEffect(() => {
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, []);
     // Текст варианта ответа с поддержкой обоих форматов: серверного и локального
     const getOptText = (opt) => {
         if (!opt) return '';
@@ -23,8 +30,8 @@ const TestResultsScreen = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="w-full max-w-2xl bg-gaming-card/95 rounded-3xl border border-white/10 my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-hidden">
+            <div className="w-[95%] h-[90vh] bg-gaming-card/95 rounded-3xl border border-white/10 flex flex-col">
                 {/* Заголовок */}
                 <div className="p-6 border-b border-white/10 text-center relative overflow-hidden">
                     {results.isPassed ? (
@@ -65,10 +72,16 @@ const TestResultsScreen = ({
                     <p className="text-gaming-textMuted relative z-10">
                         {results.correct} / {results.total} {lang === 'ru' ? 'правильных ответов' : 'ҷавоби дуруст'}
                     </p>
+                    {results.time_spent_seconds > 0 && (
+                        <p className="text-gaming-textMuted text-sm mt-1 relative z-10 flex items-center justify-center gap-1.5">
+                            <Clock size={14} />
+                            {lang === 'ru' ? 'Время решения:' : 'Вақти ҳал:'} {Math.floor(results.time_spent_seconds / 60)}м {results.time_spent_seconds % 60}с
+                        </p>
+                    )}
                 </div>
 
                 {/* Детали ответов */}
-                <div className="p-6 max-h-[50vh] overflow-y-auto space-y-4">
+                <div className="p-6 overflow-y-auto flex-1 space-y-4">
                     {results.details.map((detail, idx) => {
                         const isCorrect = detail.isCorrect ?? detail.is_correct ?? false;
                         const q = detail.question || {};

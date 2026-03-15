@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check, Loader2 } from 'lucide-react';
+import { FileText, CheckCircle, ChevronLeft, ChevronRight, Presentation, Video, ClipboardList, AlertCircle, Eye, Check } from 'lucide-react';
+import { LessonPageHeaderSkeleton, ProgressCardSkeleton, LessonContentSkeleton } from '../common/Skeleton';
 import CourseLayout from '../layout/CourseLayout';
 import VideoPlayer from '../viewer/VideoPlayer';
 import TextContent from '../viewer/TextContent';
@@ -19,6 +20,18 @@ const { renderKatex } = utilsService;
 const getProgressKey = (lessonId, type) => `progress_${lessonId}_${type}`;
 
 import { useAuth } from '../../contexts/AuthContext';
+import { Clock } from 'lucide-react';
+
+const formatTime = (totalSeconds) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (hours > 0) {
+        return `${hours}ч ${minutes}м`;
+    }
+    return `${minutes}м ${seconds}с`;
+};
 
 
 
@@ -146,6 +159,10 @@ const LessonPage = () => {
                                         return acc;
                                     }, {}));
                                     newProgress.testHistory = unique.sort((a, b) => a.timestamp - b.timestamp);
+                                }
+
+                                if (progressData?.study_time_seconds) {
+                                    newProgress.studyTimeSeconds = progressData.study_time_seconds;
                                 }
 
                                 return newProgress;
@@ -312,11 +329,15 @@ const LessonPage = () => {
         return () => window.removeEventListener('keydown', handleEsc);
     }, [showTestWarning, showSlidesViewer]);
 
-    if (loading) {
+    if (loading && !lessonData) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gaming-bg">
-                <Loader2 size={40} className="text-gaming-primary animate-spin" />
-            </div>
+            <CourseLayout subjectId={null}>
+                <div className="max-w-4xl">
+                    <LessonPageHeaderSkeleton />
+                    {!isTeacher && <ProgressCardSkeleton />}
+                    <LessonContentSkeleton />
+                </div>
+            </CourseLayout>
         );
     }
 
@@ -363,8 +384,8 @@ const LessonPage = () => {
                     </button>
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-sm text-gaming-textMuted mb-1">
-                                {t('lesson.lesson')} {lessonIndex + 1} / {topic?.lessons?.length || 0}
+                            <p className="text-sm text-gaming-textMuted mb-1 flex items-center gap-4">
+                                <span>{t('lesson.lesson')} {lessonIndex + 1} / {topic?.lessons?.length || 0}</span>
                             </p>
                             <h1 className="text-3xl font-bold mb-2 text-gaming-pink">
                                 {lessonIndex + 1}. {getTitle(lesson)}
@@ -606,7 +627,7 @@ const LessonPage = () => {
             {/* Окна просмотра (слайды, тесты) - Lazy Loaded */}
             <React.Suspense fallback={
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-md">
-                    <Loader2 size={40} className="text-gaming-primary animate-spin" />
+                    <div className="w-10 h-10 border-4 border-gaming-primary border-t-transparent rounded-full animate-spin" />
                 </div>
             }>
                 {showSlidesViewer && hasSlides && (

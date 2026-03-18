@@ -59,7 +59,7 @@ const LessonPage = () => {
     const [showTestViewer, setShowTestViewer] = useState(false);
 
     // Определяем режим учителя
-    const { user, isTeacher: rawIsTeacher, isAdmin } = useAuth();
+    const { user, isTeacher: rawIsTeacher, isAdmin, refreshProfile } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin; // Учитель, админ или суперадмин — не сохраняет прогресс
 
     // ЗАГРУЗКА ДАННЫХ И ПРОГРЕССА
@@ -272,8 +272,10 @@ const LessonPage = () => {
         if (isTeacher) return; // Учитель не сохраняет прогресс
         if (!progress.videoWatched) {
             localStorage.setItem(getProgressKey(lessonId, 'video'), 'true');
-            setProgress(prev => ({ ...prev, videoWatched: true }));
-            syncProgressToDb({ video_watched: true });
+            // Начисляем XP за видео (20 XP)
+            studentService.grantXP(20, 'video_watched', subjectKey, lessonId)
+                .then(() => refreshProfile())
+                .catch(console.error);
         }
     };
 
@@ -282,14 +284,17 @@ const LessonPage = () => {
         if (isTeacher) return; // Учитель не сохраняет прогресс
         if (!progress.textRead) {
             localStorage.setItem(getProgressKey(lessonId, 'text'), 'true');
-            setProgress(prev => ({ ...prev, textRead: true }));
-            syncProgressToDb({ text_read: true });
+            // Начисляем XP за текст (10 XP)
+            studentService.grantXP(10, 'text_read', subjectKey, lessonId)
+                .then(() => refreshProfile())
+                .catch(console.error);
         }
     };
 
     // Обновить прогресс просмотра слайдов
     const handleSlideView = (slideId) => {
         if (isTeacher) return; // Учитель не сохраняет прогресс
+        const isPreviouslyComplete = allSlidesViewed;
         const newViewed = [...new Set([...progress.slidesViewed, slideId])];
         localStorage.setItem(getProgressKey(lessonId, 'slides'), JSON.stringify(newViewed));
         setProgress(prev => ({ ...prev, slidesViewed: newViewed }));
@@ -297,6 +302,13 @@ const LessonPage = () => {
             slides_viewed_count: newViewed.length,
             total_slides: totalSlides
         });
+
+        // Начисляем XP за слайды (10 XP), если это первый раз, когда все слайды просмотрены
+        if (newViewed.length === totalSlides && !isPreviouslyComplete && totalSlides > 0) {
+            studentService.grantXP(10, 'slides_viewed', subjectKey, lessonId)
+                .then(() => refreshProfile())
+                .catch(console.error);
+        }
     };
 
     // Обработка клика по кнопке теста

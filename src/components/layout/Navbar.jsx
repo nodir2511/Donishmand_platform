@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Menu, X, Sparkles, User, LogOut, ChevronDown, BarChart3, Trophy } from 'lucide-react';
+import { Menu, X, Sparkles, User, LogOut, ChevronDown, BarChart3, Trophy, Flame } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import UserAvatar from '../common/UserAvatar';
+import { calculateLevelInfo } from '../features/LevelProgressBar';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
@@ -14,14 +15,26 @@ const Navbar = () => {
     const [scrolled, setScrolled] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const profileMenuRef = useRef(null);
+    const mobileMenuRef = useRef(null);
+    const mobileToggleRef = useRef(null);
 
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 20);
         window.addEventListener('scroll', handleScroll);
 
         const handleClickOutside = (event) => {
+            // Закрытие профиля на десктопе
             if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
                 setShowProfileMenu(false);
+            }
+            // Закрытие мобильного меню
+            if (isOpen && 
+                mobileMenuRef.current && 
+                !mobileMenuRef.current.contains(event.target) &&
+                mobileToggleRef.current &&
+                !mobileToggleRef.current.contains(event.target)
+            ) {
+                setIsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -30,10 +43,11 @@ const Navbar = () => {
             window.removeEventListener('scroll', handleScroll);
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, []);
+    }, [isOpen, showProfileMenu]);
 
     const toggleLang = () => {
-        const newLang = i18n.resolvedLanguage === 'ru' ? 'tj' : 'ru';
+        const current = i18n.language || i18n.resolvedLanguage || 'ru';
+        const newLang = current.startsWith('ru') ? 'tj' : 'ru';
         i18n.changeLanguage(newLang);
     };
 
@@ -47,7 +61,7 @@ const Navbar = () => {
     // Проверка активной ссылки
     const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
-    const currentLang = i18n.resolvedLanguage || 'ru';
+    const currentLang = (i18n.language || i18n.resolvedLanguage || 'ru').startsWith('ru') ? 'ru' : 'tj';
 
     // Отображение названия роли
     const getRoleName = (role) => {
@@ -64,7 +78,10 @@ const Navbar = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center">
                     {/* Логотип */}
-                    <Link to="/" className="flex items-center gap-3 group cursor-pointer">
+                    <Link to="/" 
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-3 group cursor-pointer"
+                    >
                         <div className="w-10 h-10 bg-gradient-to-br from-gaming-primary to-gaming-pink rounded-xl flex items-center justify-center shadow-lg shadow-gaming-primary/20 group-hover:scale-105 transition-transform duration-300">
                             <Sparkles className="text-white w-6 h-6" />
                         </div>
@@ -137,6 +154,36 @@ const Navbar = () => {
 
                     {/* CTA и User Menu */}
                     <div className="flex items-center gap-4">
+                        {/* XP и Стрик Ученика */}
+                        {user && profile?.role === 'student' && (() => {
+                            const { level, percentage } = calculateLevelInfo(profile?.total_xp || 0);
+                            return (
+                                <div className="hidden sm:flex items-center gap-4 mr-2">
+                                    {/* Стрик */}
+                                    {profile?.streak_count > 0 && (
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-orange-500/20 bg-orange-500/5 text-orange-500 hover:bg-orange-500/10 transition-colors animate-float">
+                                            <Flame size={14} fill="currentColor" />
+                                            <span className="text-xs font-bold">{profile.streak_count}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Уровень */}
+                                    <div className="flex flex-col items-end gap-1">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] text-gaming-textMuted uppercase font-bold tracking-wider">{t('studentDashboard.level')}</span>
+                                            <span className="text-sm font-heading font-black text-white">{level}</span>
+                                        </div>
+                                        <div className="w-20 h-1 bg-white/10 rounded-full overflow-hidden border border-white/5">
+                                            <div 
+                                                className="h-full bg-gradient-to-r from-gaming-primary to-gaming-accent transition-all duration-1000 ease-out"
+                                                style={{ width: `${percentage}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         <div className="hidden md:block">
                             {user ? (
                                 <div className="relative" ref={profileMenuRef}>
@@ -188,7 +235,11 @@ const Navbar = () => {
                             )}
                         </div>
 
-                        <button onClick={() => setIsOpen(!isOpen)} className="md:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors">
+                        <button 
+                            ref={mobileToggleRef}
+                            onClick={() => setIsOpen(!isOpen)} 
+                            className="md:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-colors"
+                        >
                             {isOpen ? <X /> : <Menu />}
                         </button>
                     </div>
@@ -197,7 +248,10 @@ const Navbar = () => {
 
             {/* Мобильное меню */}
             {isOpen && (
-                <div className="absolute top-full left-0 right-0 bg-gaming-card border-b border-white/5 p-4 shadow-xl md:hidden glass-panel">
+                <div 
+                    ref={mobileMenuRef}
+                    className="absolute top-full left-0 right-0 bg-gaming-card/95 border-b border-white/5 p-4 shadow-xl md:hidden backdrop-blur-xl"
+                >
                     <div className="flex flex-col gap-4">
                         {user && (
                             <div className="flex items-center gap-3 px-4 py-3 bg-white/5 rounded-xl border border-white/5">
@@ -212,6 +266,27 @@ const Navbar = () => {
                                         {getRoleName(profile?.role)}
                                     </div>
                                 </div>
+
+                                {/* Мобильный прогресс уровня */}
+                                {profile?.role === 'student' && (() => {
+                                    const { level, percentage } = calculateLevelInfo(profile?.total_xp || 0);
+                                    return (
+                                        <div className="ml-auto flex flex-col items-end gap-1.5 bg-black/20 p-2 rounded-lg border border-white/5">
+                                            <div className="flex items-center gap-2">
+                                                {profile?.streak_count > 0 && (
+                                                    <div className="flex items-center gap-1 text-orange-500">
+                                                        <Flame size={12} fill="currentColor" />
+                                                        <span className="text-xs font-bold">{profile.streak_count}</span>
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] text-gaming-textMuted font-bold uppercase">{t('studentDashboard.level')} {level}</span>
+                                            </div>
+                                            <div className="w-16 h-1 bg-white/10 rounded-full overflow-hidden">
+                                                <div className="h-full bg-gaming-primary" style={{ width: `${percentage}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
 

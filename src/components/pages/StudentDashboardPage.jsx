@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import UserAvatar from '../common/UserAvatar';
 import {
-    BarChart3, History, Settings, User
+    BarChart3, History, Settings, User, Flame
 } from 'lucide-react';
+import LevelProgressBar from '../features/LevelProgressBar';
 
 // Ленивая загрузка вкладок
 const DashboardTab = React.lazy(() => import('./dashboard/DashboardTab'));
@@ -54,7 +55,7 @@ const StudentDashboardPage = () => {
                     </div>
 
                     {/* Имя и роль */}
-                    <div className="text-center sm:text-left">
+                    <div className="flex-1 text-center sm:text-left">
                         <h1 className="text-3xl font-heading font-bold text-white">
                             {profile?.full_name || user?.email}
                         </h1>
@@ -62,10 +63,21 @@ const StudentDashboardPage = () => {
                             <span className="px-3 py-1 rounded-full text-xs font-medium border border-gaming-primary/50 bg-gaming-primary/10 text-gaming-primary">
                                 {t('studentDashboard.student')}
                             </span>
+                            {profile?.streak_count > 0 && (
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border border-orange-500/50 bg-orange-500/10 text-orange-500 animate-pulse-slow">
+                                    <Flame size={14} fill="currentColor" />
+                                    {profile.streak_count} {t('common.days', { count: profile.streak_count })}
+                                </div>
+                            )}
                             <span className="text-gaming-textMuted text-sm">
                                 {user?.email}
                             </span>
                         </div>
+                    </div>
+
+                    {/* XP Прогресс */}
+                    <div className="w-full sm:w-72 mt-4 sm:mt-0">
+                        <LevelProgressBar xp={profile?.total_xp || 0} />
                     </div>
                 </div>
             </div>

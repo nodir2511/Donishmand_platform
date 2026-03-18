@@ -105,6 +105,26 @@ export const AuthProvider = ({ children }) => {
             }
 
             setPermissions(perms);
+            
+            // 4. Если студент — обновляем стрик (серию заходов)
+            if (data?.role === 'student') {
+                try {
+                    const { studentService } = await import('../services/apiService');
+                    const streakResult = await studentService.refreshStreak();
+                    if (streakResult) {
+                        // Обновляем данные в объекте профиля, если они изменились
+                        data.streak_count = streakResult.streak;
+                        // total_xp тоже мог измениться (бонус за стрик)
+                        const { data: freshProfile } = await supabase.from('profiles').select('total_xp, streak_count').eq('id', sessionUser.id).single();
+                        if (freshProfile) {
+                            data.total_xp = freshProfile.total_xp;
+                            data.streak_count = freshProfile.streak_count;
+                        }
+                    }
+                } catch (streakError) {
+                    console.error('Ошибка обновления стрика:', streakError);
+                }
+            }
 
             // Сохраняем в кеш (SWR)
             try {
@@ -328,6 +348,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const refreshProfile = async () => {
+        if (user) {
+            const data = await loadProfile(user);
+            setProfile(data);
+            return data;
+        }
+        return null;
+    };
+
     const value = {
         user,
         profile,
@@ -335,6 +364,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         signOut,
         updateSelectedSubjects,
+        refreshProfile,
         isAuthenticated: !!user,
         isTeacher: profile?.role === 'teacher',
         isAdmin: profile?.role === 'admin' || profile?.role === 'super_admin',

@@ -156,7 +156,7 @@ const TopicContent = ({ subjectId, sectionId, topicId, isTeacher, navigate, less
                                             </div>
                                         </div>
                                     )
-                                ) : (!isTeacher && (
+                                ) : (!isTeacher && !statsLoaded && (
                                     <Skeleton className="w-16 h-10 rounded-lg mr-2" />
                                 ))}
 
@@ -177,9 +177,13 @@ const TopicPage = () => {
 
     // SWR: мгновенно показать кеш, затем обновить с сервера
     const [lessonStats, setLessonStats] = useState(() => getCachedStats());
+    const [statsLoaded, setStatsLoaded] = useState(false);
 
     useEffect(() => {
-        if (isTeacher || !profile) return;
+        if (isTeacher || !profile) {
+            setStatsLoaded(true);
+            return;
+        }
 
         let cancelled = false;
 
@@ -198,6 +202,8 @@ const TopicPage = () => {
                 }
             } catch (err) {
                 console.error('Ошибка загрузки статистики темы через RPC:', err);
+            } finally {
+                if (!cancelled) setStatsLoaded(true);
             }
         };
 

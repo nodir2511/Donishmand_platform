@@ -87,7 +87,15 @@ const DashboardTab = () => {
 
     if (!data) return null;
 
-    const { subjects, summary } = data;
+    const subjects = data?.subjects || [];
+    const summary = {
+        totalTests: data?.summary?.totalTests ?? 0,
+        avgScore: data?.summary?.avgScore ?? data?.summary?.averageScore ?? 0,
+        bestScore: data?.summary?.bestScore ?? 0,
+        completedLessons: data?.summary?.completedLessons ?? data?.summary?.lessonsCompleted ?? 0,
+        totalLessons: data?.summary?.totalLessons ?? 0,
+        passRate: data?.summary?.passRate ?? 0,
+    };
     const selectedSubjects = profile?.selected_subjects || [];
 
     // Мини-карточки со сводкой
@@ -272,7 +280,7 @@ const DashboardTab = () => {
                     {t('studentDashboard.progressBySubject')}
                 </h2>
 
-                {subjects.length > 0 ? (
+                {subjects?.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {subjects.map(subj => {
                             const config = SUBJECT_CONFIG[subj.subjectId];

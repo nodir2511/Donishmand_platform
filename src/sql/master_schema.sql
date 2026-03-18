@@ -508,6 +508,9 @@ BEGIN
         IF v_is_passed THEN
             INSERT INTO public.coin_transactions (user_id, amount, reason, subject_id, lesson_id) 
             VALUES (v_user_id, 3, 'test_passed', v_subject_id, p_lesson_id);
+            
+            -- Начисляем XP (50 XP за тест по плану)
+            PERFORM public.grant_xp(50, 'test_passed', v_subject_id, p_lesson_id);
         END IF;
     END IF;
 
@@ -928,9 +931,12 @@ AS $$
 DECLARE
     v_user_id uuid;
     v_start_date timestamp;
-    v_summary record;
-    v_lesson_stats jsonb;
-    v_dynamics jsonb;
+    v_total_tests int := 0;
+    v_avg_score int := 0;
+    v_lessons_completed int := 0;
+    v_passed_count int := 0;
+    v_lesson_stats jsonb := '{}'::jsonb;
+    v_dynamics jsonb := '[]'::jsonb;
     v_stats_map jsonb := '{}'::jsonb;
     v_subj_id text;
     v_section jsonb;
@@ -943,31 +949,38 @@ DECLARE
     v_lessons_in_section int;
     v_total_score_in_section int;
     v_lesson_id text;
+    v_subjects jsonb := '[]'::jsonb;
+    v_topics_in_section_completed int;
+    v_total_lessons_sum int := 0;
+    v_best_score int := 0;
 BEGIN
     v_user_id := auth.uid();
     IF v_user_id IS NULL THEN RETURN NULL; END IF;
 
-    -- Настройки периода
+    -- 1. Настройки периода
     v_start_date := CASE 
         WHEN p_period = 'week' THEN now() - interval '7 days'
         WHEN p_period = 'month' THEN now() - interval '30 days'
         ELSE '1970-01-01'::timestamp
     END;
 
-    -- 1. Сводные показатели
+    -- 2. Сводные показатели
     SELECT 
-        COUNT(*) as total_tests,
-        ROUND(AVG(score)) as avg_score,
-        COUNT(DISTINCT lesson_id) as lessons_completed,
-        SUM(CASE WHEN is_passed THEN 1 ELSE 0 END) as passed_count
-    INTO v_summary
+        COALESCE(COUNT(*), 0),
+        COALESCE(ROUND(AVG(score)), 0),
+        COALESCE(COUNT(DISTINCT lesson_id), 0),
+        COALESCE(SUM(CASE WHEN is_passed THEN 1 ELSE 0 END), 0)
+    INTO v_total_tests, v_avg_score, v_lessons_completed, v_passed_count
     FROM public.user_test_results
     WHERE user_id = v_user_id AND created_at >= v_start_date;
 
-    -- 2. Динамика по дням
-    SELECT jsonb_agg(d) FROM (
+    SELECT COALESCE(MAX(score), 0) INTO v_best_score 
+    FROM public.user_test_results WHERE user_id = v_user_id;
+
+    -- 3. Динамика
+    SELECT COALESCE(jsonb_agg(d), '[]'::jsonb) FROM (
         SELECT 
-            to_char(created_at, 'DD.MM') as date,
+            TO_CHAR(created_at, 'YYYY-MM-DD') as date,
             ROUND(AVG(score)) as "avgScore",
             ROUND(SUM(CASE WHEN is_passed THEN 1 ELSE 0 END)::float / COUNT(*)::float * 100) as "passRate",
             COUNT(*) as "testsCount"
@@ -977,7 +990,7 @@ BEGIN
         ORDER BY MIN(created_at)
     ) d INTO v_dynamics;
 
-    -- 3. Агрегация по урокам
+    -- 4. Агрегация по урокам
     WITH test_agg AS (
         SELECT 
             lesson_id,
@@ -989,18 +1002,18 @@ BEGIN
         WHERE user_id = v_user_id
         GROUP BY lesson_id
     )
-    SELECT jsonb_object_agg(lesson_id, jsonb_build_object(
+    SELECT COALESCE(jsonb_object_agg(lesson_id, jsonb_build_object(
         'avgScore', avg_score,
         'bestScore', best_score,
         'attempts', attempts,
         'lastAttemptAt', last_at,
         'avgErrorRate', 100 - avg_score
-    )) INTO v_lesson_stats FROM test_agg;
+    )), '{}'::jsonb) INTO v_lesson_stats FROM test_agg;
 
-    -- 4. Иерархическая агрегация (statsMap)
+    -- 5. Иерархическая статистика (statsMap)
     IF array_length(p_subject_ids, 1) > 0 THEN
         FOR v_subj_id IN SELECT unnest(p_subject_ids) LOOP
-            FOR v_section IN SELECT jsonb_array_elements(COALESCE(data->'sections', '[]'::jsonb)) FROM public.subject_syllabus WHERE subject = v_subj_id LOOP
+            FOR v_section IN SELECT jsonb_array_elements(COALESCE(s.data->'sections', '[]'::jsonb)) FROM public.subject_syllabus s WHERE s.subject = v_subj_id LOOP
                 v_lessons_in_section := 0;
                 v_total_score_in_section := 0;
                 v_topics_in_section_completed := 0;
@@ -1011,7 +1024,7 @@ BEGIN
 
                     FOR v_lesson IN SELECT jsonb_array_elements(COALESCE(v_topic->'lessons', '[]'::jsonb)) LOOP
                         v_lesson_id := v_lesson->>'id';
-                        IF v_lesson_stats ? v_lesson_id THEN
+                        IF (v_lesson_stats ? v_lesson_id) THEN
                             v_lessons_in_topic := v_lessons_in_topic + 1;
                             v_total_score_in_topic := v_total_score_in_topic + (v_lesson_stats->v_lesson_id->>'avgScore')::int;
                         END IF;
@@ -1044,14 +1057,70 @@ BEGIN
         END LOOP;
     END IF;
 
+    -- 6. Агрегация по предметам
+    IF array_length(p_subject_ids, 1) > 0 THEN
+        FOR v_subj_id IN SELECT unnest(p_subject_ids) LOOP
+            SELECT COUNT(*) INTO v_lessons_in_topic 
+            FROM public.subject_syllabus s,
+                 jsonb_array_elements(COALESCE(s.data->'sections', '[]'::jsonb)) as sec,
+                 jsonb_array_elements(COALESCE(sec->'topics', '[]'::jsonb)) as top,
+                 jsonb_array_elements(COALESCE(top->'lessons', '[]'::jsonb)) as les
+            WHERE s.subject = v_subj_id;
+
+            SELECT 
+                COALESCE(COUNT(DISTINCT lesson_id), 0),
+                COALESCE(ROUND(AVG(score)), 0)
+            INTO v_lessons_in_section, v_topic_avg
+            FROM public.user_test_results
+            WHERE user_id = v_user_id AND lesson_id IN (
+                SELECT (les->>'id')
+                FROM public.subject_syllabus s,
+                     jsonb_array_elements(COALESCE(s.data->'sections', '[]'::jsonb)) as sec,
+                     jsonb_array_elements(COALESCE(sec->'topics', '[]'::jsonb)) as top,
+                     jsonb_array_elements(COALESCE(top->'lessons', '[]'::jsonb)) as les
+                WHERE s.subject = v_subj_id
+            );
+
+            v_subjects := v_subjects || jsonb_build_object(
+                'subjectId', v_subj_id,
+                'completedLessons', v_lessons_in_section,
+                'totalLessons', v_lessons_in_topic,
+                'progress', CASE WHEN v_lessons_in_topic > 0 THEN ROUND((v_lessons_in_section::float / v_lessons_in_topic::float) * 100) ELSE 0 END,
+                'avgScore', v_topic_avg
+            );
+        END LOOP;
+    END IF;
+
+    -- 7. Расчет общего количества уроков
+    IF array_length(p_subject_ids, 1) > 0 THEN
+        SELECT COALESCE(SUM((val->>'totalLessons')::int), 0) INTO v_total_lessons_sum 
+        FROM jsonb_array_elements(v_subjects) as val;
+    ELSE
+        SELECT COUNT(*) INTO v_total_lessons_sum 
+        FROM public.subject_syllabus s,
+             jsonb_array_elements(COALESCE(s.data->'sections', '[]'::jsonb)) as sec,
+             jsonb_array_elements(COALESCE(sec->'topics', '[]'::jsonb)) as top,
+             jsonb_array_elements(COALESCE(top->'lessons', '[]'::jsonb)) as les;
+    END IF;
+
+    -- Итоговый результат
     RETURN jsonb_build_object(
         'summary', jsonb_build_object(
-            'totalTests', COALESCE(v_summary.total_tests, 0),
-            'averageScore', COALESCE(v_summary.avg_score, 0),
-            'lessonsCompleted', COALESCE(v_summary.lessons_completed, 0),
-            'passRate', CASE WHEN v_summary.total_tests > 0 THEN ROUND((v_summary.passed_count::float / v_summary.total_tests::float) * 100) ELSE 0 END
+            'totalTests', v_total_tests,
+            'avgScore', v_avg_score,
+            'bestScore', v_best_score,
+            'completedLessons', v_lessons_completed,
+            'totalLessons', v_total_lessons_sum,
+            'passRate', CASE WHEN v_total_tests > 0 THEN ROUND((v_passed_count::float / v_total_tests::float) * 100) ELSE 0 END
         ),
-        'dynamics', COALESCE(v_dynamics, '[]'::jsonb),
+        'dynamics', v_dynamics,
+        'subjects', v_subjects,
+        'lessonStats', v_lesson_stats,
+        'statsMap', v_stats_map
+    );
+END;
+$$;
+        'subjects', v_subjects,
         'lessonStats', COALESCE(v_lesson_stats, '{}'::jsonb),
         'statsMap', v_stats_map
     );

@@ -101,40 +101,67 @@ export const classService = {
                 joined_at,
                 classes!inner (
                     id, name, created_at, branch_id, subject_id, teacher_id,
-                    branch:branches (id, name),
-                    teacher:profiles!classes_teacher_id_fkey (id, full_name, role)
+                    branch:branches (id, name)
                 )
             `)
             .eq('student_id', studentId);
         if (error) throw error;
 
-        const result = data.map(item => {
+        let result = data.map(item => {
             const cls = Array.isArray(item.classes) ? item.classes[0] : item.classes;
-            const th = Array.isArray(cls.teacher) ? cls.teacher[0] : cls.teacher;
             return {
                 ...cls,
-                teacher: th,
+                teacher: { id: cls.teacher_id, full_name: 'Поиск учителя...', role: null },
                 joinedAt: item.joined_at
             };
         });
 
-        const isProfileMissing = (p) => !p || Object.keys(p).length === 0 || !p.full_name;
-        const missingTeacherIds = result.filter(c => isProfileMissing(c.teacher) && c.teacher_id).map(c => c.teacher_id);
-
-        if (missingTeacherIds.length > 0) {
+        const teacherIds = [...new Set(result.map(c => c.teacher_id).filter(Boolean))];
+        
+        if (teacherIds.length > 0) {
             try {
-                const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
-                if (!rpcError && allProfiles) {
-                    result.forEach(c => {
-                        if (isProfileMissing(c.teacher) && c.teacher_id) {
-                            const prof = allProfiles.find(p => p.id === c.teacher_id);
-                            if (prof) {
-                                c.teacher = { id: prof.id, full_name: prof.full_name, role: prof.role, avatar_url: prof.avatar_url };
+                const { data: profiles, error: pError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, role, avatar_url, email')
+                    .in('id', teacherIds);
+                
+                if (!pError && profiles) {
+                    result = result.map(c => {
+                        let prof = profiles.find(p => p.id === c.teacher_id);
+                        if (prof) {
+                            // Если имя пустое, пробуем использовать почту или ID
+                            if (!prof.full_name?.trim()) {
+                                prof.full_name = prof.email?.split('@')[0] || `ID: ${prof.id.substring(0, 8)}`;
                             }
+                            return { ...c, teacher: prof };
                         }
+                        return c;
                     });
                 }
-            } catch (err) { console.error("Failed to fetch missing teachers via RPC:", err); }
+                
+                // RPC fallback для скрытых профилей
+                const stillMissing = result.some(c => !c.teacher?.full_name?.trim() || c.teacher?.full_name === 'Поиск учителя...');
+                if (stillMissing) {
+                    const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
+                    if (!rpcError && allProfiles) {
+                        result = result.map(c => {
+                            if (!c.teacher?.full_name?.trim() || c.teacher?.full_name === 'Поиск учителя...') {
+                                const prof = allProfiles.find(p => p.id === c.teacher_id);
+                                if (prof) {
+                                    let name = prof.full_name?.trim() || prof.email?.split('@')[0] || `ID: ${prof.id.substring(0, 8)}`;
+                                    return { ...c, teacher: { id: prof.id, full_name: name, role: prof.role, avatar_url: prof.avatar_url } };
+                                } else {
+                                    // Профиля вообще нет в БД
+                                    return { ...c, teacher: { id: c.teacher_id, full_name: `Учитель не найден (ID: ${c.teacher_id.substring(0, 5)}...)`, role: 'unknown' } };
+                                }
+                            }
+                            return c;
+                        });
+                    } else if (rpcError) {
+                        console.error("RPC Fallback Error:", rpcError);
+                    }
+                }
+            } catch (err) { console.error("Failed to fetch teachers:", err); }
         }
         return result;
     },
@@ -144,27 +171,48 @@ export const classService = {
             .from('classes')
             .select(`
                 id, name, description, invite_code, created_at, teacher_id, branch_id, subject_id,
-                branch:branches (id, name),
-                teacher:profiles!classes_teacher_id_fkey (id, full_name, avatar_url)
+                branch:branches (id, name)
             `)
             .eq('id', classId)
             .single();
         if (error) throw error;
         if (!data) return null;
         
-        if (Array.isArray(data.teacher)) data.teacher = data.teacher[0];
-
-        const isProfileMissing = (p) => !p || Object.keys(p).length === 0 || !p.full_name;
-        if (isProfileMissing(data.teacher) && data.teacher_id) {
+        if (data.teacher_id) {
             try {
-                const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
-                if (!rpcError && allProfiles) {
-                    const prof = allProfiles.find(p => p.id === data.teacher_id);
-                    if (prof) {
-                        data.teacher = { id: prof.id, full_name: prof.full_name, role: prof.role, avatar_url: prof.avatar_url };
+                const { data: prof, error: pError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url, role, email')
+                    .eq('id', data.teacher_id)
+                    .maybeSingle();
+                
+                if (!pError && prof && prof.full_name?.trim()) {
+                    data.teacher = prof;
+                } else if (!pError && prof && !prof.full_name?.trim()) {
+                    // Имя пустое, но профиль есть
+                    data.teacher = { 
+                        ...prof, 
+                        full_name: prof.email?.split('@')[0] || `ID: ${prof.id.substring(0, 8)}` 
+                    };
+                } else {
+                    // РПЦ фолбек
+                    const { data: allProfiles, error: rpcError } = await supabase.rpc('get_all_profiles');
+                    if (!rpcError && allProfiles) {
+                        const foundProf = allProfiles.find(p => p.id === data.teacher_id);
+                        if (foundProf) {
+                            let name = foundProf.full_name?.trim() || foundProf.email?.split('@')[0] || `ID: ${foundProf.id.substring(0, 8)}`;
+                            data.teacher = { 
+                                id: foundProf.id, 
+                                full_name: name, 
+                                role: foundProf.role, 
+                                avatar_url: foundProf.avatar_url 
+                            };
+                        } else {
+                            data.teacher = { id: data.teacher_id, full_name: `Учитель не найден (ID: ${data.teacher_id.substring(0, 5)}...)`, role: 'unknown' };
+                        }
                     }
                 }
-            } catch (err) { console.error("Failed to fetch teacher profile via RPC:", err); }
+            } catch (err) { console.error("Failed to fetch teacher profile:", err); }
         }
         return data;
     },
@@ -580,6 +628,22 @@ export const studentService = {
         const { data, error } = await supabase.from('user_test_results').select('*').eq('user_id', userId).eq('lesson_id', lessonId);
         if (error) throw error;
         return data || [];
+    },
+    async grantXP(amount, reason, subjectId = null, lessonId = null) {
+        if (!amount) return null;
+        const { data, error } = await supabase.rpc('grant_xp', {
+            p_amount: amount,
+            p_reason: reason,
+            p_subject_id: subjectId,
+            p_lesson_id: lessonId
+        });
+        if (error) throw error;
+        return data;
+    },
+    async refreshStreak() {
+        const { data, error } = await supabase.rpc('refresh_user_streak');
+        if (error) throw error;
+        return data;
     },
     async _getLessonNames(lessonIds) {
         if (!lessonIds.length) return {};

@@ -40,7 +40,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
     const [lockedQuestions, setLockedQuestions] = useState(new Set()); // Вопросы, заблокированные после перехода
 
     // Определяем режим учителя, чтобы не сохранять прогресс
-    const { isTeacher: rawIsTeacher, isAdmin } = useAuth();
+    const { isTeacher: rawIsTeacher, isAdmin, refreshProfile } = useAuth();
     const isTeacher = rawIsTeacher || isAdmin;
 
     // ТАЙМЕР ТЕСТА
@@ -352,6 +352,9 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
                 });
 
                 if (error) throw error;
+
+                // Синхронизируем XP в профиле
+                refreshProfile();
 
                 // Сбор монет в localStorage для мгновенного отображения
                 if (serverResults.isPassed) {

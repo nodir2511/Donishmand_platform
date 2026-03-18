@@ -116,14 +116,18 @@ const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonSta
                                 </p>
                             </div>
 
-                             {stats && !isTeacher && stats.avgScore !== null && (
-                                <div className="mr-2 text-right">
-                                    <div className="text-xl font-bold text-white leading-none">{100 - stats.avgScore}%</div>
-                                    <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
-                                        {lang === 'ru' ? 'ошибок' : 'хато'}
+                             {stats ? (
+                                stats.avgScore !== null && !isTeacher && (
+                                    <div className="mr-2 text-right">
+                                        <div className="text-xl font-bold text-white leading-none">{100 - stats.avgScore}%</div>
+                                        <div className="text-[10px] text-gaming-textMuted uppercase tracking-wider opacity-70">
+                                            {lang === 'ru' ? 'ошибок' : 'хато'}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )
+                            ) : (!isTeacher && !statsLoaded && (
+                                <Skeleton className="w-16 h-10 rounded-lg mr-2" />
+                            ))}
 
                             <ArrowRight className="text-white/20 group-hover:text-gaming-primary transition-colors shrink-0" />
                         </Link>
@@ -145,9 +149,13 @@ const SubjectPage = () => {
 
     // SWR: мгновенно показать кеш, затем обновить с сервера
     const [lessonStats, setLessonStats] = useState(() => getCachedStats());
+    const [statsLoaded, setStatsLoaded] = useState(false);
 
     useEffect(() => {
-        if (isTeacher || !profile) return;
+        if (isTeacher || !profile) {
+            setStatsLoaded(true);
+            return;
+        }
 
         let cancelled = false;
 
@@ -168,6 +176,8 @@ const SubjectPage = () => {
                 }
             } catch (err) {
                 console.error('Ошибка загрузки статистики предмета через RPC:', err);
+            } finally {
+                if (!cancelled) setStatsLoaded(true);
             }
         };
 

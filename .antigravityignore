@@ -1,0 +1,20 @@
+# Antigravity Ignore
+# Исключаем тяжелые или ненужные для анализа директории
+
+node_modules/
+dist/
+.git/
+.vscode/
+.agent/
+.gemini/
+
+# Временные скрипты и отчеты
+*.log
+npm-debug.log*
+check_db.js
+db_maintenance.js
+start_project.bat
+future_ideas.md
+
+# Статические ассеты (если они слишком тяжелые для индексации)
+public/

@@ -137,6 +137,10 @@ test_columns.js
 count_lines.js
 test_name.js
 test_rpc.mjs
+check_db.js
+db_maintenance.js
+start_project.bat
+future_ideas.md
 
 # AI Agent directories
 .agent/

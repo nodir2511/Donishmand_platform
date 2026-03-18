@@ -305,6 +305,13 @@
         "passwordMismatch": "Пароли не совпадают",
         "passwordTooShort": "Пароль должен содержать минимум 6 символов",
         "passwordError": "Ошибка при смене пароля",
-        "cluster": "Кластер обучения"
+        "cluster": "Кластер обучения",
+        "level": "Уровень"
+    },
+    "common": {
+        "days": "дн.",
+        "days_one": "день",
+        "days_few": "дня",
+        "days_many": "дней"
     }
 }

@@ -34,7 +34,16 @@ const LessonContentEditor = ({ lesson, onSave, onAutoSave, onClose, isSaving, au
         if (onAutoSave && debouncedContent && JSON.stringify(debouncedContent) !== JSON.stringify(lesson.content)) {
             onAutoSave(debouncedContent);
         }
-    }, [debouncedContent]);
+    }, [debouncedContent, onAutoSave, lesson.content]);
+
+    // Блокировка прокрутки фона
+    useEffect(() => {
+        const originalStyle = window.getComputedStyle(document.body).overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = originalStyle;
+        };
+    }, []);
 
     const handleTabChange = (tabId) => {
         setActiveTab(tabId);
@@ -50,7 +59,7 @@ const LessonContentEditor = ({ lesson, onSave, onAutoSave, onClose, isSaving, au
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm sm:p-4">
-            <div className="w-full max-w-4xl h-[90vh] sm:h-auto sm:max-h-[90vh] bg-gaming-card/95 backdrop-blur-xl rounded-t-3xl sm:rounded-3xl border border-white/10 overflow-hidden flex flex-col">
+            <div className="w-full max-w-7xl h-full max-h-[95vh] bg-gaming-card/95 backdrop-blur-xl rounded-t-3xl sm:rounded-3xl border border-white/10 overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/10 shrink-0">
                     <div className="flex flex-col">

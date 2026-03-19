@@ -134,6 +134,29 @@ CREATE TABLE IF NOT EXISTS public.topic_grades (
     UNIQUE(student_id, class_id, topic_id)
 );
 
+-- RLS для topic_grades
+ALTER TABLE public.topic_grades ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Students can view own grades" ON public.topic_grades;
+CREATE POLICY "Students can view own grades" ON public.topic_grades
+    FOR SELECT USING (auth.uid() = student_id);
+
+DROP POLICY IF EXISTS "Teachers can manage class grades" ON public.topic_grades;
+CREATE POLICY "Teachers can manage class grades" ON public.topic_grades
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM public.classes c
+            WHERE c.id = topic_grades.class_id
+            AND (c.teacher_id = auth.uid() OR EXISTS (
+                SELECT 1 FROM public.class_teachers ct WHERE ct.class_id = c.id AND ct.teacher_id = auth.uid()
+            ))
+        )
+    );
+
+DROP POLICY IF EXISTS "Admins can manage all grades" ON public.topic_grades;
+CREATE POLICY "Admins can manage all grades" ON public.topic_grades
+    FOR ALL USING (public.is_admin_or_above());
+
 -- 1.11 NOTIFICATIONS (Персональные уведомления)
 CREATE TABLE IF NOT EXISTS public.notifications (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -285,13 +308,20 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_my_profile() TO authenticated;
 
 -- 4.2 Получение ВСЕХ профилей (для AdminPage, обход RLS)
+-- Доступно только учителям и выше (защита персональных данных)
 CREATE OR REPLACE FUNCTION public.get_all_profiles()
 RETURNS SETOF public.profiles
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT * FROM public.profiles ORDER BY updated_at DESC NULLS LAST;
+BEGIN
+    IF NOT public.is_teacher_or_above() THEN
+        RAISE EXCEPTION 'Недостаточно прав для просмотра всех профилей';
+    END IF;
+    
+    RETURN QUERY SELECT * FROM public.profiles ORDER BY updated_at DESC NULLS LAST;
+END;
 $$;
 GRANT EXECUTE ON FUNCTION public.get_all_profiles() TO authenticated;
 
@@ -510,6 +540,7 @@ DECLARE
     v_subject_id TEXT;
     v_bonus_coins INT := 0;
     v_bonus_xp INT := 0;
+    v_fast_q_total INT := 0;
     i INT;
 BEGIN
     v_user_id := auth.uid();

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { X, CheckCircle, XCircle, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Lock } from 'lucide-react';
-import { utilsService } from '../../services/apiService';
+import { X, CheckCircle, XCircle, ChevronLeft, ChevronRight, RotateCcw, AlertTriangle, Lock, Clock } from 'lucide-react';
+import { utilsService, cleanUndefined } from '../../services/apiService';
 const { renderKatex, shuffleArray } = utilsService;
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,23 +10,6 @@ import NumericQuestion from './questions/NumericQuestion';
 import TestResultsScreen from './questions/TestResultsScreen';
 import ComponentErrorBoundary from '../common/ComponentErrorBoundary';
 import { useEngagementTimer } from '../../hooks/useEngagementTimer';
-import { Clock } from 'lucide-react';
-
-// Очистка объекта от undefined (PostgREST падает с ошибкой 400, если есть undefined)
-// Сохраняем Date объекты нетронутыми
-const cleanUndefined = (obj) => {
-    if (obj === undefined) return null;
-    if (obj === null || typeof obj !== 'object') return obj;
-    if (obj instanceof Date) return obj;
-    if (Array.isArray(obj)) return obj.map(cleanUndefined);
-    const result = {};
-    for (const key in obj) {
-        if (Object.prototype.hasOwnProperty.call(obj, key)) {
-            result[key] = cleanUndefined(obj[key]);
-        }
-    }
-    return result;
-};
 
 const PASS_THRESHOLD = 80;
 

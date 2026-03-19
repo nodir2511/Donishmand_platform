@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Book, ArrowRight, ArrowLeft } from 'lucide-react';
-import { CardSkeleton } from '../common/Skeleton';
+import { CardSkeleton, Skeleton } from '../common/Skeleton';
 import { SUBJECT_NAMES } from '../../constants/data';
 import CourseLayout from '../layout/CourseLayout';
 import { useTranslation } from 'react-i18next';
@@ -36,7 +36,7 @@ const getEntityStats = (entityId, statsMap) => {
 };
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonStats }) => {
+const SubjectContent = ({ subjectId, subjectName, isTeacher, navigate, lessonStats, statsLoaded }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
@@ -193,6 +193,7 @@ const SubjectPage = () => {
                 isTeacher={isTeacher}
                 navigate={navigate}
                 lessonStats={lessonStats}
+                statsLoaded={statsLoaded}
             />
         </CourseLayout>
     );

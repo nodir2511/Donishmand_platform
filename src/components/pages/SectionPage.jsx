@@ -35,7 +35,7 @@ const getEntityStats = (entityId, statsMap) => {
 };
 
 // Внутренний компонент — имеет доступ к SyllabusContext через CourseLayout
-const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats }) => {
+const SectionContent = ({ subjectId, sectionId, isTeacher, navigate, lessonStats, statsLoaded }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.resolvedLanguage || 'ru';
     const { subjectData, loading } = useSyllabus();
@@ -203,6 +203,7 @@ const SectionPage = () => {
                 isTeacher={isTeacher}
                 navigate={navigate}
                 lessonStats={lessonStats}
+                statsLoaded={statsLoaded}
             />
         </CourseLayout>
     );

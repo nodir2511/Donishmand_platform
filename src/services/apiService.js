@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import katex from 'katex';
+import { SYLLABUS_FALLBACK } from '../constants/syllabus';
 
 // ==========================================
 // Общие утилиты
@@ -337,7 +338,47 @@ export const classService = {
             averageGrade: 0,
             testsPassed: 0
         }));
+    },
+    async getLessonNames(lessonIds) {
+        if (!lessonIds || lessonIds.length === 0) return {};
+        const { data, error } = await supabase.from('lessons').select('id, title_ru, title_tj').in('id', lessonIds);
+        if (error) throw error;
+        const names = {}; data.forEach(l => names[l.id] = l.title_ru || l.title_tj || l.id);
+        return names;
     }
+};
+
+/**
+ * Поиск урока в резервном плане (fallback).
+ */
+const findLessonInFallback = (lessonId) => {
+    for (const subject of Object.keys(SYLLABUS_FALLBACK)) {
+        const syllabus = SYLLABUS_FALLBACK[subject];
+        for (const section of syllabus.sections) {
+            for (const topic of section.topics) {
+                const lesson = topic.lessons.find(l => l.id === lessonId);
+                if (lesson) {
+                    return {
+                        id: lesson.id,
+                        title_ru: lesson.title,
+                        title_tj: lesson.titleTj || lesson.title,
+                        subject,
+                        content_ru: { 
+                            video: lesson.type === 'video' ? { url: '' } : undefined,
+                            text: lesson.type === 'text' ? { bodyRu: 'Контент восстанавливается...' } : undefined,
+                            test: { questions: [] }
+                        },
+                        content_tj: { 
+                            video: lesson.type === 'video' ? { url: '' } : undefined,
+                            text: lesson.type === 'text' ? { bodyTj: 'Контент восстанавливается...' } : undefined,
+                            test: { questions: [] }
+                        }
+                    };
+                }
+            }
+        }
+    }
+    return null;
 };
 
 // ==========================================
@@ -512,9 +553,23 @@ export const syllabusService = {
         if (syllabusCache.structures[subject]) return syllabusCache.structures[subject];
         const { data, error } = await supabase.from('subject_syllabus').select('data').eq('subject', subject).maybeSingle();
         if (error) throw error;
-        if (!data) return null;
-        syllabusCache.structures[subject] = data.data;
-        return data.data;
+        if (!data || !data.data) {
+            const empty = { sections: [] };
+            syllabusCache.structures[subject] = empty;
+            return empty;
+        }
+
+        // Гарантируем наличие поля sections, даже если в БД лежит пустой объект
+        let result = { sections: [], ...data.data };
+
+        // FALLBACK: Если в базе пусто (нет разделов), но у нас есть данные в коде - берем их
+        if (result.sections.length === 0 && SYLLABUS_FALLBACK[subject]) {
+            console.log(`[apiService] Используется FALLBACK для предмета: ${subject}`);
+            result = SYLLABUS_FALLBACK[subject];
+        }
+
+        syllabusCache.structures[subject] = result;
+        return result;
     },
     async saveLesson(lesson, subject) {
         const { contentRu, contentTj } = splitContent(lesson.content);
@@ -540,9 +595,18 @@ export const syllabusService = {
     async getLesson(lessonId, lang = null) {
         const columns = lang === 'ru' ? 'id, title_ru, title_tj, subject, content_ru' : lang === 'tj' ? 'id, title_ru, title_tj, subject, content_tj' : '*';
         const { data, error } = await supabase.from('lessons').select(columns).eq('id', lessonId).single();
-        if (error) { if (error.code === 'PGRST116') return null; throw error; }
-        let content = lang ? (wrapSingleLangContent(lang === 'ru' ? data.content_ru : data.content_tj, lang)) : mergeContent(data.content_ru, data.content_tj);
-        return { id: data.id, title: data.title_ru, titleTj: data.title_tj, content, subject: data.subject };
+        
+        let finalData = data;
+        if (error || !data) {
+            if (error && error.code !== 'PGRST116') throw error;
+            // FALLBACK: Если урока нет в БД, ищем в коде
+            finalData = findLessonInFallback(lessonId);
+            if (!finalData) return null;
+            console.log(`[apiService] Используется FALLBACK для урока: ${lessonId}`);
+        }
+
+        let content = lang ? (wrapSingleLangContent(lang === 'ru' ? finalData.content_ru : finalData.content_tj, lang)) : mergeContent(finalData.content_ru, finalData.content_tj);
+        return { id: finalData.id, title: finalData.title_ru, titleTj: finalData.title_tj, content, subject: finalData.subject };
     }
 };
 

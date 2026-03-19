@@ -66,27 +66,37 @@ const CreatorPage = () => {
         // Пропускаем начальную загрузку или пустой объект
         if (!debouncedSyllabus) return;
         // Не сохраняем в облако, пока не загрузили актуальные данные из Supabase
-        if (!isCloudLoaded.current) return;
+        if (!debouncedSyllabus || !selectedSubject) return;
+        
+        // КРИТИЧЕСКАЯ ЗАЩИТА: Не сохраняем в облако, пока не подтверждена загрузка ИЗ облака
+        // Это предотвращает затирание базы данных пустым стейтом при первом входе.
+        if (!isCloudLoaded.current) {
+            console.log('[CreatorPage] Автосохранение пропущено: облако еще не загружено');
+            return;
+        }
 
-        const syncToCloud = async () => {
-            setSaveStatus('saving');
+        const saveToCloud = async () => {
             try {
-                // Сохраняем структуру для ТЕКУЩЕГО предмета.
-                // Мы исходим из того, что пользователь редактирует только выбранный предмет.
-
-                if (debouncedSyllabus[selectedSubject]) {
-                    await syllabusService.saveStructure(selectedSubject, debouncedSyllabus[selectedSubject]);
-                    // Сбрасываем кеш, чтобы навигационные страницы загрузили свежие данные
-                    invalidateSyllabusCache(selectedSubject);
+                // Если структура абсолютно пустая (нет разделов), 
+                // мы тоже не хотим её сохранять автоматически, если только пользователь явно не удалил всё.
+                const currentData = debouncedSyllabus[selectedSubject];
+                if (!currentData || !currentData.sections || currentData.sections.length === 0) {
+                    console.log('[CreatorPage] Автосохранение пропущено: пустая структура');
+                    return;
                 }
+
+                setSaveStatus('saving');
+                await syllabusService.saveStructure(selectedSubject, currentData);
+                // Сбрасываем кеш, чтобы навигационные страницы загрузили свежие данные
+                invalidateSyllabusCache(selectedSubject);
                 setSaveStatus('saved');
             } catch (error) {
-                console.error('Ошибка авто-сохранения:', error);
+                console.error('Ошибка автосохранения структуры:', error);
                 setSaveStatus('error');
             }
         };
 
-        syncToCloud();
+        saveToCloud();
     }, [debouncedSyllabus, selectedSubject]);
     // --- ЛОГИКА АВТО-СОХРАНЕНИЯ КОНЕЦ ---
 
@@ -168,7 +178,13 @@ const CreatorPage = () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(syllabus));
     }, [syllabus]);
 
-    const currentSubjectSyllabus = useMemo(() => syllabus[selectedSubject] || { sections: [] }, [syllabus, selectedSubject]);
+    const currentSubjectSyllabus = useMemo(() => {
+        const entry = syllabus[selectedSubject];
+        if (entry && Array.isArray(entry.sections)) {
+            return entry;
+        }
+        return { sections: [] };
+    }, [syllabus, selectedSubject]);
 
     const toggleSection = useCallback((sectionId) => setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] })), []);
     const toggleTopic = useCallback((topicId) => setExpandedTopics(prev => ({ ...prev, [topicId]: !prev[topicId] })), []);
@@ -501,23 +517,29 @@ const CreatorPage = () => {
     // --- СИНХРОНИЗАЦИЯ С ОБЛАКОМ (ЗАГРУЗКА) ---
     useEffect(() => {
         const loadFromCloud = async () => {
-            // Блокируем auto-save на время загрузки из облака
             isCloudLoaded.current = false;
             try {
                 setSaveStatus('saving');
-
+                console.log(`[CreatorPage] Загрузка структуры для: ${selectedSubject}`);
                 const cloudData = await syllabusService.getStructure(selectedSubject);
+                
                 if (cloudData) {
+                    console.log(`[CreatorPage] Данные получены:`, cloudData);
+                    // Гарантируем, что даже если в стейте что-то пойдет не так, мы получим объект с sections
+                    const sanitizedData = { 
+                        sections: Array.isArray(cloudData.sections) ? cloudData.sections : [] 
+                    };
+
                     setSyllabus(prev => ({
                         ...prev,
-                        [selectedSubject]: cloudData // В БД лежит объект { sections: [...] }
+                        [selectedSubject]: sanitizedData
                     }));
                 }
                 setSaveStatus('saved');
             } catch (error) {
-                console.error('Ошибка загрузки данных:', error);
+                console.error('Ошибка загрузки данных из облака:', error);
+                setSaveStatus('error');
             } finally {
-                // Разрешаем auto-save только после успешной загрузки из облака
                 isCloudLoaded.current = true;
             }
         };
@@ -803,7 +825,8 @@ const CreatorPage = () => {
             </div>
 
             {/* Область контента */}
-            <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
+            <ComponentErrorBoundary>
+                <div className="bg-gaming-card/40 backdrop-blur-xl border border-white/5 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <h2 className="text-xl font-semibold flex items-center gap-2">
                         <Layers className="text-gaming-primary" size={24} />
@@ -1090,6 +1113,7 @@ const CreatorPage = () => {
                     </div>
                 </div>
             )}
+            </ComponentErrorBoundary>
         </div>
     );
 };

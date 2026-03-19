@@ -12,7 +12,7 @@ import {
     CheckCircle2,
     Calendar
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+
 
 const AdminNotificationsTab = () => {
     // Состояние формы
@@ -291,27 +291,22 @@ const AdminNotificationsTab = () => {
                             </div>
 
                             {/* Статус */}
-                            <AnimatePresence>
-                                {status.message && (
-                                    <motion.div
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className={`flex items-center gap-2 p-3 rounded-xl ${
-                                            status.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                        }`}
-                                    >
-                                        {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-                                        <span className="text-sm font-medium">{status.message}</span>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                            {status.message && (
+                                <div
+                                    className={`flex items-center gap-2 p-3 rounded-xl animate-fade-in-up ${
+                                        status.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    }`}
+                                >
+                                    {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                                    <span className="text-sm font-medium">{status.message}</span>
+                                </div>
+                            )}
 
                             {/* Кнопка отправки */}
                             <button
                                 type="submit"
                                 disabled={sending || !isFormValid}
-                                className="w-full py-4 bg-gradient-to-r from-gaming-primary via- gaming-accent to-pink-500 text-white rounded-xl font-bold shadow-xl shadow-gaming-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3 mt-4"
+                                className="w-full py-4 bg-gradient-to-r from-gaming-primary via-gaming-accent to-pink-500 text-white rounded-xl font-bold shadow-xl shadow-gaming-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-3 mt-4"
                             >
                                 {sending ? (
                                     <Loader2 className="animate-spin" size={20} />

@@ -1,7 +1,7 @@
 {
   "name": "donishmand-platform",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.3",
   "type": "module",
   "homepage": "https://github.com/nodir2511/Donishmand_platform",
   "scripts": {

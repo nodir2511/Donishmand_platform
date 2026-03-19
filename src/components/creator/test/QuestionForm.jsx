@@ -172,7 +172,7 @@ const QuestionForm = ({ question: initialQuestion, onSave, onCancel }) => {
     }, []);
 
     return (
-        <div className="flex flex-col w-[95%] h-[90vh] bg-gaming-card mx-auto rounded-3xl border border-white/10 shadow-2xl overflow-hidden relative">
+        <div className="flex flex-col w-full max-w-7xl h-full max-h-[95vh] bg-gaming-card mx-auto rounded-3xl border border-white/10 shadow-2xl overflow-hidden relative">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 bg-black/20">
                 <h3 className="text-lg font-bold text-gaming-primary flex items-center gap-2">

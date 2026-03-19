@@ -46,9 +46,23 @@ const TestResultsScreen = ({
                                 <h2 className="text-3xl font-bold mb-2 text-green-400">
                                     {lang === 'ru' ? 'Тест сдан!' : 'Тест супорида шуд!'}
                                 </h2>
-                                <p className="text-green-300/80 mb-2">
-                                    {lang === 'ru' ? '+3 монеты в копилку' : '+3 танга ба хазина'}
-                                </p>
+                                <div className="space-y-1 mb-4">
+                                    <p className="text-green-300/80">
+                                        {lang === 'ru' ? '+3 монеты и 50 XP' : '+3 танга ва 50 XP'}
+                                    </p>
+                                    {results.bonus_coins > 0 && (
+                                        <p className="text-yellow-400 font-bold text-sm animate-pulse flex items-center justify-center gap-1">
+                                            <span>⚡</span>
+                                            {lang === 'ru' ? `+${results.bonus_coins} монета за скорость!` : `+${results.bonus_coins} танга барои суръат!`}
+                                        </p>
+                                    )}
+                                    {results.bonus_xp > 0 && (
+                                        <p className="text-cyan-400 font-bold text-sm animate-pulse flex items-center justify-center gap-1">
+                                            <span>🚀</span>
+                                            {lang === 'ru' ? `+${results.bonus_xp} XP за скорость!` : `+${results.bonus_xp} XP барои суръат!`}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </>
                     ) : (
@@ -82,7 +96,7 @@ const TestResultsScreen = ({
 
                 {/* Детали ответов */}
                 <div className="p-6 overflow-y-auto flex-1 space-y-4">
-                    {results.details.map((detail, idx) => {
+                    {(results.details || []).map((detail, idx) => {
                         const isCorrect = detail.isCorrect ?? detail.is_correct ?? false;
                         const q = detail.question || {};
 

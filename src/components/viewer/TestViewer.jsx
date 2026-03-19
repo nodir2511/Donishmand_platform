@@ -127,7 +127,7 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         };
     }, [swapUnansweredQuestions, showResults]);
     // --- НОВЫЙ АНТИЧИТ КОНЕЦ ---
-    
+
     // Блокировка прокрутки фона
     useEffect(() => {
         document.body.style.overflow = 'hidden';
@@ -421,6 +421,29 @@ const TestViewer = ({ questions, lessonId, lang, onClose, onComplete }) => {
         setShowResults(false);
         setTestVersion(v => v + 1); // Перемешиваем заново при перезапуске
     }, [progressKey]);
+
+    // ОБРАБОТКА ENTER ДЛЯ ПРОВЕРКИ/ДАЛЕЕ
+    useEffect(() => {
+        const handleGlobalKeyDown = (e) => {
+            // Если нажата клавиша Enter и мы не на экране результатов
+            if (e.key === 'Enter' && !showResults && !isSubmitting) {
+                // Проверяем, не нажат ли Shift/Ctrl (чтобы не мешать другим сочетаниям)
+                if (e.shiftKey || e.ctrlKey || e.altKey) return;
+
+                // Предотвращаем стандартное действие (например, если фокус на другом элементе)
+                e.preventDefault();
+
+                if (currentIndex < totalQuestions - 1) {
+                    goNext();
+                } else {
+                    handleSubmit();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, [currentIndex, totalQuestions, showResults, isSubmitting, lang, goNext, handleSubmit]);
 
     // Получить текст вопроса в зависимости от языка (с поддержкой KaTeX-формул)
     const getQuestionText = useCallback((q) => {

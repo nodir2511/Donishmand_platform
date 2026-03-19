@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   subject text,
   language text DEFAULT 'tj',
   cluster_id integer,
-  selected_subjects text[] DEFAULT '{}'
+  selected_subjects text[] DEFAULT '{}',
+  fast_q_count integer DEFAULT 0
 );
 
 -- 1.2 BRANCHES (Филиалы)
@@ -133,6 +134,34 @@ CREATE TABLE IF NOT EXISTS public.topic_grades (
     UNIQUE(student_id, class_id, topic_id)
 );
 
+-- 1.11 NOTIFICATIONS (Персональные уведомления)
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    type text NOT NULL, -- 'test_checked', 'new_lesson', 'achievement', 'admin', 'system'
+    title_ru text NOT NULL,
+    title_tj text NOT NULL,
+    message_ru text,
+    message_tj text,
+    is_read boolean DEFAULT false,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamptz DEFAULT now()
+);
+
+-- 1.12 ANNOUNCEMENTS (Глобальные и групповые анонсы)
+CREATE TABLE IF NOT EXISTS public.announcements (
+    id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+    type text NOT NULL DEFAULT 'global', -- 'global', 'class', 'branch'
+    target_id uuid, -- NULL для global, ID класса или филиала
+    title_ru text NOT NULL,
+    title_tj text NOT NULL,
+    content_ru text NOT NULL,
+    content_tj text NOT NULL,
+    created_by uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+    expires_at timestamptz,
+    created_at timestamptz DEFAULT now()
+);
+
 
 -- ========================================================================================
 -- 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ (RPC)
@@ -149,6 +178,31 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- 2.3 Функция отправки уведомлений (RPC)
+CREATE OR REPLACE FUNCTION public.send_notification(
+    p_user_id uuid,
+    p_type text,
+    p_title_ru text,
+    p_title_tj text,
+    p_message_ru text DEFAULT NULL,
+    p_message_tj text DEFAULT NULL,
+    p_metadata jsonb DEFAULT '{}'::jsonb
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_id uuid;
+BEGIN
+    INSERT INTO public.notifications (user_id, type, title_ru, title_tj, message_ru, message_tj, metadata)
+    VALUES (p_user_id, p_type, p_title_ru, p_title_tj, p_message_ru, p_message_tj, p_metadata)
+    RETURNING id INTO v_id;
+    RETURN v_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.send_notification TO authenticated;
 
 -- Проверка: Суперадмин (обходит RLS)
 CREATE OR REPLACE FUNCTION public.is_super_admin()
@@ -454,14 +508,19 @@ DECLARE
     v_correct_value TEXT;
     v_correct_matches JSONB;
     v_subject_id TEXT;
+    v_bonus_coins INT := 0;
+    v_bonus_xp INT := 0;
     i INT;
 BEGIN
     v_user_id := auth.uid();
+    -- Очистка p_lesson_id (если прилетает с кавычками)
+    p_lesson_id := trim('"' from p_lesson_id::text);
+    
     v_total_questions := jsonb_array_length(p_question_ids);
     IF v_total_questions IS NULL OR v_total_questions = 0 THEN RAISE EXCEPTION 'No questions provided for evaluation'; END IF;
 
     SELECT content_ru, subject INTO v_lesson_content, v_subject_id FROM public.lessons WHERE id = p_lesson_id;
-    IF v_lesson_content IS NULL THEN RAISE EXCEPTION 'Lesson not found'; END IF;
+    IF v_lesson_content IS NULL THEN RAISE EXCEPTION 'Lesson not found: %', p_lesson_id; END IF;
 
     v_test_questions := v_lesson_content->'test'->'questions';
     IF v_test_questions IS NULL OR jsonb_array_length(v_test_questions) = 0 THEN RAISE EXCEPTION 'Test questions not found for this lesson'; END IF;
@@ -512,10 +571,39 @@ BEGIN
             -- Начисляем XP (50 XP за тест по плану)
             PERFORM public.grant_xp(50, 'test_passed', v_subject_id, p_lesson_id);
         END IF;
+
+        -- Бонусы за скорость (Этап 3 - Новые правила)
+        -- Среднее время на вопрос <= 5 секунд
+        IF p_time_spent > 0 AND (p_time_spent::numeric / v_total_questions::numeric) <= 5 THEN
+            -- +1 монета за каждый быстрый вопрос
+            v_bonus_coins := v_total_questions;
+            INSERT INTO public.coin_transactions (user_id, amount, reason, subject_id, lesson_id) 
+            VALUES (v_user_id, v_bonus_coins, 'speed_bonus_per_q', v_subject_id, p_lesson_id);
+            
+            -- Накопительный бонус XP за каждые 10 быстрых вопросов
+            UPDATE public.profiles 
+            SET fast_q_count = COALESCE(fast_q_count, 0) + v_total_questions,
+                updated_at = now()
+            WHERE id = v_user_id
+            RETURNING fast_q_count INTO v_fast_q_total;
+
+            -- Проверяем, перешагнули ли мы порог в 10 вопросов
+            IF (v_fast_q_total / 10) > ((v_fast_q_total - v_total_questions) / 10) THEN
+                v_bonus_xp := 2 * ((v_fast_q_total / 10) - ((v_fast_q_total - v_total_questions) / 10));
+                PERFORM public.grant_xp(v_bonus_xp, 'speed_bonus_cumulative_10', v_subject_id, p_lesson_id);
+            END IF;
+        END IF;
     END IF;
 
     RETURN jsonb_build_object(
-        'score', v_score, 'correct', v_correct_count, 'total', v_total_questions, 'isPassed', v_is_passed, 'details', v_details
+        'score', v_score, 
+        'correct', v_correct_count, 
+        'total', v_total_questions, 
+        'isPassed', v_is_passed, 
+        'bonus_coins', v_bonus_coins,
+        'bonus_xp', v_bonus_xp,
+        'details', v_details,
+        'time_spent_seconds', p_time_spent
     );
 END;
 $$;
@@ -731,10 +819,60 @@ BEGIN
                 ELSE public.topic_grades.teacher_id 
             END,
             updated_at = now();
+
+        -- ОТПРАВКА УВЕДОМЛЕНИЯ УЧЕНИКУ
+        PERFORM public.send_notification(
+            (v_item->>'student_id')::uuid,
+            'test_checked',
+            'Выставлена оценка за тему',
+            'Баҳои мавзӯъ гузошта шуд',
+            'Учитель проверил ваши работы по теме: ' || p_topic_id,
+            'Муаллим корҳои шуморо аз рӯи мавзӯи ' || p_topic_id || ' санҷид',
+            jsonb_build_object('class_id', p_class_id, 'topic_id', p_topic_id)
+        );
     END LOOP;
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.save_topic_grades(uuid, text, JSONB) TO authenticated;
+
+
+-- 4.14 Массовая рассылка уведомлений (RPC для админов)
+CREATE OR REPLACE FUNCTION public.send_mass_notification(
+    p_targets text, -- 'all', 'branch', 'class'
+    p_target_id uuid, -- NULL для 'all', ID класса. Для branch используем p_target_val
+    p_target_val text, -- Название филиала
+    p_type text,
+    p_title_ru text,
+    p_title_tj text,
+    p_message_ru text,
+    p_message_tj text,
+    p_metadata jsonb DEFAULT '{}'::jsonb
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    IF NOT public.is_teacher_or_above() THEN RAISE EXCEPTION 'Недостаточно прав'; END IF;
+
+    IF p_targets = 'all' THEN
+        INSERT INTO public.notifications (user_id, type, title_ru, title_tj, message_ru, message_tj, metadata)
+        SELECT id, p_type, p_title_ru, p_title_tj, p_message_ru, p_message_tj, p_metadata
+        FROM public.profiles;
+    ELSIF p_targets = 'branch' AND p_target_val IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, type, title_ru, title_tj, message_ru, message_tj, metadata)
+        SELECT id, p_type, p_title_ru, p_title_tj, p_message_ru, p_message_tj, p_metadata
+        FROM public.profiles
+        WHERE branch = p_target_val;
+    ELSIF p_targets = 'class' AND p_target_id IS NOT NULL THEN
+        INSERT INTO public.notifications (user_id, type, title_ru, title_tj, message_ru, message_tj, metadata)
+        SELECT student_id, p_type, p_title_ru, p_title_tj, p_message_ru, p_message_tj, p_metadata
+        FROM public.class_members
+        WHERE class_id = p_target_id;
+    END IF;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.send_mass_notification TO authenticated;
 
 
 -- ========================================================================================
@@ -768,6 +906,8 @@ ALTER TABLE public.user_lesson_progress ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_test_results ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.coin_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.topic_grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 
 -- Подстраховка для контент-таблиц (создавались в других скриптах, но мы страхуем их политики)
 DO $$
@@ -798,6 +938,19 @@ CREATE POLICY "Admins can insert profiles" ON public.profiles FOR INSERT WITH CH
 -- 5.2 BRANCHES (Филиалы)
 -- ----------------------------------------------------------------------------------------
 CREATE POLICY "Everyone can view branches" ON public.branches FOR SELECT USING (true);
+
+-- 5.11 NOTIFICATIONS (Уведомления)
+CREATE POLICY "Users can view own notifications" ON public.notifications
+    FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON public.notifications
+    FOR UPDATE USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- 5.12 ANNOUNCEMENTS (Анонсы)
+CREATE POLICY "Everyone can view active announcements" ON public.announcements
+    FOR SELECT USING (expires_at IS NULL OR expires_at > now());
+CREATE POLICY "Admins can manage announcements" ON public.announcements
+    FOR ALL USING (public.is_teacher_or_above());
 CREATE POLICY "Admins can manage branches" ON public.branches FOR ALL USING (is_admin_or_above());
 
 -- ----------------------------------------------------------------------------------------

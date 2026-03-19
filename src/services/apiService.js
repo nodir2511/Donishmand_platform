@@ -1001,6 +1001,122 @@ export const tripleGradingService = {
     }
 };
 
+// ==========================================
+// 7. СЕРВИС УВЕДОМЛЕНИЙ (notificationService)
+// ==========================================
+export const notificationService = {
+    async getNotifications(limit = 20) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+        
+        const { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+            
+        if (error) throw error;
+        return data || [];
+    },
+
+    async markAsRead(notificationId) {
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('id', notificationId);
+            
+        if (error) throw error;
+        return true;
+    },
+
+    async markAllAsRead() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return false;
+
+        const { error } = await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+            
+        if (error) throw error;
+        return true;
+    },
+
+    async getUnreadCount() {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return 0;
+
+        const { count, error } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('is_read', false);
+            
+        if (error) throw error;
+        return count || 0;
+    },
+
+    async getAnnouncements() {
+        // Получаем активные анонсы
+        const { data, error } = await supabase
+            .from('announcements')
+            .select('*')
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+            .order('created_at', { ascending: false });
+            
+        if (error) throw error;
+        return data || [];
+    },
+
+    // Метод для создания уведомления
+    async createNotification(payload) {
+        const { data, error } = await supabase
+            .from('notifications')
+            .insert([payload])
+            .select()
+            .single();
+            
+        if (error) throw error;
+        return data;
+    },
+
+    // Массовая рассылка (RPC)
+    async sendMassNotification(payload) {
+        const { error } = await supabase.rpc('send_mass_notification', {
+            p_targets: payload.targets, // 'all', 'branch', 'class'
+            p_target_id: payload.targetId || null,
+            p_target_val: payload.targetVal || null,
+            p_type: payload.type || 'admin',
+            p_title_ru: payload.titleRu,
+            p_title_tj: payload.titleTj,
+            p_message_ru: payload.messageRu,
+            p_message_tj: payload.messageTj,
+            p_metadata: payload.metadata || {}
+        });
+        if (error) throw error;
+        return true;
+    },
+
+    // Создание анонса (баннера)
+    async createAnnouncement(payload) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const { data, error } = await supabase
+            .from('announcements')
+            .insert([{
+                ...payload,
+                created_by: user?.id
+            }])
+            .select()
+            .single();
+            
+        if (error) throw error;
+        return data;
+    }
+};
+
 // Единый экспорт для удобства
 export default {
     branchService,
@@ -1012,5 +1128,6 @@ export default {
     storageService,
     utilsService,
     tripleGradingService,
+    notificationService,
     cleanUndefined
 };

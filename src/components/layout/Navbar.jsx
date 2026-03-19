@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../contexts/AuthContext';
 import UserAvatar from '../common/UserAvatar';
 import { calculateLevelInfo } from '../features/LevelProgressBar';
+import NotificationBell from '../features/NotificationBell';
+import AnnouncementBanner from './AnnouncementBanner';
 
 const Navbar = () => {
     const { t, i18n } = useTranslation();
@@ -75,6 +77,7 @@ const Navbar = () => {
 
     return (
         <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-gaming-bg/80 backdrop-blur-xl border-b border-white/5 py-3' : 'bg-transparent py-6'}`}>
+            <AnnouncementBanner />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center">
                     {/* Логотип */}
@@ -184,6 +187,8 @@ const Navbar = () => {
                             );
                         })()}
 
+                        {user && <NotificationBell />}
+
                         <div className="hidden md:block">
                             {user ? (
                                 <div className="relative" ref={profileMenuRef}>
@@ -265,6 +270,9 @@ const Navbar = () => {
                                     <div className="text-xs text-gaming-textMuted uppercase tracking-wider">
                                         {getRoleName(profile?.role)}
                                     </div>
+                                </div>
+                                <div className="ml-auto flex items-center gap-2">
+                                    <NotificationBell />
                                 </div>
 
                                 {/* Мобильный прогресс уровня */}

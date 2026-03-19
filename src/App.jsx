@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
 import HomePage from './components/pages/HomePage';
+import WhatsNewModal from './components/common/WhatsNewModal';
 
 // Обёртка для React.lazy() с автоматическим перезапуском при ошибке загрузки чанка.
 // После нового деплоя хеши файлов меняются, и старые ссылки возвращают 404.
@@ -72,6 +73,7 @@ function AppContent() {
     return (
         <div className="min-h-screen bg-gaming-bg font-sans text-white selection:bg-gaming-pink/30 selection:text-white overflow-hidden flex flex-col">
             <Navbar />
+            <WhatsNewModal />
 
             <main className="flex-grow pt-24">
                 <Suspense fallback={<PageLoader />}>
